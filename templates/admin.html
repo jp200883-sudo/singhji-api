@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Singh Ji AI Ultra v4.0 — Admin</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Segoe UI', sans-serif; 
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #fff; min-height: 100vh; padding: 20px;
+        }
+        .header { text-align: center; margin-bottom: 30px; }
+        .header h1 { font-size: 2.5em; color: #ffd700; }
+        .header .subtitle { color: #aaa; margin-top: 10px; }
+        .logo { font-size: 3em; margin-bottom: 10px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; max-width: 1200px; margin: 0 auto; }
+        .card { background: rgba(255,255,255,0.05); border-radius: 15px; padding: 20px; border: 1px solid rgba(255,215,0,0.2); transition: transform 0.3s; }
+        .card:hover { transform: translateY(-5px); border-color: #ffd700; }
+        .card h3 { color: #ffd700; margin-bottom: 10px; }
+        .card .status { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 0.85em; }
+        .status.ready { background: rgba(0,255,0,0.2); color: #0f0; }
+        .status.active { background: rgba(0,255,0,0.2); color: #0f0; }
+        .status.pending { background: rgba(255,165,0,0.2); color: #ffa500; }
+        .endpoints { margin-top: 10px; font-size: 0.9em; color: #aaa; }
+        .footer { text-align: center; margin-top: 40px; color: #666; }
+        .kela { color: #ffd700; font-weight: bold; }
+        @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+        .logo { animation: pulse 2s infinite; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo">🦁🍌</div>
+        <h1>Singh Ji AI Ultra v4.0</h1>
+        <p class="subtitle">Admin Dashboard — <span class="kela">KELA Mode ON</span></p>
+    </div>
+
+    <div class="grid">
+        <div class="card">
+            <h3>⚡ U1 — Proactive AI</h3>
+            <span class="status active">Active</span>
+            <div class="endpoints">/api/u1/...</div>
+        </div>
+        <div class="card">
+            <h3>🧬 U2 — Gender Detection</h3>
+            <span class="status active">Active</span>
+            <div class="endpoints">/api/u2/...</div>
+        </div>
+        <div class="card">
+            <h3>🌐 U3 — Language Hub (26 Lang)</h3>
+            <span class="status ready">Ready</span>
+            <div class="endpoints">/api/u3/list</div>
+        </div>
+        <div class="card">
+            <h3>📢 U4 — Auto Message</h3>
+            <span class="status ready">Ready</span>
+            <div class="endpoints">/api/u4/...</div>
+        </div>
+        <div class="card">
+            <h3>📿 U5 — Ramayan Speak</h3>
+            <span class="status ready">Ready</span>
+            <div class="endpoints">/api/u5/...</div>
+        </div>
+        <div class="card">
+            <h3>📱 U6 — PWA Lite</h3>
+            <span class="status ready">Ready</span>
+            <div class="endpoints">/api/u6/...</div>
+        </div>
+        <div class="card">
+            <h3>🆘 U8 — MADAD Button</h3>
+            <span class="status active">Active</span>
+            <div class="endpoints">/api/u8/...</div>
+        </div>
+        <div class="card">
+            <h3>🤝 U9 — Singh Ji Haath</h3>
+            <span class="status active">Active</span>
+            <div class="endpoints">/api/u9/...</div>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>🙏 "अकेला सही रास्ते पे।"</p>
+        <p>"KELA mode on।"</p>
+        <p>"Sab peeche — Singh Ji aage।"</p>
+    </div>
+</body>
+</html>
