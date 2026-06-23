@@ -16,4 +16,4 @@ services:
         value: lazy
     healthCheckPath: /api/health
     autoDeploy: true
-    branch: main
+    branch: master

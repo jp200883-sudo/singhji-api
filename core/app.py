@@ -3,6 +3,7 @@ Singh Ji AI Ultra v4.0 — KELA Mode Core
 Lightweight bootstrap, lazy module loading
 """
 from flask import Flask, jsonify, request, render_template
+from flask_cors import cors
 import importlib
 import os
 from datetime import datetime
