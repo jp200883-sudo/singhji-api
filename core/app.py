@@ -3,7 +3,7 @@ Singh Ji AI Ultra v4.0 — KELA Mode Core
 Lightweight bootstrap, lazy module loading
 """
 from flask import Flask, jsonify, request, render_template
-from flask_cors import CORS   # ← यह जोड़ो
+from flask_cors import CORS   
 import importlib
 import os
 from datetime import datetime
@@ -25,7 +25,26 @@ MODULES = {
     'u8': {'name': 'MADAD Button', 'path': 'modules.u8_madad_button.handler'},
     'u9': {'name': 'Singh Ji Haath', 'path': 'modules.u9_singh_ji_haath.handler'},
 }
+@app.route('/')
+def home():
+    return jsonify({
+        "status": "Singh Ji AI Ultra v4.0 is LIVE!",
+        "creator": "JP Singh Ji, Kanpur",
+        "version": "4.0"
+    })
 
+@app.route('/health')
+def health():
+    return jsonify({"status": "ok"})
+
+@app.route('/api/chat', methods=['POST'])
+def chat():
+    data = request.get_json()
+    message = data.get('message', '')
+    return jsonify({
+        "reply": f"Singh Ji ne sun liya: {message}",
+        "status": "success"
+    })
 # 🏠 HOME — Welcome + Status
 @app.route('/')
 def home():
