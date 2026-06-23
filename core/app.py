@@ -3,15 +3,16 @@ Singh Ji AI Ultra v4.0 — KELA Mode Core
 Lightweight bootstrap, lazy module loading
 """
 from flask import Flask, jsonify, request, render_template
-from flask_cors import cors
+from flask_cors import CORS   # ← यह जोड़ो
 import importlib
 import os
 from datetime import datetime
 
-app = Flask(__name__, 
+app = Flask(__name__,
     template_folder='../templates',
     static_folder='../static'
 )
+CORS(app)   
 
 # ⚡ MODULE REGISTRY — Add U3-U6 here when ready
 MODULES = {
