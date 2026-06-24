@@ -1,21 +1,16 @@
+# 🦁 Singh Ji AI Ultra — Render Deploy Config
 services:
   - type: web
     name: singhji-api
     runtime: python
-    plan: free
     buildCommand: "pip install -r requirements.txt"
-    startCommand: "cd core && gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --threads 2"
+    startCommand: "gunicorn app:app --bind 0.0.0.0:$PORT --workers 4"
     envVars:
       - key: PYTHON_VERSION
-        value: 3.11.4
-      - key: PORT
-        value: 10000
+        value: 3.11.0
       - key: FLASK_ENV
         value: production
-      - key: RENDER_LOAD_MODE
-        value: lazy
-      - key: PYTHONPATH
-        value: "/opt/render/project/src"
-    healthCheckPath: /health
+      - key: PORT
+        value: 10000
     autoDeploy: true
-    branch: master
+    healthCheckPath: /api/v1/health
