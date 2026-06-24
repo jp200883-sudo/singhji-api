@@ -1,3 +1,5 @@
+# core/app.py
+
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 import importlib
@@ -5,7 +7,7 @@ import os
 import sys
 from datetime import datetime
 
-app = Flask(__name__, static_folder='frontend')
+app = Flask(__name__)
 CORS(app)
 
 # ⚡ MODULE REGISTRY
@@ -20,44 +22,35 @@ MODULES = {
     'u9': {'name': 'Singh Ji Haath', 'path': 'modules.u9_singh_ji_haath.handler'},
 }
 
-# 🏠 HOME — Frontend Serve (SIRF एक बार!)
+# 🏠 HOME — Frontend serve (PATH सही करो!)
 @app.route('/')
 def home():
-    return send_from_directory('frontend', 'index.html')
+    # '../frontend' = core से बाहर जाओ, फिर frontend में जाओ
+    return send_from_directory('../frontend', 'index.html')
 
-# 📊 STATUS — API Info (अलग route!)
+# 📁 STATIC FILES
+@app.route('/<path:filename>')
+def static_files(filename):
+    return send_from_directory('../frontend', filename)
+
+# 💓 HEALTH
+@app.route('/api/health')
+def health_check():
+    return jsonify({"status": "ok", "app": "Singh Ji AI Ultra v4.0"}), 200
+
+# 📊 STATUS
 @app.route('/api/status')
 def status():
     return jsonify({
         "app": "Singh Ji AI Ultra v4.0",
-        "status": "live",
-        "mode": "KELA",
-        "timestamp": datetime.now().isoformat(),
-        "modules_loaded": len(MODULES),
-        "modules": {k: v['name'] for k, v in MODULES.items()},
-        "endpoints": {
-            "health": "/api/health",
-            "status": "/api/status",
-            "modules": "/api/<module>/<path:path>"
-        }
+        "modules": {k: v['name'] for k, v in MODULES.items()}
     })
 
-# 💓 HEALTH CHECK
-@app.route('/api/health')
-def health_check():
-    return jsonify({
-        "status": "ok",
-        "app": "Singh Ji AI Ultra v4.0",
-        "mode": "KELA",
-        "timestamp": datetime.now().isoformat(),
-        "modules_registered": len(MODULES)
-    }), 200
-
-# 🧩 LAZY MODULE ROUTER
+# 🧩 MODULE ROUTER
 @app.route('/api/<module>/<path:path>', methods=['GET', 'POST'])
 def module_router(module, path):
     if module not in MODULES:
-        return jsonify({"error": "Module not found", "available": list(MODULES.keys())}), 404
+        return jsonify({"error": "Module not found"}), 404
     try:
         module_path = MODULES[module]['path']
         module_name, handler_name = module_path.rsplit('.', 1)
@@ -65,24 +58,7 @@ def module_router(module, path):
         handler = getattr(mod, handler_name)
         return handler(path, request)
     except Exception as e:
-        return jsonify({"error": str(e), "module": module}), 500
-
-# 🧩 MODULE INFO
-@app.route('/api/<module>/info')
-def module_info(module):
-    if module not in MODULES:
-        return jsonify({"error": "Module not found"}), 404
-    return jsonify({
-        "module": module,
-        "name": MODULES[module]['name'],
-        "status": "registered",
-        "loaded": "lazy"
-    })
-
-# 📁 STATIC FILES
-@app.route('/<path:filename>')
-def static_files(filename):
-    return send_from_directory('frontend', filename)
+        return jsonify({"error": str(e)}), 500
 
 # 🚀 RUN
 if __name__ == '__main__':
