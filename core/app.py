@@ -7,8 +7,9 @@ from flask_cors import CORS
 import importlib
 import os
 import sys
+from flask import Flask, jsonify, send_from_directory
 from datetime import datetime
-
+ 
 app = Flask(__name__,
     template_folder='../templates',
     static_folder='../static'
@@ -83,11 +84,14 @@ def module_info(module):
         "loaded": module in sys.modules if 'sys' in dir() else "lazy"
     })
 
-# 🎛️ ADMIN DASHBOARD
-@app.route('/admin')
-def admin():
-    return render_template('admin.html')
+# 🎨 FRONTEND SERVE
+@app.route('/')
+def home():
+    return send_from_directory('frontend', 'index.html')
 
+@app.route('/<path:filename>')
+def static_files(filename):
+    return send_from_directory('frontend', filename)
 # 🚀 RUN
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
