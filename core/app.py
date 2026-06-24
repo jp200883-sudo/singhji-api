@@ -1,22 +1,14 @@
-"""
-Singh Ji AI Ultra v4.0 — KELA Mode Core
-Lightweight bootstrap, lazy module loading
-"""
-from flask import Flask, jsonify, request, render_template
-from flask_cors import CORS   
+from flask import Flask, jsonify, request, send_from_directory
+from flask_cors import CORS
 import importlib
 import os
 import sys
-from flask import Flask, jsonify, send_from_directory
 from datetime import datetime
- 
-app = Flask(__name__,
-    template_folder='../templates',
-    static_folder='../static'
-)
-CORS(app)   
 
-# ⚡ MODULE REGISTRY — Add U3-U6 here when ready
+app = Flask(__name__, static_folder='frontend')
+CORS(app)
+
+# ⚡ MODULE REGISTRY
 MODULES = {
     'u1': {'name': 'Proactive AI', 'path': 'modules.u1_proactive_ai.handler'},
     'u2': {'name': 'Gender Detection', 'path': 'modules.u2_gender_detection.handler'},
@@ -27,9 +19,15 @@ MODULES = {
     'u8': {'name': 'MADAD Button', 'path': 'modules.u8_madad_button.handler'},
     'u9': {'name': 'Singh Ji Haath', 'path': 'modules.u9_singh_ji_haath.handler'},
 }
-# 🏠 HOME — Welcome + Status
+
+# 🏠 HOME — Frontend Serve (SIRF एक बार!)
 @app.route('/')
 def home():
+    return send_from_directory('frontend', 'index.html')
+
+# 📊 STATUS — API Info (अलग route!)
+@app.route('/api/status')
+def status():
     return jsonify({
         "app": "Singh Ji AI Ultra v4.0",
         "status": "live",
@@ -39,12 +37,12 @@ def home():
         "modules": {k: v['name'] for k, v in MODULES.items()},
         "endpoints": {
             "health": "/api/health",
-            "modules": "/api/<module>/<path:path>",
-            "admin": "/admin"
+            "status": "/api/status",
+            "modules": "/api/<module>/<path:path>"
         }
     })
 
-# 💓 HEALTH CHECK — Render uses this
+# 💓 HEALTH CHECK
 @app.route('/api/health')
 def health_check():
     return jsonify({
@@ -52,17 +50,14 @@ def health_check():
         "app": "Singh Ji AI Ultra v4.0",
         "mode": "KELA",
         "timestamp": datetime.now().isoformat(),
-        "memory": "lightweight",
         "modules_registered": len(MODULES)
     }), 200
 
-# 🧩 LAZY MODULE ROUTER — Load only when called!
+# 🧩 LAZY MODULE ROUTER
 @app.route('/api/<module>/<path:path>', methods=['GET', 'POST'])
 def module_router(module, path):
-    """KELA Mode: Module loads ONLY when API called"""
     if module not in MODULES:
         return jsonify({"error": "Module not found", "available": list(MODULES.keys())}), 404
-
     try:
         module_path = MODULES[module]['path']
         module_name, handler_name = module_path.rsplit('.', 1)
@@ -72,7 +67,7 @@ def module_router(module, path):
     except Exception as e:
         return jsonify({"error": str(e), "module": module}), 500
 
-# 🧩 MODULE INFO — Check without loading
+# 🧩 MODULE INFO
 @app.route('/api/<module>/info')
 def module_info(module):
     if module not in MODULES:
@@ -81,17 +76,14 @@ def module_info(module):
         "module": module,
         "name": MODULES[module]['name'],
         "status": "registered",
-        "loaded": module in sys.modules if 'sys' in dir() else "lazy"
+        "loaded": "lazy"
     })
 
-# 🎨 FRONTEND SERVE
-@app.route('/')
-def home():
-    return send_from_directory('frontend', 'index.html')
-
+# 📁 STATIC FILES
 @app.route('/<path:filename>')
 def static_files(filename):
     return send_from_directory('frontend', filename)
+
 # 🚀 RUN
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
