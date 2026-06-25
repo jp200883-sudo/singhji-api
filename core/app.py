@@ -1,5 +1,3 @@
-# core/app.py
-
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 import importlib
@@ -8,7 +6,20 @@ import sys
 from datetime import datetime
 
 app = Flask(__name__)
-CORS(app)
+
+# ✅ CORS FIXED — GitHub Pages ke liye specific origins
+CORS(app, resources={
+    r"/api/*": {
+        "origins": [
+            "https://jp200883-sudo.github.io",
+            "https://jp200883-sudo.github.io/singhji-ai",
+            "http://localhost:3000",
+            "http://localhost:5000"
+        ],
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization"]
+    }
+})
 
 # ⚡ MODULE REGISTRY
 MODULES = {
@@ -20,12 +31,13 @@ MODULES = {
     'u6': {'name': 'PWA Lite', 'path': 'modules.u6_pwa_lite.handler'},
     'u8': {'name': 'MADAD Button', 'path': 'modules.u8_madad_button.handler'},
     'u9': {'name': 'Singh Ji Haath', 'path': 'modules.u9_singh_ji_haath.handler'},
+    # ✅ NEW: Admin Panel
+    'admin': {'name': 'Admin Panel', 'path': 'modules.admin_panel.handler'},
 }
 
-# 🏠 HOME — Frontend serve (PATH सही करो!)
+# 🏠 HOME — Frontend serve
 @app.route('/')
 def home():
-    # '../frontend' = core से बाहर जाओ, फिर frontend में जाओ
     return send_from_directory('../frontend', 'index.html')
 
 # 📁 STATIC FILES
