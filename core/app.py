@@ -31,8 +31,11 @@ MODULES = {
     'u6': {'name': 'PWA Lite', 'path': 'modules.u6_pwa_lite.handler'},
     'u8': {'name': 'MADAD Button', 'path': 'modules.u8_madad_button.handler'},
     'u9': {'name': 'Singh Ji Haath', 'path': 'modules.u9_singh_ji_haath.handler'},
-    # ✅ NEW: Admin Panel
+    # ✅ PHASE 1: Admin Panel
     'admin': {'name': 'Admin Panel', 'path': 'modules.admin_panel.handler'},
+    # ✅ PHASE 2: Telegram + Plant
+    'telegram': {'name': 'Telegram Bot', 'path': 'modules.telegram_bot.handler'},
+    'plant': {'name': 'Plant ID', 'path': 'modules.plant_id.handler'},
 }
 
 # 🏠 HOME — Frontend serve
@@ -48,13 +51,14 @@ def static_files(filename):
 # 💓 HEALTH
 @app.route('/api/health')
 def health_check():
-    return jsonify({"status": "ok", "app": "Singh Ji AI Ultra v4.0"}), 200
+    return jsonify({"status": "ok", "app": "Singh Ji AI Ultra v4.0", "phase": "2"}), 200
 
 # 📊 STATUS
 @app.route('/api/status')
 def status():
     return jsonify({
         "app": "Singh Ji AI Ultra v4.0",
+        "phase": 2,
         "modules": {k: v['name'] for k, v in MODULES.items()}
     })
 
