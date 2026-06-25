@@ -7,38 +7,54 @@
     <style>
         *{margin:0;padding:0;box-sizing:border-box}
         body{font-family:Arial,sans-serif;background:#0a0a1a;color:#fff;min-height:100vh}
-        .top-bar{display:flex;justify-content:space-between;align-items:center;padding:10px 20px;background:#1a1a3e;font-size:14px}
+        
+        /* Top Bar */
+        .top-bar{display:flex;justify-content:center;gap:30px;padding:12px;background:#1a1a3e;font-size:14px;border-bottom:1px solid #333}
         .top-bar span{color:#00ff88}
-        .header{text-align:center;padding:40px 20px}
-        .header h1{font-size:42px;margin-bottom:10px}
-        .header p{color:#aaa;font-size:16px}
-        .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;max-width:900px;margin:0 auto;padding:20px}
-        .card{background:#1a1a3e;border:1px solid #333;border-radius:10px;padding:30px;text-align:center;cursor:pointer;transition:0.3s}
-        .card:hover{border-color:#ff6b35;transform:translateY(-5px)}
-        .card .icon{font-size:40px;margin-bottom:15px}
-        .card h3{color:#ff6b35;margin-bottom:8px}
-        .card p{color:#888;font-size:14px}
-        .payment{background:linear-gradient(90deg,#ff6b35,#f7931e);text-align:center;padding:20px;margin:20px auto;max-width:500px;border-radius:10px}
-        .payment h2{margin-bottom:10px}
-        .upi{background:rgba(255,255,255,0.2);padding:10px 20px;border-radius:20px;display:inline-block;font-weight:bold;margin-top:10px}
-        .admin-btn{position:fixed;top:20px;right:20px;background:#ff6b35;color:#fff;padding:10px 20px;border-radius:20px;text-decoration:none;font-weight:bold}
+        
+        /* Header */
+        .header{text-align:center;padding:50px 20px 30px}
+        .header .lion{font-size:60px;margin-bottom:15px}
+        .header h1{font-size:36px;margin-bottom:10px}
+        .header p{color:#888;font-size:16px}
+        
+        /* Grid */
+        .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:15px;max-width:800px;margin:0 auto;padding:20px}
+        .card{background:#1a1a3e;border:1px solid #2a2a4e;border-radius:12px;padding:30px 20px;text-align:center;cursor:pointer;transition:0.3s}
+        .card:hover{border-color:#ff6b35;transform:translateY(-3px)}
+        .card .icon{font-size:32px;margin-bottom:12px}
+        .card h3{color:#fff;font-size:16px;margin-bottom:6px}
+        .card p{color:#666;font-size:13px}
+        
+        /* Payment */
+        .payment{text-align:center;padding:30px 20px}
+        .payment .upi-btn{background:linear-gradient(90deg,#ff6b35,#f7931e);color:#fff;padding:12px 30px;border-radius:25px;display:inline-block;font-weight:bold;cursor:pointer}
+        
+        /* Admin Link */
+        .admin-link{position:fixed;top:15px;right:15px;background:#333;color:#fff;padding:8px 16px;border-radius:20px;text-decoration:none;font-size:13px}
+        
         @media(max-width:768px){.grid{grid-template-columns:1fr}}
     </style>
 </head>
 <body>
+    <!-- Top Status -->
     <div class="top-bar">
         <span>🟢 API: Live</span>
         <span>🟢 Bot: Active</span>
         <span>🌐 26 Languages</span>
     </div>
     
-    <a href="admin.html" class="admin-btn">⚙️ Admin</a>
+    <!-- Admin -->
+    <a href="admin.html" class="admin-link">⚙️ Admin</a>
     
+    <!-- Header -->
     <div class="header">
-        <h1>🦁 Singh Ji AI Ultra</h1>
+        <div class="lion">🦁</div>
+        <h1>Singh Ji AI Ultra</h1>
         <p>India's All-in-One Super App — Zero Phone Load, Full Automation</p>
     </div>
     
+    <!-- 6 Cards -->
     <div class="grid">
         <div class="card" onclick="openApp('ai-chat')">
             <div class="icon">🤖</div>
@@ -72,17 +88,16 @@
         </div>
     </div>
     
+    <!-- Payment -->
     <div class="payment">
-        <h2>💰 Support Singh Ji AI</h2>
-        <p>Scan & Pay via any UPI App</p>
-        <div class="upi">📱 jp200883@sbi</div>
+        <div class="upi-btn" onclick="alert('UPI: jp200883@sbi')">💰 Support — UPI: jp200883@sbi</div>
     </div>
     
     <script>
         function openApp(app){
             fetch('https://singhji-api.onrender.com/api/'+app)
             .then(r=>r.json())
-            .then(d=>alert('🦁 '+app+' loading...'))
+            .then(d=>console.log(app,d))
             .catch(e=>alert('🦁 '+app+' — Coming Soon!'));
         }
     </script>
