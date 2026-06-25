@@ -25,7 +25,6 @@ CORS(app, resources={
 MODULES = {
     'u1': {'name': 'Proactive AI', 'path': 'modules.u1_proactive_ai.handler'},
     'u2': {'name': 'Gender Detection', 'path': 'modules.u2_gender_detection.handler'},
-    'u3': {'name': 'Language Hub', 'path': 'modules.u3_language_hub.handler'},
     'u4': {'name': 'Auto Message', 'path': 'modules.u4_auto_message.handler'},
     'u5': {'name': 'Ramayan Speak', 'path': 'modules.u5_ramayan_speak.handler'},
     'u6': {'name': 'PWA Lite', 'path': 'modules.u6_pwa_lite.handler'},
