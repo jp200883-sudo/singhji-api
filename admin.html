@@ -3,76 +3,43 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>⚙️ Admin Panel — Singh Ji AI</title>
+    <title>⚙️ Admin — Singh Ji AI</title>
     <style>
         *{margin:0;padding:0;box-sizing:border-box}
         body{font-family:Arial,sans-serif;background:#0a0a1a;color:#fff;min-height:100vh}
-        .header{background:#1a1a3e;padding:20px;text-align:center;border-bottom:2px solid #ff6b35}
+        .back{position:fixed;top:15px;left:15px;background:#333;color:#fff;padding:8px 16px;border-radius:20px;text-decoration:none;font-size:13px}
+        .header{text-align:center;padding:40px 20px;border-bottom:1px solid #333}
         .header h1{font-size:28px}
-        .back{position:fixed;top:20px;left:20px;background:#333;color:#fff;padding:10px 20px;border-radius:20px;text-decoration:none}
-        .container{max-width:1000px;margin:30px auto;padding:20px}
-        .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:20px}
-        .card{background:#1a1a3e;border:1px solid #333;border-radius:10px;padding:25px}
+        .container{max-width:800px;margin:30px auto;padding:20px}
+        .card{background:#1a1a3e;border:1px solid #2a2a4e;border-radius:12px;padding:20px;margin-bottom:15px}
         .card h3{color:#ff6b35;margin-bottom:15px}
-        .status{display:flex;justify-content:space-between;margin:10px 0;padding:10px;background:#0a0a1a;border-radius:5px}
+        .row{display:flex;justify-content:space-between;padding:10px;border-bottom:1px solid #2a2a4e}
+        .row:last-child{border:none}
         .online{color:#00ff88}
         .offline{color:#ff4444}
-        .btn{background:#ff6b35;color:#fff;border:none;padding:10px 20px;border-radius:5px;cursor:pointer;margin-top:10px}
-        .logs{background:#0a0a1a;padding:15px;border-radius:5px;height:200px;overflow-y:auto;font-family:monospace;font-size:12px;color:#888;margin-top:10px}
-        @media(max-width:768px){.grid{grid-template-columns:1fr}}
+        .btn{background:#ff6b35;color:#fff;border:none;padding:8px 16px;border-radius:5px;cursor:pointer;margin-right:10px}
     </style>
 </head>
 <body>
     <a href="index.html" class="back">← Back</a>
-    
     <div class="header">
-        <h1>⚙️ Singh Ji AI — Admin Panel</h1>
+        <h1>⚙️ Admin Panel</h1>
         <p>Dashboard & Controls</p>
     </div>
-    
     <div class="container">
-        <div class="grid">
-            <div class="card">
-                <h3>🔑 API Keys</h3>
-                <div class="status"><span>Gemini</span><span class="online">✅ Active</span></div>
-                <div class="status"><span>HuggingFace</span><span class="online">✅ Active</span></div>
-                <div class="status"><span>Plant.id</span><span class="online">✅ Active</span></div>
-                <div class="status"><span>Telegram</span><span class="online">✅ Active</span></div>
-                <div class="status"><span>Bhashini</span><span class="offline">⏳ Pending</span></div>
-            </div>
-            
-            <div class="card">
-                <h3>📊 Services</h3>
-                <div class="status"><span>Render API</span><span class="online">🟢 Live</span></div>
-                <div class="status"><span>GitHub Pages</span><span class="online">🟢 Live</span></div>
-                <div class="status"><span>Railway Bot</span><span class="online">🟢 Active</span></div>
-                <div class="status"><span>Supabase</span><span class="offline">⏳ Pending</span></div>
-            </div>
-            
-            <div class="card">
-                <h3>🤖 Bot Controls</h3>
-                <p>Telegram Bot Status: <span class="online">Running</span></p>
-                <button class="btn" onclick="alert('Restarting Bot...')">🔄 Restart Bot</button>
-                <button class="btn" onclick="alert('Webhook Updated!')">🔗 Update Webhook</button>
-            </div>
-            
-            <div class="card">
-                <h3>📝 Logs</h3>
-                <div class="logs" id="logs">
-                    [2026-06-25] API: Live<br>
-                    [2026-06-25] Bot: Active<br>
-                    [2026-06-25] Render: Connected<br>
-                    [2026-06-25] Gemini: Responding<br>
-                </div>
-                <button class="btn" onclick="clearLogs()">🗑️ Clear</button>
-            </div>
+        <div class="card">
+            <h3>🔑 API Status</h3>
+            <div class="row"><span>Gemini</span><span class="online">✅ Active</span></div>
+            <div class="row"><span>HuggingFace</span><span class="online">✅ Active</span></div>
+            <div class="row"><span>Plant.id</span><span class="online">✅ Active</span></div>
+            <div class="row"><span>Telegram</span><span class="online">✅ Active</span></div>
+            <div class="row"><span>Bhashini</span><span class="offline">⏳ Pending</span></div>
+        </div>
+        <div class="card">
+            <h3>🤖 Bot Controls</h3>
+            <button class="btn" onclick="alert('Bot Restarted')">🔄 Restart</button>
+            <button class="btn" onclick="alert('Webhook Updated')">🔗 Webhook</button>
         </div>
     </div>
-    
-    <script>
-        function clearLogs(){
-            document.getElementById('logs').innerHTML='[Cleared]';
-        }
-    </script>
 </body>
 </html>
