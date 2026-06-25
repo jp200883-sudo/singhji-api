@@ -6,17 +6,16 @@ import requests
 BHASHINI_API_KEY = os.environ.get('BHASHINI_API_KEY', '')
 BHASHINI_URL = "https://meity-auth.ulcacontrib.org/ulca/apis/v0/model"
 
-# NLLB-200 (Meta) - via Hugging Face or direct
+# NLLB-200 (Meta) - via Hugging Face
 NLLB_API_URL = "https://api-inference.huggingface.co/models/facebook/nllb-200-distilled-600M"
 HF_TOKEN = os.environ.get('HUGGINGFACE_TOKEN', '')
 
 # Gemini API
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
-GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent"
 
-# 50+ Languages with Bhashini support
+# 50+ Languages
 LANGUAGES = {
-    # Indian Languages (Bhashini supported)
+    # Indian Languages (Bhashini)
     'hi': {'name': 'हिन्दी', 'source': 'bhashini', 'hello': 'नमस्ते'},
     'bn': {'name': 'বাংলা', 'source': 'bhashini', 'hello': 'নমস্কার'},
     'te': {'name': 'తెలుగు', 'source': 'bhashini', 'hello': 'నమస్కారం'},
@@ -115,7 +114,6 @@ def translate(data):
     if to_lang not in LANGUAGES:
         return jsonify({"error": "Language not supported"}), 400
 
-    # Route to correct API
     source = LANGUAGES[to_lang]['source']
 
     if source == 'bhashini' and BHASHINI_API_KEY:
@@ -155,7 +153,6 @@ def bhashini_translate(text, from_lang, to_lang):
                 "to": to_lang
             })
 
-        # Fallback to NLLB
         return nllb_translate(text, from_lang, to_lang)
 
     except Exception as e:
@@ -192,7 +189,6 @@ def nllb_translate(text, from_lang, to_lang):
         })
 
     except Exception as e:
-        # Fallback: return original with note
         return jsonify({
             "status": "fallback",
             "source": "gemini-ready",
@@ -207,7 +203,6 @@ def nllb_translate(text, from_lang, to_lang):
 def detect_language(data):
     text = data.get('text', '')
 
-    # Basic detection by Unicode range
     if any('\u0900' <= c <= '\u097F' for c in text):
         detected = 'hi'
     elif any('\u0980' <= c <= '\u09FF' for c in text):
