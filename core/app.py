@@ -16,21 +16,6 @@ CORS(app, resources={
     }
 })
 
-# ⚡ MODULE REGISTRY (U3 हटा दिया)
-MODULES = {
-    'u1': {'name': 'Proactive AI', 'path': 'modules.u1_proactive_ai.handler'},
-    'u2': {'name': 'Gender Detection', 'path': 'modules.u2_gender_detection.handler'},
-    'u4': {'name': 'Auto Message', 'path': 'modules.u4_auto_message.handler'},
-    'u5': {'name': 'Ramayan Speak', 'path': 'modules.u5_ramayan_speak.handler'},
-    'u6': {'name': 'PWA Lite', 'path': 'modules.u6_pwa_lite.handler'},
-    'u8': {'name': 'MADAD Button', 'path': 'modules.u8_madad_button.handler'},
-    'u9': {'name': 'Singh Ji Haath', 'path': 'modules.u9_singh_ji_haath.handler'},
-    'admin': {'name': 'Admin Panel', 'path': 'modules.admin_panel.handler'},
-    'telegram': {'name': 'Telegram Bot', 'path': 'modules.telegram_bot.handler'},
-    'plant': {'name': 'Plant ID', 'path': 'modules.plant_id.handler'},
-    'memory': {'name': 'Supabase Memory', 'path': 'modules.supabase_memory.handler'},
-    'language': {'name': 'Language Hub', 'path': 'modules.language_hub.handler'},
-}
 
 # 🏠 HOME
 @app.route('/')
