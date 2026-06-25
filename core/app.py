@@ -23,7 +23,39 @@ MODULES = {
     'memory': {'name': 'Supabase Memory', 'path': 'modules.supabase_memory.handler'},
     'language': {'name': 'Language Hub', 'path': 'modules.language_hub.handler'},
 }
+# core/app.py में यह add करो (MODULES के बाद)
 
+@app.route('/api/debug/<module>')
+def debug_module(module):
+    try:
+        module_path = MODULES[module]['path']
+        module_name, handler_name = module_path.rsplit('.', 1)
+        
+        # Try to import
+        mod = importlib.import_module(module_name)
+        
+        # Check if handler exists
+        has_handler = hasattr(mod, handler_name)
+        
+        # Get all attributes
+        attrs = [a for a in dir(mod) if not a.startswith('_')]
+        
+        return jsonify({
+            "module": module,
+            "path": module_path,
+            "imported": True,
+            "has_handler": has_handler,
+            "handler_name": handler_name,
+            "available_attributes": attrs,
+            "file_location": mod.__file__ if hasattr(mod, '__file__') else 'unknown'
+        })
+    except Exception as e:
+        import traceback
+        return jsonify({
+            "module": module,
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }), 500
 # 🏠 HOME
 @app.route('/')
 def home():
