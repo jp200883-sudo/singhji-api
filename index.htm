@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🦁 Singh Ji AI Ultra — India's Super App</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            color: #fff;
+        }
+
+        .header {
+            text-align: center;
+            padding: 20px;
+            background: rgba(0,0,0,0.3);
+            border-bottom: 2px solid #e94560;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 5px;
+        }
+
+        .header p {
+            color: #aaa;
+            font-size: 1.1em;
+        }
+
+        .admin-link {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: #e94560;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            text-decoration: none;
+            font-size: 0.9em;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+        }
+
+        .card {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 15px;
+            padding: 25px;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            background: rgba(255,255,255,0.1);
+            border-color: #e94560;
+            box-shadow: 0 10px 30px rgba(233, 69, 96, 0.3);
+        }
+
+        .card-icon {
+            font-size: 3em;
+            margin-bottom: 15px;
+        }
+
+        .card h3 {
+            font-size: 1.3em;
+            margin-bottom: 10px;
+            color: #e94560;
+        }
+
+        .card p {
+            color: #aaa;
+            font-size: 0.95em;
+        }
+
+        .status-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0,0,0,0.8);
+            padding: 10px;
+            text-align: center;
+            border-top: 1px solid #e94560;
+        }
+
+        .status-bar span {
+            margin: 0 15px;
+            font-size: 0.85em;
+        }
+
+        .status-online {
+            color: #00ff88;
+        }
+
+        .status-offline {
+            color: #ff4444;
+        }
+
+        .payment-section {
+            background: linear-gradient(135deg, #e94560, #ff6b6b);
+            border-radius: 15px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: center;
+        }
+
+        .payment-section h2 {
+            margin-bottom: 15px;
+        }
+
+        .upi-id {
+            background: rgba(255,255,255,0.2);
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-size: 1.2em;
+            font-weight: bold;
+            display: inline-block;
+            margin: 10px 0;
+        }
+
+        .language-selector {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+        }
+
+        .language-selector select {
+            background: rgba(255,255,255,0.1);
+            color: white;
+            border: 1px solid #e94560;
+            padding: 5px 10px;
+            border-radius: 5px;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 1.8em;
+            }
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <a href="admin.html" class="admin-link">⚙️ Admin</a>
+    
+    <div class="language-selector">
+        <select id="language">
+            <option value="hi">🇮🇳 हिंदी</option>
+            <option value="en">🇬🇧 English</option>
+            <option value="pa">🇮🇳 ਪੰਜਾਬੀ</option>
+            <option value="bn">🇮🇳 বাংলা</option>
+            <option value="te">🇮🇳 తెలుగు</option>
+            <option value="ta">🇮🇳 தமிழ்</option>
+            <option value="mr">🇮🇳 मराठी</option>
+            <option value="gu">🇮🇳 ગુજરાતી</option>
+            <option value="kn">🇮🇳 ಕನ್ನಡ</option>
+            <option value="ml">🇮🇳 മലയാളം</option>
+            <option value="ur">🇮🇳 اردو</option>
+            <option value="or">🇮🇳 ଓଡ଼ିଆ</option>
+            <option value="as">🇮🇳 অসমীয়া</option>
+        </select>
+    </div>
+
+    <div class="header">
+        <h1>🦁 Singh Ji AI Ultra</h1>
+        <p>India's All-in-One Super App — Zero Phone Load, Full Automation</p>
+    </div>
+
+    <div class="container">
+        <!-- Payment Section -->
+        <div class="payment-section">
+            <h2>💰 Premium Support</h2>
+            <p>Support our mission to empower every Indian</p>
+            <div class="upi-id">📱 UPI: jp200883@sbi</div>
+            <p style="margin-top: 10px; font-size: 0.9em;">Scan & Pay via any UPI App</p>
+        </div>
+
+        <!-- Main Grid -->
+        <div class="grid">
+            <div class="card" onclick="openModule('emergency')">
+                <div class="card-icon">🚨</div>
+                <h3>Emergency</h3>
+                <p>Ambulance, Police, Fire — One Tap SOS</p>
+            </div>
+
+            <div class="card" onclick="openModule('govt')">
+                <div class="card-icon">🏛️</div>
+                <h3>Govt Schemes</h3>
+                <p>PM-KISAN, Ayushman, Scholarships & More</p>
+            </div>
+
+            <div class="card" onclick="openModule('voice')">
+                <div class="card-icon">🎙️</div>
+                <h3>JP Voice</h3>
+                <p>AI Voice Clone — Speak with JP Singh</p>
+            </div>
+
+            <div class="card" onclick="openModule('food')">
+                <div class="card-icon">🍲</div>
+                <h3>Food</h3>
+                <p>Order, Recipes, Nutrition Info</p>
+            </div>
+
+            <div class="card" onclick="openModule('taxi')">
+                <div class="card-icon">🚕</div>
+                <h3>Taxi</h3>
+                <p>Book Cabs, Auto, Bike — Best Rates</p>
+            </div>
+
+            <div class="card" onclick="openModule('music')">
+                <div class="card-icon">🎵</div>
+                <h3>Music</h3>
+                <p>Bollywood, Regional, Devotional</p>
+            </div>
+
+            <div class="card" onclick="openModule('maps')">
+                <div class="card-icon">🗺️</div>
+                <h3>Maps</h3>
+                <p>Navigation, Traffic, Nearby Places</p>
+            </div>
+
+            <div class="card" onclick="openModule('games')">
+                <div class="card-icon">🎮</div>
+                <h3>Games</h3>
+                <p>Desi Games, Trivia, Puzzles</p>
+            </div>
+
+            <div class="card" onclick="openModule('education')">
+                <div class="card-icon">📚</div>
+                <h3>Education</h3>
+                <p>NCERT, Courses, Skill Development</p>
+            </div>
+
+            <div class="card" onclick="openModule('safety')">
+                <div class="card-icon">🛡️</div>
+                <h3>Safety</h3>
+                <p>Women Safety, Cyber Security, Alerts</p>
+            </div>
+
+            <div class="card" onclick="openModule('banking')">
+                <div class="card-icon">🏦</div>
+                <h3>Banking</h3>
+                <p>Balance Check, Mini Statement, UPI</p>
+            </div>
+
+            <div class="card" onclick="openModule('ai-chat')">
+                <div class="card-icon">🤖</div>
+                <h3>AI Chat</h3>
+                <p>Gemini Powered — Ask Anything</p>
+            </div>
+
+            <div class="card" onclick="openModule('ai-tools')">
+                <div class="card-icon">🛠️</div>
+                <h3>AI Tools</h3>
+                <p>Image Gen, PDF, QR, Plant ID</p>
+            </div>
+
+            <div class="card" onclick="openModule('telegram')">
+                <div class="card-icon">📱</div>
+                <h3>Telegram Bot</h3>
+                <p>Bot Controls & Logs</p>
+            </div>
+
+            <div class="card" onclick="openModule('languages')">
+                <div class="card-icon">🌐</div>
+                <h3>26 Languages</h3>
+                <p>Speak in Your Mother Tongue</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Status Bar -->
+    <div class="status-bar">
+        <span>🟢 Render API: <span class="status-online">Online</span></span>
+        <span>🤖 Gemini: <span class="status-online">Active</span></span>
+        <span>🌿 Plant.id: <span class="status-online">Ready</span></span>
+        <span>📱 Telegram: <span class="status-online">Connected</span></span>
+        <span>🔑 Bhashini: <span class="status-offline">Pending</span></span>
+    </div>
+
+    <script>
+        function openModule(module) {
+            // API call to Render backend
+            fetch('https://singhji-api.onrender.com/api/' + module)
+                .then(res => res.json())
+                .then(data => {
+                    console.log(module + ' loaded:', data);
+                    alert(module + ' module loading...');
+                })
+                .catch(err => {
+                    console.error('Error:', err);
+                    alert('Module coming soon! Backend integration pending.');
+                });
+        }
+
+        // Language switcher
+        document.getElementById('language').addEventListener('change', function() {
+            const lang = this.value;
+            console.log('Language switched to:', lang);
+            // TODO: Call Bhashini/NLLB API for translation
+        });
+    </script>
+</body>
+</html>
