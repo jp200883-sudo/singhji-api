@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🛡️ Singh Ji AI Admin</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: linear-gradient(135deg, #0f0f23 0%, #1a1a3e 100%);
+      color: #fff;
+      min-height: 100vh;
+    }
+    .header {
+      background: rgba(233, 69, 96, 0.9);
+      padding: 15px;
+      text-align: center;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header h1 { font-size: 22px; }
+    .header p { font-size: 11px; opacity: 0.9; }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 15px;
+      padding: 20px;
+      max-width: 500px;
+      margin: 0 auto;
+    }
+    .stat-card {
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 16px;
+      padding: 20px;
+      text-align: center;
+    }
+    .stat-card .number {
+      font-size: 32px;
+      font-weight: bold;
+      color: #ffd700;
+    }
+    .stat-card .label {
+      font-size: 12px;
+      color: #a0a0a0;
+      margin-top: 5px;
+    }
+    .section {
+      max-width: 500px;
+      margin: 20px auto;
+      padding: 0 20px;
+    }
+    .section h2 {
+      font-size: 18px;
+      margin-bottom: 10px;
+      color: #e94560;
+    }
+    .btn {
+      padding: 12px 24px;
+      border-radius: 10px;
+      border: none;
+      color: #fff;
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
+      margin: 5px;
+      transition: all 0.3s;
+    }
+    .btn-green { background: #00c853; }
+    .btn-blue { background: #2196f3; }
+    .btn-red { background: #ff1744; }
+    .btn:hover { transform: scale(1.05); opacity: 0.9; }
+    .log-box {
+      background: rgba(0,0,0,0.3);
+      border-radius: 12px;
+      padding: 15px;
+      max-height: 200px;
+      overflow-y: auto;
+      font-size: 12px;
+      color: #a0a0a0;
+    }
+    .log-item {
+      padding: 5px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+    .input-box {
+      width: 100%;
+      padding: 12px;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.2);
+      background: rgba(255,255,255,0.05);
+      color: #fff;
+      margin: 10px 0;
+      font-size: 14px;
+    }
+    .back-btn {
+      position: fixed;
+      bottom: 30px;
+      right: 30px;
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      background: #e94560;
+      border: none;
+      color: #fff;
+      font-size: 24px;
+      cursor: pointer;
+      box-shadow: 0 4px 20px rgba(233, 69, 96, 0.4);
+    }
+  </style>
+<base target="_blank">
+</head>
+<body>
+  <div class="header">
+    <h1>🛡️ Admin Panel</h1>
+    <p>Singh Ji AI Ultra v4.0 | Super Secret</p>
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="number" id="total-users">0</div>
+      <div class="label">Total Users</div>
+    </div>
+    <div class="stat-card">
+      <div class="number" id="total-payments">0</div>
+      <div class="label">Payments</div>
+    </div>
+    <div class="stat-card">
+      <div class="number" id="total-revenue">₹0</div>
+      <div class="label">Revenue</div>
+    </div>
+    <div class="stat-card">
+      <div class="number" id="active-now">0</div>
+      <div class="label">Active Now</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>⚡ Quick Actions</h2>
+    <button class="btn btn-green" onclick="refreshStats()">🔄 Refresh</button>
+    <button class="btn btn-blue" onclick="showUsers()">👥 Users</button>
+    <button class="btn btn-red" onclick="showPayments()">💰 Payments</button>
+  </div>
+
+  <div class="section">
+    <h2>📢 Broadcast Message</h2>
+    <input type="text" class="input-box" id="broadcast-msg" placeholder="Message sabko bhejo...">
+    <button class="btn btn-green" onclick="sendBroadcast()">📤 Send</button>
+  </div>
+
+  <div class="section">
+    <h2>📋 Recent Logs</h2>
+    <div class="log-box" id="logs">
+      <div class="log-item">🟢 Admin panel loaded...</div>
+    </div>
+  </div>
+
+  <button class="back-btn" onclick="goHome()">🏠</button>
+
+  <script>
+    const API_URL = 'https://singhji-api.onrender.com/api/admin';
+
+    window.onload = function() {
+      refreshStats();
+      loadLogs();
+    };
+
+    async function refreshStats() {
+      try {
+        const res = await fetch(`${API_URL}/stats`);
+        const data = await res.json();
+        document.getElementById('total-users').innerText = data.total_users || 0;
+        document.getElementById('total-payments').innerText = data.total_payments || 0;
+        document.getElementById('total-revenue').innerText = '₹' + (data.total_revenue || 0);
+        document.getElementById('active-now').innerText = data.active_now || 0;
+        addLog('📊 Stats refreshed');
+      } catch(e) {
+        addLog('❌ Stats load failed: ' + e.message);
+      }
+    }
+
+    async function showUsers() {
+      try {
+        const res = await fetch(`${API_URL}/users`);
+        const data = await res.json();
+        alert('Users: ' + JSON.stringify(data, null, 2));
+        addLog('👥 Users viewed');
+      } catch(e) {
+        addLog('❌ Users load failed');
+      }
+    }
+
+    async function showPayments() {
+      try {
+        const res = await fetch(`${API_URL}/payments`);
+        const data = await res.json();
+        alert('Payments: ' + JSON.stringify(data, null, 2));
+        addLog('💰 Payments viewed');
+      } catch(e) {
+        addLog('❌ Payments load failed');
+      }
+    }
+
+    async function sendBroadcast() {
+      const msg = document.getElementById('broadcast-msg').value;
+      if(!msg) { alert('Message likho!'); return; }
+      try {
+        await fetch(`${API_URL}/broadcast`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({message: msg})
+        });
+        addLog('📢 Broadcast sent: ' + msg);
+        document.getElementById('broadcast-msg').value = '';
+      } catch(e) {
+        addLog('❌ Broadcast failed');
+      }
+    }
+
+    async function loadLogs() {
+      try {
+        const res = await fetch(`${API_URL}/logs`);
+        const data = await res.json();
+        const box = document.getElementById('logs');
+        box.innerHTML = '';
+        data.slice(-20).forEach(log => {
+          box.innerHTML += `<div class="log-item">${log}</div>`;
+        });
+      } catch(e) {
+        addLog('❌ Logs load failed');
+      }
+    }
+
+    function addLog(text) {
+      const box = document.getElementById('logs');
+      const time = new Date().toLocaleTimeString();
+      box.innerHTML = `<div class="log-item">[${time}] ${text}</div>` + box.innerHTML;
+    }
+
+    function goHome() {
+      window.location.href = 'index.html';
+    }
+  </script>
+</body>
+</html>
