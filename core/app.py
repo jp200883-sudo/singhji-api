@@ -1,4 +1,4 @@
-# core/app.py — v5.0 Update
+# core/app.py — v5.0 (Fixed)
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 import importlib
@@ -7,7 +7,6 @@ from datetime import datetime
 
 app = Flask(__name__)
 
-# ✅ CORS v5.0
 CORS(app, resources={
     r"/api/*": {
         "origins": "*",
@@ -16,6 +15,14 @@ CORS(app, resources={
     }
 })
 
+# ⚡ MODULE REGISTRY (YEH MISSING THA!)
+MODULES = {
+    'admin': {'name': 'Admin Panel', 'path': 'modules.admin_panel.handler'},
+    'telegram': {'name': 'Telegram Bot', 'path': 'modules.telegram_bot.handler'},
+    'plant': {'name': 'Plant ID', 'path': 'modules.plant_id.handler'},
+    'memory': {'name': 'Supabase Memory', 'path': 'modules.supabase_memory.handler'},
+    'language': {'name': 'Language Hub', 'path': 'modules.language_hub.handler'},
+}
 
 # 🏠 HOME
 @app.route('/')
