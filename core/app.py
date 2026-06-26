@@ -1,5 +1,5 @@
 # core/app.py — Singh Ji AI Ultra v5.0
-# Fix: Underscores added back to module paths
+# BULLETPROOF VERSION — Startup crash proof
 # Date: 26 June 2026
 
 from fastapi import FastAPI, Request
@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 import importlib
 import sys
 import os
+import traceback
 
 app = FastAPI(
     title="Singh Ji AI Ultra v5.0",
@@ -15,7 +16,7 @@ app = FastAPI(
     version="5.0.0"
 )
 
-# ✅ CORS — Allow ALL origins (GitHub Pages, localhost, etc.)
+# ✅ CORS — Allow ALL origins
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -24,20 +25,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ========== MODULE REGISTRY (with underscores!) ==========
-# Module path → API prefix
+# ========== MODULE REGISTRY ==========
 MODULES = {
     "modules.language": "/api/language",
-    "modules.telegram_bot": "/api/telegram",      # ✅ underscore
-    "modules.plant_id": "/api/plant",              # ✅ underscore
-    "modules.supabase_memory": "/api/memory",      # ✅ underscore
+    "modules.telegram_bot": "/api/telegram",
+    "modules.plant_id": "/api/plant",
+    "modules.supabase_memory": "/api/memory",
     "modules.adminpanel": "/api/admin",
 }
 
 # ========== HEALTH CHECK ==========
 @app.get("/api/health")
 def health():
-    return {"status": "🦁 Singh Ji AI Ultra v5.0 is LIVE!", "timestamp": str(__import__("datetime").datetime.now())}
+    return {
+        "status": "🦁 Singh Ji AI Ultra v5.0 is LIVE!",
+        "timestamp": str(__import__("datetime").datetime.now())
+    }
 
 @app.get("/api/status")
 def status():
@@ -46,9 +49,20 @@ def status():
     for mod_name, prefix in MODULES.items():
         try:
             mod = importlib.import_module(mod_name)
-            loaded.append({"module": mod_name, "prefix": prefix, "status": "✅ Loaded"})
+            has_router = hasattr(mod, "router")
+            loaded.append({
+                "module": mod_name,
+                "prefix": prefix,
+                "status": "✅ Loaded",
+                "has_router": has_router
+            })
         except Exception as e:
-            failed.append({"module": mod_name, "prefix": prefix, "error": str(e)})
+            failed.append({
+                "module": mod_name,
+                "prefix": prefix,
+                "error": str(e),
+                "trace": traceback.format_exc()[-200:]
+            })
     return {
         "app": "Singh Ji AI Ultra v5.0",
         "loaded_modules": loaded,
@@ -61,7 +75,6 @@ def status():
 # ========== DEBUG ENDPOINT ==========
 @app.get("/api/debug/{module_name}")
 def debug_module(module_name: str):
-    """Inspect any module — returns file path, classes, functions, errors"""
     import inspect
     result = {
         "requested": module_name,
@@ -74,7 +87,6 @@ def debug_module(module_name: str):
         "error": None
     }
     try:
-        # Try with underscore variations
         candidates = [
             f"modules.{module_name}",
             f"modules.{module_name.replace('_', '')}",
@@ -90,19 +102,18 @@ def debug_module(module_name: str):
                         result["classes"].append(name)
                     elif inspect.isfunction(obj):
                         result["functions"].append(name)
-                # Check for FastAPI router
                 if hasattr(mod, "router"):
                     result["routes"] = [r.path for r in mod.router.routes]
                 break
             except ImportError:
                 continue
         if not result["exists"]:
-            result["error"] = f"Module '{module_name}' not found in modules/"
+            result["error"] = f"Module '{module_name}' not found"
     except Exception as e:
         result["error"] = str(e)
     return result
 
-# ========== AUTO-LOAD ALL MODULES ==========
+# ========== AUTO-LOAD ALL MODULES (BULLETPROOF) ==========
 def load_modules():
     for mod_name, prefix in MODULES.items():
         try:
@@ -114,6 +125,7 @@ def load_modules():
                 print(f"⚠️ No router in: {mod_name}")
         except Exception as e:
             print(f"❌ Failed: {mod_name} → {e}")
+            # App continues even if module fails!
 
 # Load on startup
 load_modules()
