@@ -2,7 +2,6 @@ from fastapi import APIRouter
 from core.config import settings
 
 router = APIRouter()
-
 @router.get("/")
 def social_home():
     return {
@@ -10,10 +9,7 @@ def social_home():
         "status": "ok",
         "platforms": settings.SOCIAL_PLATFORMS
     }
-
 @router.get("/platforms")
 def social_platforms():
-    return {
         "platforms": ["instagram", "facebook", "twitter", "whatsapp", "telegram"],
         "status": "active"
-    }
