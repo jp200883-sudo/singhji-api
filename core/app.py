@@ -15,9 +15,8 @@ CORS(app, resources={
     }
 })
 
-# ⚡ MODULE REGISTRY (YEH MISSING THA!)
 MODULES = {
-    'admin': {'name': 'Admin Panel', 'path': 'modules.admin_panel.handler'},
+    'admin': {'name': 'Admin Panel', 'path': 'modules.adminpanel.handler'},
     'telegram': {'name': 'Telegram Bot', 'path': 'modules.telegram_bot.handler'},
     'plant': {'name': 'Plant ID', 'path': 'modules.plant_id.handler'},
     'memory': {'name': 'Supabase Memory', 'path': 'modules.supabase_memory.handler'},
