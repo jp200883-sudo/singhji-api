@@ -25,15 +25,30 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ========== MODULE REGISTRY ==========
 MODULES = {
+    # Existing
     "modules.language": "/api/language",
     "modules.telegram_bot": "/api/telegram",
     "modules.plant_id": "/api/plant",
     "modules.supabase_memory": "/api/memory",
     "modules.adminpanel": "/api/admin",
+    "modules.ai_chat": "/api/ai",
+    "modules.weather": "/api/weather",
+    "modules.mandi": "/api/mandi",
+    "modules.search": "/api/search",
+    "modules.news": "/api/news",
+    "modules.emergency": "/api/emergency",
+    "modules.govt": "/api/govt",
+    "modules.upi": "/api/upi",
+    "modules.email": "/api/email",
+    "modules.social": "/api/social",
+    "modules.schedule": "/api/schedule",
+    "modules.voice": "/api/voice",
+    
+    # NEW 🔥
+    "modules.voice_tts": "/api/voice-tts",      # F5-TTS
+    "modules.voice_cmd": "/api/voice-cmd",      # Hindi Commands
 }
-
 # ========== HEALTH CHECK ==========
 @app.get("/api/health")
 def health():
