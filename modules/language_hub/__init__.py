@@ -1,8 +1,4 @@
-# modules/language/__init__.py — Singh Ji AI Ultra v5.0
-# Language Hub — 58 Languages
-
 from fastapi import APIRouter
-
 router = APIRouter()
 
 LANGUAGES = {
