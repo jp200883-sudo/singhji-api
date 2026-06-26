@@ -17,13 +17,12 @@ CORS(app, resources={
 
 # ✅ FIXED MODULES — paths match ACTUAL folder names!
 MODULES = {
-    'telegram': {'name': 'Telegram Bot', 'path': 'modules.telegram.handler'},
+    'telegram': {'name': 'Telegram Bot', 'path': 'modules.telegrambot.handler'},  
     'plant': {'name': 'Plant ID', 'path': 'modules.plant.handler'},
     'memory': {'name': 'Supabase Memory', 'path': 'modules.memory.handler'},
     'language': {'name': 'Language Hub', 'path': 'modules.language.handler'},
-    'admin': {'name': 'Admin Panel', 'path': 'modules.adminpanal.handler'},  # ✅ FIXED: adminpanal (not adminpanel)
+    'admin': {'name': 'Admin Panel', 'path': 'modules.adminpanal.handler'},
 }
-
 @app.route('/api/debug/<module>')
 def debug_module(module):
     try:
