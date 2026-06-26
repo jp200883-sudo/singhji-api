@@ -1,10 +1,8 @@
 # modules/adminpanel/__init__.py — Singh Ji AI Ultra v5.0
-# This file = handler.py (Render free tier fix)
 # Admin Dashboard Backend
 
 from fastapi import APIRouter
 import os
-import json
 
 router = APIRouter()
 
@@ -27,15 +25,14 @@ def admin_health():
 @router.get("/stats")
 def admin_stats():
     """System-wide statistics"""
-    import psutil
     try:
+        import psutil
         return {
             "ok": True,
             "app": "Singh Ji AI Ultra v5.0",
             "system": {
                 "cpu_percent": psutil.cpu_percent(interval=0.1),
                 "memory_percent": psutil.virtual_memory().percent,
-                "disk_usage": psutil.disk_usage('/').percent if hasattr(psutil, 'disk_usage') else "N/A"
             },
             "modules": {
                 "language": "✅ Active",
@@ -50,7 +47,7 @@ def admin_stats():
         return {
             "ok": True,
             "app": "Singh Ji AI Ultra v5.0",
-            "system": {"note": "psutil not available on Render free tier"},
+            "system": {"note": "psutil not available"},
             "modules": {
                 "language": "✅ Active",
                 "telegram_bot": "✅ Active",
@@ -62,7 +59,6 @@ def admin_stats():
 
 @router.get("/modules")
 def list_modules():
-    """List all modules and their status"""
     return {
         "ok": True,
         "modules": [
@@ -76,14 +72,12 @@ def list_modules():
 
 @router.get("/verify")
 def verify_admin(key: str = ""):
-    """Verify admin access key"""
     if key == ADMIN_KEY:
         return {"ok": True, "admin": True, "message": "🦁 Welcome, Admin!"}
     return {"ok": False, "admin": False, "message": "❌ Invalid admin key"}
 
 @router.get("/config")
 def get_config():
-    """Get app configuration (safe values only)"""
     return {
         "ok": True,
         "app_name": "Singh Ji AI Ultra v5.0",
@@ -92,12 +86,4 @@ def get_config():
         "language_count": 58,
         "indian_languages": 22,
         "global_languages": 36,
-        "features": [
-            "Language Hub (58 languages)",
-            "Telegram Bot Integration",
-            "Plant ID (AI Plant Recognition)",
-            "Supabase Memory",
-            "Admin Dashboard",
-            "Bhashini Integration (Pending)"
-        ]
     }
