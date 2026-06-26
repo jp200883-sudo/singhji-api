@@ -16,7 +16,7 @@ CORS(app, resources={
 })
 
 MODULES = {
-    'admin': {'name': 'Admin Panel', 'path': 'modules.adminpanel.handler'},
+ 
     'telegram': {'name': 'Telegram Bot', 'path': 'modules.telegrambot.handler'},
     'plant': {'name': 'Plant ID', 'path': 'modules.plantid.handler'},
     'memory': {'name': 'Supabase Memory', 'path': 'modules.supabasememory.handler'},
