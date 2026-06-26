@@ -21,9 +21,8 @@ MODULES = {
     'plant': {'name': 'Plant ID', 'path': 'modules.plant.handler'},
     'memory': {'name': 'Supabase Memory', 'path': 'modules.memory.handler'},
     'language': {'name': 'Language Hub', 'path': 'modules.language.handler'},
+    'admin': {'name': 'Admin Panel', 'path': 'modules.adminpanel.handler'},  # ✅ adminpanel (not admin)
 }
-
-# 🐛 DEBUG ENDPOINT — MODULES ke baad, HOME se pehle
 @app.route('/api/debug/<module>')
 def debug_module(module):
     try:
