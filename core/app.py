@@ -1,105 +1,142 @@
-# core/app.py — v5.0 (ALL PATHS FIXED — NO DUPLICATES)
-from flask import Flask, jsonify, request
-from flask_cors import CORS
+# core/app.py — Singh Ji AI Ultra v5.0
+# Fix: Underscores added back to module paths
+# Date: 26 June 2026
+
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 import importlib
+import sys
 import os
-from datetime import datetime
 
-app = Flask(__name__)
+app = FastAPI(
+    title="Singh Ji AI Ultra v5.0",
+    description="भारत का ऑल-इन-वन सुपर ऐप — ज़ीरो फोन लोड, फुल ऑटोमेशन",
+    version="5.0.0"
+)
 
-CORS(app, resources={
-    r"/api/*": {
-        "origins": "*",
-        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        "allow_headers": ["Content-Type", "Authorization"]
-    }
-})
+# ✅ CORS — Allow ALL origins (GitHub Pages, localhost, etc.)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-# ✅ ALL MODULES — paths match ACTUAL folder names!
+# ========== MODULE REGISTRY (with underscores!) ==========
+# Module path → API prefix
 MODULES = {
-    'telegram': {'name': 'Telegram Bot', 'path': 'modules.telegram_bot.handler'},
-    'plant': {'name': 'Plant ID', 'path': 'modules.plant_id.handler'},
-    'memory': {'name': 'Supabase Memory', 'path': 'modules.supabase_memory.handler'},
-    'language': {'name': 'Language Hub', 'path': 'modules.language_hub.handler'},
-    'admin': {'name': 'Admin Panel', 'path': 'modules.adminpanal.handler'}
+    "modules.language": "/api/language",
+    "modules.telegram_bot": "/api/telegram",      # ✅ underscore
+    "modules.plant_id": "/api/plant",              # ✅ underscore
+    "modules.supabase_memory": "/api/memory",      # ✅ underscore
+    "modules.adminpanel": "/api/admin",
 }
 
-@app.route('/api/debug/<module>')
-def debug_module(module):
-    try:
-        module_path = MODULES[module]['path']
-        module_name, handler_name = module_path.rsplit('.', 1)
-        
-        mod = importlib.import_module(module_name)
-        has_handler = hasattr(mod, handler_name)
-        attrs = [a for a in dir(mod) if not a.startswith('_')]
-        
-        return jsonify({
-            "module": module,
-            "path": module_path,
-            "imported": True,
-            "has_handler": has_handler,
-            "handler_name": handler_name,
-            "available_attributes": attrs,
-            "file_location": mod.__file__ if hasattr(mod, '__file__') else 'unknown'
-        })
-    except Exception as e:
-        import traceback
-        return jsonify({
-            "module": module,
-            "error": str(e),
-            "traceback": traceback.format_exc()
-        }), 500
+# ========== HEALTH CHECK ==========
+@app.get("/api/health")
+def health():
+    return {"status": "🦁 Singh Ji AI Ultra v5.0 is LIVE!", "timestamp": str(__import__("datetime").datetime.now())}
 
-# 🏠 HOME
-@app.route('/')
-def home():
-    return jsonify({
-        "app": "Singh Ji AI Ultra v5.0",
-        "status": "live",
-        "phase": 4,
-        "message": "🦁 Singh Ji AI Ultra v5.0 is live!"
-    })
-
-# 💓 HEALTH
-@app.route('/api/health')
-def health_check():
-    return jsonify({
-        "status": "ok",
-        "app": "Singh Ji AI Ultra v5.0",
-        "phase": 4,
-        "timestamp": datetime.now().isoformat(),
-        "modules": len(MODULES),
-        "bhashini": "active" if os.environ.get('BHASHINI_API_KEY') else "pending"
-    }), 200
-
-# 📊 STATUS
-@app.route('/api/status')
+@app.get("/api/status")
 def status():
-    return jsonify({
+    loaded = []
+    failed = []
+    for mod_name, prefix in MODULES.items():
+        try:
+            mod = importlib.import_module(mod_name)
+            loaded.append({"module": mod_name, "prefix": prefix, "status": "✅ Loaded"})
+        except Exception as e:
+            failed.append({"module": mod_name, "prefix": prefix, "error": str(e)})
+    return {
         "app": "Singh Ji AI Ultra v5.0",
-        "phase": 4,
-        "modules": {k: v['name'] for k, v in MODULES.items()},
-        "total_modules": len(MODULES)
-    })
+        "loaded_modules": loaded,
+        "failed_modules": failed,
+        "total": len(MODULES),
+        "working": len(loaded),
+        "broken": len(failed)
+    }
 
-# 🧩 MODULE ROUTER
-@app.route('/api/<module>/<path:path>', methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'])
-def module_router(module, path):
-    if module not in MODULES:
-        return jsonify({"error": "Module not found", "available": list(MODULES.keys())}), 404
+# ========== DEBUG ENDPOINT ==========
+@app.get("/api/debug/{module_name}")
+def debug_module(module_name: str):
+    """Inspect any module — returns file path, classes, functions, errors"""
+    import inspect
+    result = {
+        "requested": module_name,
+        "module_path": None,
+        "file": None,
+        "exists": False,
+        "classes": [],
+        "functions": [],
+        "routes": [],
+        "error": None
+    }
     try:
-        module_path = MODULES[module]['path']
-        module_name, handler_name = module_path.rsplit('.', 1)
-        mod = importlib.import_module(module_name)
-        handler = getattr(mod, handler_name)
-        return handler(path, request)
-    except ModuleNotFoundError as e:
-        return jsonify({"error": f"Module not loaded: {str(e)}", "module": module}), 500
+        # Try with underscore variations
+        candidates = [
+            f"modules.{module_name}",
+            f"modules.{module_name.replace('_', '')}",
+        ]
+        for cand in candidates:
+            try:
+                mod = importlib.import_module(cand)
+                result["module_path"] = cand
+                result["file"] = getattr(mod, "__file__", "Unknown")
+                result["exists"] = True
+                for name, obj in inspect.getmembers(mod):
+                    if inspect.isclass(obj):
+                        result["classes"].append(name)
+                    elif inspect.isfunction(obj):
+                        result["functions"].append(name)
+                # Check for FastAPI router
+                if hasattr(mod, "router"):
+                    result["routes"] = [r.path for r in mod.router.routes]
+                break
+            except ImportError:
+                continue
+        if not result["exists"]:
+            result["error"] = f"Module '{module_name}' not found in modules/"
     except Exception as e:
-        return jsonify({"error": str(e), "module": module}), 500
+        result["error"] = str(e)
+    return result
 
-# 🚀 RUN
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=False)
+# ========== AUTO-LOAD ALL MODULES ==========
+def load_modules():
+    for mod_name, prefix in MODULES.items():
+        try:
+            mod = importlib.import_module(mod_name)
+            if hasattr(mod, "router"):
+                app.include_router(mod.router, prefix=prefix)
+                print(f"✅ Loaded: {mod_name} → {prefix}")
+            else:
+                print(f"⚠️ No router in: {mod_name}")
+        except Exception as e:
+            print(f"❌ Failed: {mod_name} → {e}")
+
+# Load on startup
+load_modules()
+
+# ========== ROOT ==========
+@app.get("/")
+def root():
+    return {
+        "name": "Singh Ji AI Ultra v5.0",
+        "tagline": "भारत का ऑल-इन-वन सुपर ऐप",
+        "status": "🦁 LIVE",
+        "endpoints": {
+            "health": "/api/health",
+            "status": "/api/status",
+            "language": "/api/language",
+            "telegram": "/api/telegram",
+            "plant": "/api/plant",
+            "memory": "/api/memory",
+            "admin": "/api/admin",
+            "debug": "/api/debug/{module}"
+        }
+    }
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=10000)
