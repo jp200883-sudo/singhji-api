@@ -1,6 +1,3 @@
-# modules/adminpanel/__init__.py — Singh Ji AI Ultra v5.0
-# Admin Dashboard Backend
-
 from fastapi import APIRouter
 import os
 
