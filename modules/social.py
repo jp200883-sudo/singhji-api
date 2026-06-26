@@ -2,7 +2,7 @@
 # 📱 Social Media
 
 from fastapi import APIRouter
-from core.config import settings
+from config.settings import settings 
 
 router = APIRouter()
 
