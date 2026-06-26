@@ -10,12 +10,8 @@ BHASHINI_URL = "https://meity-auth.ulcacontrib.org/ulca/apis/v0/model"
 NLLB_API_URL = "https://api-inference.huggingface.co/models/facebook/nllb-200-distilled-600M"
 HF_TOKEN = os.environ.get('HUGGINGFACE_TOKEN', '')
 
-# Gemini API
-GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
-
 # 50+ Languages
 LANGUAGES = {
-    # Indian Languages (Bhashini)
     'hi': {'name': 'हिन्दी', 'source': 'bhashini', 'hello': 'नमस्ते'},
     'bn': {'name': 'বাংলা', 'source': 'bhashini', 'hello': 'নমস্কার'},
     'te': {'name': 'తెలుగు', 'source': 'bhashini', 'hello': 'నమస్కారం'},
@@ -38,8 +34,6 @@ LANGUAGES = {
     'doi': {'name': 'डोगरी', 'source': 'bhashini', 'hello': 'नमस्कार'},
     'mai': {'name': 'मैथिली', 'source': 'bhashini', 'hello': 'नमस्कार'},
     'sat': {'name': 'ᱥᱟᱱᱛᱟᱲᱤ', 'source': 'bhashini', 'hello': 'ᱡᱚᱦᱟᱨ'},
-
-    # Global Languages (NLLB-200)
     'en': {'name': 'English', 'source': 'nllb', 'hello': 'Hello'},
     'zh': {'name': '中文', 'source': 'nllb', 'hello': '你好'},
     'ja': {'name': '日本語', 'source': 'nllb', 'hello': 'こんにちは'},
