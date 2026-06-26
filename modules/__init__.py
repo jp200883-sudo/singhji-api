@@ -1,6 +1,3 @@
-# modules/telegram_bot/__init__.py — Singh Ji AI Ultra v5.0
-# FASTAPI VERSION — NO FLASK!
-
 from fastapi import APIRouter, Request
 import os
 
