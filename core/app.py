@@ -15,28 +15,23 @@ CORS(app, resources={
     }
 })
 
+# ✅ FIXED MODULES — paths match actual folder names!
 MODULES = {
- 
-    'telegram': {'name': 'Telegram Bot', 'path': 'modules.telegrambot.handler'},
-    'plant': {'name': 'Plant ID', 'path': 'modules.plantid.handler'},
-    'memory': {'name': 'Supabase Memory', 'path': 'modules.supabasememory.handler'},
-    'language': {'name': 'Language Hub', 'path': 'modules.languagehub.handler'},
+    'telegram': {'name': 'Telegram Bot', 'path': 'modules.telegram.handler'},
+    'plant': {'name': 'Plant ID', 'path': 'modules.plant.handler'},
+    'memory': {'name': 'Supabase Memory', 'path': 'modules.memory.handler'},
+    'language': {'name': 'Language Hub', 'path': 'modules.language.handler'},
 }
-# core/app.py में यह add करो (MODULES के बाद)
 
+# 🐛 DEBUG ENDPOINT — MODULES ke baad, HOME se pehle
 @app.route('/api/debug/<module>')
 def debug_module(module):
     try:
         module_path = MODULES[module]['path']
         module_name, handler_name = module_path.rsplit('.', 1)
         
-        # Try to import
         mod = importlib.import_module(module_name)
-        
-        # Check if handler exists
         has_handler = hasattr(mod, handler_name)
-        
-        # Get all attributes
         attrs = [a for a in dir(mod) if not a.startswith('_')]
         
         return jsonify({
@@ -55,6 +50,7 @@ def debug_module(module):
             "error": str(e),
             "traceback": traceback.format_exc()
         }), 500
+
 # 🏠 HOME
 @app.route('/')
 def home():
