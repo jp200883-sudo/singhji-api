@@ -17,10 +17,12 @@ CORS(app, resources={
 
 # ✅ ALL MODULES — paths match ACTUAL folder names!
 MODULES = {
-    'telegram': {'name': 'Telegram Bot', 'path': 'modules.telegram_bot.handler'},     
-    'plant': {'name': 'Plant ID', 'path': 'modules.plant_id.handler'},                
-    'memory': {'name': 'Supabase Memory', 'path': 'modules.supabase_memory.handler'},   
-    'language': {'name': 'Language Hub', 'path': 'modules.language_hub.handler'},    # core/app.py — v5.0 (ALL PATHS FIXED)
+    'telegram': {'name': 'Telegram Bot', 'path': 'modules.telegram_bot.handler'},
+    'plant': {'name': 'Plant ID', 'path': 'modules.plant_id.handler'},
+    'memory': {'name': 'Supabase Memory', 'path': 'modules.supabase_memory.handler'},
+    'language': {'name': 'Language Hub', 'path': 'modules.language_hub.handler'},
+    'admin': {'name': 'Admin Panel', 'path': 'modules.adminpanal.handler'}  
+}
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 import importlib
