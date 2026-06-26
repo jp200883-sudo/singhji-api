@@ -92,11 +92,6 @@
             border-top: 1px solid rgba(255,255,255,0.1);
             margin-top: 50px;
         }
-        .indian-flag {
-            display: inline-block;
-            font-size: 2em;
-            margin: 0 10px;
-        }
         .test-btn {
             background: linear-gradient(90deg, #ff9933, #ff6b35);
             color: white;
@@ -122,10 +117,7 @@
             display: none;
         }
         .api-response.show { display: block; }
-        .loading { display: none; color: #ff9933; }
-        .loading.show { display: inline; }
     </style>
-<base target="_blank">
 </head>
 <body>
     <div class="header">
@@ -135,7 +127,6 @@
     </div>
 
     <div class="container">
-        <!-- Status Bar -->
         <div class="status-bar">
             <div class="status-live">🟢 Backend Live: <span id="backend-url">https://singhji-api.onrender.com</span></div>
             <div style="margin-top:10px;color:#aaa;">
@@ -145,7 +136,6 @@
             <div id="status-response" class="api-response"></div>
         </div>
 
-        <!-- Modules Grid -->
         <h2 style="text-align:center;margin-bottom:20px;">⚡ Modules</h2>
         <div class="modules-grid">
             <div class="module-card" onclick="testModule('language')">
@@ -189,17 +179,13 @@
             </div>
         </div>
 
-        <!-- Language Section -->
         <div class="lang-section">
             <h2 style="text-align:center;margin-bottom:10px;">🌍 Language Hub — 58 Languages</h2>
             <p style="text-align:center;color:#aaa;margin-bottom:20px;">Click any language to say Hello!</p>
-            <div class="lang-grid" id="lang-grid">
-                <!-- Languages loaded dynamically -->
-            </div>
+            <div class="lang-grid" id="lang-grid"></div>
             <div id="hello-response" class="api-response" style="margin-top:20px;"></div>
         </div>
 
-        <!-- Quick Links -->
         <div class="lang-section">
             <h2 style="text-align:center;margin-bottom:20px;">🔗 Quick Links</h2>
             <div style="display:flex;flex-wrap:wrap;gap:15px;justify-content:center;">
@@ -212,7 +198,6 @@
     </div>
 
     <div class="footer">
-        <div class="indian-flag">🇮🇳</div>
         <p>🦁 Singh Ji AI Ultra v5.0</p>
         <p style="margin-top:10px;">Made with ❤️ in India</p>
         <p style="margin-top:10px;font-size:0.8em;">Backend: <a href="https://singhji-api.onrender.com" style="color:#ff9933;">singhji-api.onrender.com</a></p>
@@ -221,85 +206,60 @@
     <script>
         const API_BASE = "https://singhji-api.onrender.com";
 
-        // Load languages on page load
         async function loadLanguages() {
             try {
                 const res = await fetch(`${API_BASE}/api/language/list`);
                 const data = await res.json();
                 const grid = document.getElementById('lang-grid');
-
+                
                 if (data.languages) {
                     Object.entries(data.languages).forEach(([code, lang]) => {
                         const div = document.createElement('div');
                         div.className = 'lang-item';
-                        div.innerHTML = `
-                            <div class="lang-hello">${lang.hello}</div>
-                            <div class="lang-name">${lang.name}</div>
-                        `;
+                        div.innerHTML = `<div class="lang-hello">${lang.hello}</div><div class="lang-name">${lang.name}</div>`;
                         div.onclick = () => sayHello(code);
                         grid.appendChild(div);
                     });
                 }
-            } catch (e) {
-                console.error('Error loading languages:', e);
-            }
+            } catch (e) { console.error('Error:', e); }
         }
 
         async function sayHello(code) {
-            const responseDiv = document.getElementById('hello-response');
-            responseDiv.classList.add('show');
-            responseDiv.textContent = 'Loading...';
-
+            const div = document.getElementById('hello-response');
+            div.classList.add('show'); div.textContent = 'Loading...';
             try {
                 const res = await fetch(`${API_BASE}/api/language/hello/${code}`);
                 const data = await res.json();
-                responseDiv.textContent = JSON.stringify(data, null, 2);
-            } catch (e) {
-                responseDiv.textContent = 'Error: ' + e.message;
-            }
+                div.textContent = JSON.stringify(data, null, 2);
+            } catch (e) { div.textContent = 'Error: ' + e.message; }
         }
 
         async function checkStatus() {
-            const responseDiv = document.getElementById('status-response');
-            responseDiv.classList.add('show');
-            responseDiv.textContent = 'Loading...';
-
+            const div = document.getElementById('status-response');
+            div.classList.add('show'); div.textContent = 'Loading...';
             try {
                 const res = await fetch(`${API_BASE}/api/status`);
                 const data = await res.json();
-                responseDiv.textContent = JSON.stringify(data, null, 2);
-                document.getElementById('modules-count').textContent = 
-                    `${data.working}/${data.total} Modules Loaded`;
-            } catch (e) {
-                responseDiv.textContent = 'Error: ' + e.message;
-            }
+                div.textContent = JSON.stringify(data, null, 2);
+                document.getElementById('modules-count').textContent = `${data.working}/${data.total} Modules Loaded`;
+            } catch (e) { div.textContent = 'Error: ' + e.message; }
         }
 
         async function testModule(module) {
-            const responseDiv = document.getElementById(`${module}-response`);
-            responseDiv.classList.add('show');
-            responseDiv.textContent = 'Loading...';
-
+            const div = document.getElementById(`${module}-response`);
+            div.classList.add('show'); div.textContent = 'Loading...';
             const endpoints = {
-                language: '/api/language/health',
-                telegram: '/api/telegram/health',
-                plant: '/api/plant/health',
-                memory: '/api/memory/health',
-                admin: '/api/admin/health'
+                language: '/api/language/health', telegram: '/api/telegram/health',
+                plant: '/api/plant/health', memory: '/api/memory/health', admin: '/api/admin/health'
             };
-
             try {
                 const res = await fetch(`${API_BASE}${endpoints[module]}`);
                 const data = await res.json();
-                responseDiv.textContent = JSON.stringify(data, null, 2);
-            } catch (e) {
-                responseDiv.textContent = 'Error: ' + e.message;
-            }
+                div.textContent = JSON.stringify(data, null, 2);
+            } catch (e) { div.textContent = 'Error: ' + e.message; }
         }
 
-        // Load on startup
-        loadLanguages();
-        checkStatus();
+        loadLanguages(); checkStatus();
     </script>
 </body>
 </html>
