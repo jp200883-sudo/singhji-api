@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from config.settings import settings 
 router = APIRouter()
 
 @router.get("/")
