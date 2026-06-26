@@ -1,237 +1,125 @@
-from flask import jsonify, request
-import os
-import requests
+# modules/language/__init__.py — Singh Ji AI Ultra v5.0
+# Language Hub — 58 Languages (22 Indian + 36 Global)
 
-# Bhashini API (Govt of India)
-BHASHINI_API_KEY = os.environ.get('BHASHINI_API_KEY', '')
-BHASHINI_URL = "https://meity-auth.ulcacontrib.org/ulca/apis/v0/model"
+from fastapi import APIRouter
 
-# NLLB-200 (Meta) - via Hugging Face
-NLLB_API_URL = "https://api-inference.huggingface.co/models/facebook/nllb-200-distilled-600M"
-HF_TOKEN = os.environ.get('HUGGINGFACE_TOKEN', '')
+router = APIRouter()
 
-# 50+ Languages
+# 58 Languages Database
 LANGUAGES = {
-    'hi': {'name': 'हिन्दी', 'source': 'bhashini', 'hello': 'नमस्ते'},
-    'bn': {'name': 'বাংলা', 'source': 'bhashini', 'hello': 'নমস্কার'},
-    'te': {'name': 'తెలుగు', 'source': 'bhashini', 'hello': 'నమస్కారం'},
-    'ta': {'name': 'தமிழ்', 'source': 'bhashini', 'hello': 'வணக்கம்'},
-    'mr': {'name': 'मराठी', 'source': 'bhashini', 'hello': 'नमस्कार'},
-    'gu': {'name': 'ગુજરાતી', 'source': 'bhashini', 'hello': 'નમસ્તે'},
-    'kn': {'name': 'ಕನ್ನಡ', 'source': 'bhashini', 'hello': 'ನಮಸ್ಕಾರ'},
-    'ml': {'name': 'മലയാളം', 'source': 'bhashini', 'hello': 'നമസ്കാരം'},
-    'pa': {'name': 'ਪੰਜਾਬੀ', 'source': 'bhashini', 'hello': 'ਸਤ ਸ੍ਰੀ ਅਕਾਲ'},
-    'ur': {'name': 'اردو', 'source': 'bhashini', 'hello': 'السلام علیکم'},
-    'or': {'name': 'ଓଡ଼ିଆ', 'source': 'bhashini', 'hello': 'ନମସ୍କାର'},
-    'as': {'name': 'অসমীয়া', 'source': 'bhashini', 'hello': 'নমস্কাৰ'},
-    'ne': {'name': 'नेपाली', 'source': 'bhashini', 'hello': 'नमस्ते'},
-    'si': {'name': 'සිංහල', 'source': 'bhashini', 'hello': 'ආයුබෝවන්'},
-    'sd': {'name': 'سنڌي', 'source': 'bhashini', 'hello': 'سلام'},
-    'sa': {'name': 'संस्कृत', 'source': 'bhashini', 'hello': 'नमो नमः'},
-    'kok': {'name': 'कोंकणी', 'source': 'bhashini', 'hello': 'नमस्कार'},
-    'mni': {'name': 'মৈতৈলোন্', 'source': 'bhashini', 'hello': 'খুরুমজরি'},
-    'brx': {'name': 'बड़ो', 'source': 'bhashini', 'hello': 'नमसे'},
-    'doi': {'name': 'डोगरी', 'source': 'bhashini', 'hello': 'नमस्कार'},
-    'mai': {'name': 'मैथिली', 'source': 'bhashini', 'hello': 'नमस्कार'},
-    'sat': {'name': 'ᱥᱟᱱᱛᱟᱲᱤ', 'source': 'bhashini', 'hello': 'ᱡᱚᱦᱟᱨ'},
-    'en': {'name': 'English', 'source': 'nllb', 'hello': 'Hello'},
-    'zh': {'name': '中文', 'source': 'nllb', 'hello': '你好'},
-    'ja': {'name': '日本語', 'source': 'nllb', 'hello': 'こんにちは'},
-    'ko': {'name': '한국어', 'source': 'nllb', 'hello': '안녕하세요'},
-    'ar': {'name': 'العربية', 'source': 'nllb', 'hello': 'مرحبا'},
-    'fr': {'name': 'Français', 'source': 'nllb', 'hello': 'Bonjour'},
-    'de': {'name': 'Deutsch', 'source': 'nllb', 'hello': 'Hallo'},
-    'es': {'name': 'Español', 'source': 'nllb', 'hello': 'Hola'},
-    'it': {'name': 'Italiano', 'source': 'nllb', 'hello': 'Ciao'},
-    'pt': {'name': 'Português', 'source': 'nllb', 'hello': 'Olá'},
-    'ru': {'name': 'Русский', 'source': 'nllb', 'hello': 'Привет'},
-    'tr': {'name': 'Türkçe', 'source': 'nllb', 'hello': 'Merhaba'},
-    'th': {'name': 'ไทย', 'source': 'nllb', 'hello': 'สวัสดี'},
-    'vi': {'name': 'Tiếng Việt', 'source': 'nllb', 'hello': 'Xin chào'},
-    'id': {'name': 'Bahasa Indonesia', 'source': 'nllb', 'hello': 'Halo'},
-    'ms': {'name': 'Bahasa Melayu', 'source': 'nllb', 'hello': 'Hai'},
-    'tl': {'name': 'Filipino', 'source': 'nllb', 'hello': 'Kamusta'},
-    'pl': {'name': 'Polski', 'source': 'nllb', 'hello': 'Cześć'},
-    'uk': {'name': 'Українська', 'source': 'nllb', 'hello': 'Привіт'},
-    'ro': {'name': 'Română', 'source': 'nllb', 'hello': 'Salut'},
-    'nl': {'name': 'Nederlands', 'source': 'nllb', 'hello': 'Hallo'},
-    'sv': {'name': 'Svenska', 'source': 'nllb', 'hello': 'Hej'},
-    'no': {'name': 'Norsk', 'source': 'nllb', 'hello': 'Hei'},
-    'da': {'name': 'Dansk', 'source': 'nllb', 'hello': 'Hej'},
-    'fi': {'name': 'Suomi', 'source': 'nllb', 'hello': 'Hei'},
-    'cs': {'name': 'Čeština', 'source': 'nllb', 'hello': 'Ahoj'},
-    'hu': {'name': 'Magyar', 'source': 'nllb', 'hello': 'Szia'},
-    'el': {'name': 'Ελληνικά', 'source': 'nllb', 'hello': 'Γεια σας'},
-    'he': {'name': 'עברית', 'source': 'nllb', 'hello': 'שלום'},
-    'fa': {'name': 'فارسی', 'source': 'nllb', 'hello': 'سلام'},
-    'sw': {'name': 'Kiswahili', 'source': 'nllb', 'hello': 'Habari'},
-    'am': {'name': 'አማርኛ', 'source': 'nllb', 'hello': 'ሰላም'},
-    'ha': {'name': 'Hausa', 'source': 'nllb', 'hello': 'Sannu'},
-    'yo': {'name': 'Yorùbá', 'source': 'nllb', 'hello': 'Báwo ni'},
-    'ig': {'name': 'Igbo', 'source': 'nllb', 'hello': 'Nnọọ'},
-    'zu': {'name': 'isiZulu', 'source': 'nllb', 'hello': 'Sawubona'},
+    # Indian Languages (22)
+    "hi": {"name": "Hindi", "hello": "नमस्ते", "native": "हिन्दी", "region": "India"},
+    "bn": {"name": "Bengali", "hello": "নমস্কার", "native": "বাংলা", "region": "India"},
+    "te": {"name": "Telugu", "hello": "నమస్కారం", "native": "తెలుగు", "region": "India"},
+    "mr": {"name": "Marathi", "hello": "नमस्कार", "native": "मराठी", "region": "India"},
+    "ta": {"name": "Tamil", "hello": "வணக்கம்", "native": "தமிழ்", "region": "India"},
+    "ur": {"name": "Urdu", "hello": "السلام علیکم", "native": "اردو", "region": "India"},
+    "gu": {"name": "Gujarati", "hello": "નમસ્તે", "native": "ગુજરાતી", "region": "India"},
+    "kn": {"name": "Kannada", "hello": "ನಮಸ್ಕಾರ", "native": "ಕನ್ನಡ", "region": "India"},
+    "ml": {"name": "Malayalam", "hello": "നമസ്കാരം", "native": "മലയാളം", "region": "India"},
+    "pa": {"name": "Punjabi", "hello": "ਸਤ ਸ੍ਰੀ ਅਕਾਲ", "native": "ਪੰਜਾਬੀ", "region": "India"},
+    "or": {"name": "Odia", "hello": "ନମସ୍କାର", "native": "ଓଡ଼ିଆ", "region": "India"},
+    "as": {"name": "Assamese", "hello": "নমস্কাৰ", "native": "অসমীয়া", "region": "India"},
+    "ne": {"name": "Nepali", "hello": "नमस्ते", "native": "नेपाली", "region": "India"},
+    "si": {"name": "Sinhala", "hello": "ආයුබෝවන්", "native": "සිංහල", "region": "India"},
+    "kok": {"name": "Konkani", "hello": "नमस्कार", "native": "कोंकणी", "region": "India"},
+    "mni": {"name": "Manipuri", "hello": "ꯍꯦꯜꯂꯣ", "native": "মৈতৈলোন্", "region": "India"},
+    "doi": {"name": "Dogri", "hello": "नमस्कार", "native": "डोगरी", "region": "India"},
+    "sat": {"name": "Santali", "hello": "ᱡᱚᱦᱟᱨ", "native": "ᱥᱟᱱᱛᱟᱲᱤ", "region": "India"},
+    "ks": {"name": "Kashmiri", "hello": "السلام علیکم", "native": "कॉशुर", "region": "India"},
+    "sd": {"name": "Sindhi", "hello": "सलाम", "native": "سنڌي", "region": "India"},
+    "brx": {"name": "Bodo", "hello": "नमस्कार", "native": "बड़ो", "region": "India"},
+    "mai": {"name": "Maithili", "hello": "प्रणाम", "native": "मैथिली", "region": "India"},
+    
+    # Global Languages (36)
+    "en": {"name": "English", "hello": "Hello", "native": "English", "region": "Global"},
+    "es": {"name": "Spanish", "hello": "Hola", "native": "Español", "region": "Global"},
+    "fr": {"name": "French", "hello": "Bonjour", "native": "Français", "region": "Global"},
+    "de": {"name": "German", "hello": "Hallo", "native": "Deutsch", "region": "Global"},
+    "zh": {"name": "Chinese", "hello": "你好", "native": "中文", "region": "Global"},
+    "ja": {"name": "Japanese", "hello": "こんにちは", "native": "日本語", "region": "Global"},
+    "ko": {"name": "Korean", "hello": "안녕하세요", "native": "한국어", "region": "Global"},
+    "ru": {"name": "Russian", "hello": "Привет", "native": "Русский", "region": "Global"},
+    "ar": {"name": "Arabic", "hello": "مرحبا", "native": "العربية", "region": "Global"},
+    "pt": {"name": "Portuguese", "hello": "Olá", "native": "Português", "region": "Global"},
+    "it": {"name": "Italian", "hello": "Ciao", "native": "Italiano", "region": "Global"},
+    "tr": {"name": "Turkish", "hello": "Merhaba", "native": "Türkçe", "region": "Global"},
+    "vi": {"name": "Vietnamese", "hello": "Xin chào", "native": "Tiếng Việt", "region": "Global"},
+    "th": {"name": "Thai", "hello": "สวัสดี", "native": "ไทย", "region": "Global"},
+    "id": {"name": "Indonesian", "hello": "Halo", "native": "Bahasa Indonesia", "region": "Global"},
+    "ms": {"name": "Malay", "hello": "Hai", "native": "Bahasa Melayu", "region": "Global"},
+    "pl": {"name": "Polish", "hello": "Cześć", "native": "Polski", "region": "Global"},
+    "nl": {"name": "Dutch", "hello": "Hallo", "native": "Nederlands", "region": "Global"},
+    "sv": {"name": "Swedish", "hello": "Hej", "native": "Svenska", "region": "Global"},
+    "el": {"name": "Greek", "hello": "Γειά σου", "native": "Ελληνικά", "region": "Global"},
+    "cs": {"name": "Czech", "hello": "Ahoj", "native": "Čeština", "region": "Global"},
+    "ro": {"name": "Romanian", "hello": "Salut", "native": "Română", "region": "Global"},
+    "hu": {"name": "Hungarian", "hello": "Szia", "native": "Magyar", "region": "Global"},
+    "he": {"name": "Hebrew", "hello": "שלום", "native": "עברית", "region": "Global"},
+    "uk": {"name": "Ukrainian", "hello": "Привіт", "native": "Українська", "region": "Global"},
+    "fa": {"name": "Persian", "hello": "سلام", "native": "فارسی", "region": "Global"},
+    "my": {"name": "Burmese", "hello": "မင်္ဂလာပါ", "native": "မြန်မာဘာသာ", "region": "Global"},
+    "km": {"name": "Khmer", "hello": "សួស្តី", "native": "ភាសាខ្មែរ", "region": "Global"},
+    "la": {"name": "Latin", "hello": "Salve", "native": "Latina", "region": "Global"},
+    "no": {"name": "Norwegian", "hello": "Hei", "native": "Norsk", "region": "Global"},
+    "fi": {"name": "Finnish", "hello": "Hei", "native": "Suomi", "region": "Global"},
+    "da": {"name": "Danish", "hello": "Hej", "native": "Dansk", "region": "Global"},
+    "sr": {"name": "Serbian", "hello": "Здраво", "native": "Српски", "region": "Global"},
+    "hr": {"name": "Croatian", "hello": "Bok", "native": "Hrvatski", "region": "Global"},
+    "bg": {"name": "Bulgarian", "hello": "Здравейте", "native": "Български", "region": "Global"},
+    "lt": {"name": "Lithuanian", "hello": "Labas", "native": "Lietuvių", "region": "Global"},
 }
 
-def handler(path, request_obj):
-    method = request_obj.method
+@router.get("/health")
+def language_health():
+    return {
+        "module": "language",
+        "status": "✅ OK",
+        "total_languages": len(LANGUAGES),
+        "indian": 22,
+        "global": 36
+    }
 
-    if path == 'list' and method == 'GET':
-        return jsonify({
-            "status": "success",
-            "total": len(LANGUAGES),
-            "indian": sum(1 for v in LANGUAGES.values() if v['source'] == 'bhashini'),
-            "global": sum(1 for v in LANGUAGES.values() if v['source'] == 'nllb'),
-            "languages": {k: {"name": v['name'], "source": v['source']} for k, v in LANGUAGES.items()}
-        })
+@router.get("/list")
+def list_languages():
+    """Return all 58 languages"""
+    return {
+        "ok": True,
+        "count": len(LANGUAGES),
+        "indian_count": 22,
+        "global_count": 36,
+        "languages": LANGUAGES
+    }
 
-    elif path == 'translate' and method == 'POST':
-        data = request_obj.json
-        return translate(data)
-
-    elif path == 'detect' and method == 'POST':
-        data = request_obj.json
-        return detect_language(data)
-
-    elif path.startswith('hello/') and method == 'GET':
-        lang_code = path.split('/')[-1]
-        return get_hello(lang_code)
-
-    else:
-        return jsonify({"error": "Language endpoint not found"}), 404
-
-
-def translate(data):
-    text = data.get('text', '')
-    from_lang = data.get('from', 'en')
-    to_lang = data.get('to', 'hi')
-
-    if to_lang not in LANGUAGES:
-        return jsonify({"error": "Language not supported"}), 400
-
-    source = LANGUAGES[to_lang]['source']
-
-    if source == 'bhashini' and BHASHINI_API_KEY:
-        return bhashini_translate(text, from_lang, to_lang)
-    else:
-        return nllb_translate(text, from_lang, to_lang)
-
-
-def bhashini_translate(text, from_lang, to_lang):
-    try:
-        headers = {
-            "Authorization": BHASHINI_API_KEY,
-            "Content-Type": "application/json"
+@router.get("/hello/{code}")
+def say_hello(code: str):
+    """Say hello in any language"""
+    lang = LANGUAGES.get(code.lower())
+    if not lang:
+        return {
+            "ok": False,
+            "error": f"Language code '{code}' not found",
+            "available": list(LANGUAGES.keys())
         }
+    return {
+        "ok": True,
+        "code": code,
+        "language": lang["name"],
+        "native": lang["native"],
+        "hello": lang["hello"],
+        "region": lang["region"]
+    }
 
-        payload = {
-            "input": [{"source": text}],
-            "config": {
-                "language": {
-                    "sourceLanguage": from_lang,
-                    "targetLanguage": to_lang
-                }
-            }
-        }
-
-        res = requests.post(f"{BHASHINI_URL}/compute", json=payload, headers=headers, timeout=10)
-        data = res.json()
-
-        if 'output' in data and len(data['output']) > 0:
-            translated = data['output'][0].get('target', text)
-            return jsonify({
-                "status": "translated",
-                "source": "bhashini",
-                "original": text,
-                "translated": translated,
-                "from": from_lang,
-                "to": to_lang
-            })
-
-        return nllb_translate(text, from_lang, to_lang)
-
-    except Exception as e:
-        return nllb_translate(text, from_lang, to_lang)
-
-
-def nllb_translate(text, from_lang, to_lang):
-    try:
-        headers = {"Authorization": f"Bearer {HF_TOKEN}"} if HF_TOKEN else {}
-
-        payload = {
-            "inputs": text,
-            "parameters": {
-                "src_lang": from_lang,
-                "tgt_lang": to_lang
-            }
-        }
-
-        res = requests.post(NLLB_API_URL, json=payload, headers=headers, timeout=15)
-        data = res.json()
-
-        if isinstance(data, list) and len(data) > 0:
-            translated = data[0].get('translation_text', text)
-        else:
-            translated = text
-
-        return jsonify({
-            "status": "translated",
-            "source": "nllb-200",
-            "original": text,
-            "translated": translated,
-            "from": from_lang,
-            "to": to_lang
-        })
-
-    except Exception as e:
-        return jsonify({
-            "status": "fallback",
-            "source": "gemini-ready",
-            "original": text,
-            "translated": text,
-            "note": "Translation service temporarily unavailable",
-            "from": from_lang,
-            "to": to_lang
-        })
-
-
-def detect_language(data):
-    text = data.get('text', '')
-
-    if any('\u0900' <= c <= '\u097F' for c in text):
-        detected = 'hi'
-    elif any('\u0980' <= c <= '\u09FF' for c in text):
-        detected = 'bn'
-    elif any('\u0C00' <= c <= '\u0C7F' for c in text):
-        detected = 'te'
-    elif any('\u0B80' <= c <= '\u0BFF' for c in text):
-        detected = 'ta'
-    elif any('\u0600' <= c <= '\u06FF' for c in text):
-        detected = 'ur'
-    elif any('\u4E00' <= c <= '\u9FFF' for c in text):
-        detected = 'zh'
-    elif any('\u3040' <= c <= '\u309F' or '\u30A0' <= c <= '\u30FF' for c in text):
-        detected = 'ja'
-    elif any('\uAC00' <= c <= '\uD7AF' for c in text):
-        detected = 'ko'
-    elif any('\u0400' <= c <= '\u04FF' for c in text):
-        detected = 'ru'
-    else:
-        detected = 'en'
-
-    return jsonify({
-        "status": "detected",
-        "language": detected,
-        "name": LANGUAGES.get(detected, {}).get('name', 'Unknown'),
-        "source": LANGUAGES.get(detected, {}).get('source', 'nllb')
-    })
-
-
-def get_hello(lang_code):
-    if lang_code in LANGUAGES:
-        return jsonify({
-            "status": "found",
-            "code": lang_code,
-            "hello": LANGUAGES[lang_code]['hello'],
-            "name": LANGUAGES[lang_code]['name']
-        })
-    return jsonify({"status": "not_found"}), 404
+@router.post("/translate")
+async def translate_text(text: str, target: str = "hi"):
+    """Simple translation (fallback mode)"""
+    # Fallback: Return original with note
+    # Full Bhashini integration coming after approval
+    return {
+        "ok": True,
+        "original": text,
+        "target_language": target,
+        "translated": text,  # Placeholder
+        "note": "Full translation powered by Bhashini API - approval pending",
+        "mode": "fallback"
+    }
