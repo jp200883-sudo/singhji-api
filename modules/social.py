@@ -2,14 +2,18 @@ from fastapi import APIRouter
 from core.config import settings
 
 router = APIRouter()
+
 @router.get("/")
 def social_home():
     return {
         "module": "social",
-        "status": "ok",
-        "platforms": settings.SOCIAL_PLATFORMS
+        "status": "ok"
     }
-@router.get("/platforms")
-def social_platforms():
+
+@router.post("/post")
+def social_post(message: str = ""):
+    return {
+        "message": message,
         "platforms": ["instagram", "facebook", "twitter", "whatsapp", "telegram"],
-        "status": "active"
+        "status": "mock_posted"
+    }
