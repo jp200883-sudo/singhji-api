@@ -1,13 +1,11 @@
 # modules/language/__init__.py — Singh Ji AI Ultra v5.0
-# Language Hub — 58 Languages (22 Indian + 36 Global)
+# Language Hub — 58 Languages
 
 from fastapi import APIRouter
 
 router = APIRouter()
 
-# 58 Languages Database
 LANGUAGES = {
-    # Indian Languages (22)
     "hi": {"name": "Hindi", "hello": "नमस्ते", "native": "हिन्दी", "region": "India"},
     "bn": {"name": "Bengali", "hello": "নমস্কার", "native": "বাংলা", "region": "India"},
     "te": {"name": "Telugu", "hello": "నమస్కారం", "native": "తెలుగు", "region": "India"},
@@ -30,8 +28,6 @@ LANGUAGES = {
     "sd": {"name": "Sindhi", "hello": "सलाम", "native": "سنڌي", "region": "India"},
     "brx": {"name": "Bodo", "hello": "नमस्कार", "native": "बड़ो", "region": "India"},
     "mai": {"name": "Maithili", "hello": "प्रणाम", "native": "मैथिली", "region": "India"},
-    
-    # Global Languages (36)
     "en": {"name": "English", "hello": "Hello", "native": "English", "region": "Global"},
     "es": {"name": "Spanish", "hello": "Hola", "native": "Español", "region": "Global"},
     "fr": {"name": "French", "hello": "Bonjour", "native": "Français", "region": "Global"},
@@ -72,54 +68,19 @@ LANGUAGES = {
 
 @router.get("/health")
 def language_health():
-    return {
-        "module": "language",
-        "status": "✅ OK",
-        "total_languages": len(LANGUAGES),
-        "indian": 22,
-        "global": 36
-    }
+    return {"module": "language", "status": "✅ OK", "total_languages": len(LANGUAGES), "indian": 22, "global": 36}
 
 @router.get("/list")
 def list_languages():
-    """Return all 58 languages"""
-    return {
-        "ok": True,
-        "count": len(LANGUAGES),
-        "indian_count": 22,
-        "global_count": 36,
-        "languages": LANGUAGES
-    }
+    return {"ok": True, "count": len(LANGUAGES), "indian_count": 22, "global_count": 36, "languages": LANGUAGES}
 
 @router.get("/hello/{code}")
 def say_hello(code: str):
-    """Say hello in any language"""
     lang = LANGUAGES.get(code.lower())
     if not lang:
-        return {
-            "ok": False,
-            "error": f"Language code '{code}' not found",
-            "available": list(LANGUAGES.keys())
-        }
-    return {
-        "ok": True,
-        "code": code,
-        "language": lang["name"],
-        "native": lang["native"],
-        "hello": lang["hello"],
-        "region": lang["region"]
-    }
+        return {"ok": False, "error": f"Language code '{code}' not found", "available": list(LANGUAGES.keys())}
+    return {"ok": True, "code": code, "language": lang["name"], "native": lang["native"], "hello": lang["hello"], "region": lang["region"]}
 
 @router.post("/translate")
 async def translate_text(text: str, target: str = "hi"):
-    """Simple translation (fallback mode)"""
-    # Fallback: Return original with note
-    # Full Bhashini integration coming after approval
-    return {
-        "ok": True,
-        "original": text,
-        "target_language": target,
-        "translated": text,  # Placeholder
-        "note": "Full translation powered by Bhashini API - approval pending",
-        "mode": "fallback"
-    }
+    return {"ok": True, "original": text, "target_language": target, "translated": text, "note": "Bhashini API integration pending", "mode": "fallback"}
