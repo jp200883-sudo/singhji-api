@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from config.settings import settings
+from core.config.settings import settings
 router = APIRouter()
 @router.get("/")
 def ai_chat_home():
