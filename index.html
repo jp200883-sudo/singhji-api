@@ -3,263 +3,139 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🦁 Singh Ji AI Ultra v5.0 - भारत का ऑल-इन-वन सुपर ऐप</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
-            min-height: 100vh;
-            color: #fff;
-        }
-        .header {
-            text-align: center;
-            padding: 30px 20px;
-            background: linear-gradient(90deg, #ff9933, #ffffff, #138808);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-        .header h1 { font-size: 2.5em; margin-bottom: 10px; }
-        .header p { font-size: 1.2em; color: #aaa; -webkit-text-fill-color: #aaa; }
-        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
-        .status-bar {
-            background: rgba(255,255,255,0.1);
-            border-radius: 15px;
-            padding: 20px;
-            margin-bottom: 30px;
-            text-align: center;
-            backdrop-filter: blur(10px);
-        }
-        .status-live { color: #00ff88; font-size: 1.2em; }
-        .modules-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-        .module-card {
-            background: rgba(255,255,255,0.05);
-            border-radius: 20px;
-            padding: 25px;
-            border: 1px solid rgba(255,255,255,0.1);
-            transition: transform 0.3s, box-shadow 0.3s;
-            cursor: pointer;
-        }
-        .module-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 40px rgba(255,153,51,0.3);
-            border-color: #ff9933;
-        }
-        .module-icon { font-size: 3em; margin-bottom: 15px; }
-        .module-title { font-size: 1.3em; margin-bottom: 10px; color: #ff9933; }
-        .module-desc { color: #aaa; font-size: 0.9em; }
-        .module-status {
-            display: inline-block;
-            padding: 5px 15px;
-            border-radius: 20px;
-            font-size: 0.8em;
-            margin-top: 15px;
-        }
-        .status-ok { background: #00ff8833; color: #00ff88; }
-        .lang-section {
-            background: rgba(255,255,255,0.05);
-            border-radius: 20px;
-            padding: 25px;
-            margin-bottom: 30px;
-        }
-        .lang-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 10px;
-            margin-top: 20px;
-        }
-        .lang-item {
-            background: rgba(255,153,51,0.1);
-            border-radius: 10px;
-            padding: 10px;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-        .lang-item:hover { background: rgba(255,153,51,0.3); transform: scale(1.05); }
-        .lang-hello { font-size: 1.5em; margin-bottom: 5px; }
-        .lang-name { font-size: 0.8em; color: #aaa; }
-        .footer {
-            text-align: center;
-            padding: 30px;
-            color: #666;
-            border-top: 1px solid rgba(255,255,255,0.1);
-            margin-top: 50px;
-        }
-        .test-btn {
-            background: linear-gradient(90deg, #ff9933, #ff6b35);
-            color: white;
-            border: none;
-            padding: 12px 30px;
-            border-radius: 25px;
-            cursor: pointer;
-            font-size: 1em;
-            margin-top: 15px;
-            transition: all 0.3s;
-        }
-        .test-btn:hover { transform: scale(1.05); box-shadow: 0 5px 20px rgba(255,107,53,0.4); }
-        .api-response {
-            background: #000;
-            border-radius: 10px;
-            padding: 15px;
-            margin-top: 15px;
-            font-family: monospace;
-            font-size: 0.8em;
-            color: #00ff88;
-            max-height: 200px;
-            overflow-y: auto;
-            display: none;
-        }
-        .api-response.show { display: block; }
-    </style>
+    <title>🙏 Singh Ji AI Ultra v5.0</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="header">
-        <h1>🦁 Singh Ji AI Ultra v5.0</h1>
-        <p>भारत का ऑल-इन-वन सुपर ऐप — ज़ीरो फोन लोड, फुल ऑटोमेशन</p>
-        <p style="margin-top:10px;font-size:0.9em;">🇮🇳 सबका भला, सबका साथ 🇮🇳</p>
-    </div>
+    <!-- ==================== 👑 HEADER ==================== -->
+    <header class="main-header">
+        <div class="logo">🙏 Singh Ji AI Ultra v5.0</div>
+        <div class="owner">👑 JP Singh Ji Kanpur</div>
+        <div class="status">🟢 23/23 Agents LIVE</div>
+    </header>
 
-    <div class="container">
-        <div class="status-bar">
-            <div class="status-live">🟢 Backend Live: https://singhji-api.onrender.com</div>
-            <div style="margin-top:10px;color:#aaa;">
-                <span id="modules-count">Loading modules...</span>
-            </div>
-            <button class="test-btn" onclick="checkStatus()">🔄 Check Status</button>
-            <div id="status-response" class="api-response"></div>
+    <!-- ==================== 🎬 ENTERTAINMENT HUB ==================== -->
+    <section id="entertainment-hub" class="hub-section">
+        <div class="hub-header">
+            <h2>🎬 Entertainment Hub</h2>
+            <p>गाने, वीडियो, रामायण, गेम्स — सब कुछ!</p>
         </div>
-
-        <h2 style="text-align:center;margin-bottom:20px;">⚡ Modules</h2>
-        <div class="modules-grid">
-            <div class="module-card" onclick="testModule('language')">
-                <div class="module-icon">🌐</div>
-                <div class="module-title">Language Hub</div>
-                <div class="module-desc">58 Languages — 22 Indian + 36 Global</div>
-                <span class="module-status status-ok">✅ Active</span>
-                <div id="lang-response" class="api-response"></div>
+        
+        <div class="hub-grid">
+            <!-- 🎵 MUSIC -->
+            <div class="hub-card music-card" onclick="openMusic()">
+                <div class="card-icon">🎵</div>
+                <h3>🎶 Music</h3>
+                <p>गाने सुनें, प्लेलिस्ट बनाएं</p>
+                <button class="btn-enter">Enter</button>
             </div>
-
-            <div class="module-card" onclick="testModule('telegram')">
-                <div class="module-icon">🤖</div>
-                <div class="module-title">Telegram Bot</div>
-                <div class="module-desc">AI Chatbot with Webhook Support</div>
-                <span class="module-status status-ok">✅ Active</span>
-                <div id="telegram-response" class="api-response"></div>
+            
+            <!-- 🎬 VIDEO -->
+            <div class="hub-card video-card" onclick="openVideo()">
+                <div class="card-icon">🎬</div>
+                <h3>🎥 Video</h3>
+                <p>मूवी, टीवी, लाइव चैनल</p>
+                <button class="btn-enter">Enter</button>
             </div>
-
-            <div class="module-card" onclick="testModule('plant')">
-                <div class="module-icon">🌿</div>
-                <div class="module-title">Plant ID</div>
-                <div class="module-desc">AI Plant Recognition & Disease Detection</div>
-                <span class="module-status status-ok">✅ Active</span>
-                <div id="plant-response" class="api-response"></div>
+            
+            <!-- 📖 RAMAYAN -->
+            <div class="hub-card ramayan-card" onclick="openRamayan()">
+                <div class="card-icon">📖</div>
+                <h3>🙏 Ramayan & Puja</h3>
+                <p>रामायण, गीता, आरती, पंचांग</p>
+                <button class="btn-enter">Enter</button>
             </div>
-
-            <div class="module-card" onclick="testModule('memory')">
-                <div class="module-icon">🧠</div>
-                <div class="module-title">Supabase Memory</div>
-                <div class="module-desc">User Memory & Conversation History</div>
-                <span class="module-status status-ok">✅ Active</span>
-                <div id="memory-response" class="api-response"></div>
-            </div>
-
-            <div class="module-card" onclick="testModule('admin')">
-                <div class="module-icon">⚡</div>
-                <div class="module-title">Admin Panel</div>
-                <div class="module-desc">Dashboard & System Analytics</div>
-                <span class="module-status status-ok">✅ Active</span>
-                <div id="admin-response" class="api-response"></div>
+            
+            <!-- 🎮 GAMING -->
+            <div class="hub-card gaming-card" onclick="openGaming()">
+                <div class="card-icon">🎮</div>
+                <h3>🎮 Gaming</h3>
+                <p>24 गेम्स, लीडरबोर्ड, रिवार्ड</p>
+                <button class="btn-enter">Enter</button>
             </div>
         </div>
+    </section>
 
-        <div class="lang-section">
-            <h2 style="text-align:center;margin-bottom:10px;">🌍 Language Hub — 58 Languages</h2>
-            <p style="text-align:center;color:#aaa;margin-bottom:20px;">Click any language to say Hello!</p>
-            <div class="lang-grid" id="lang-grid"></div>
-            <div id="hello-response" class="api-response" style="margin-top:20px;"></div>
+    <!-- ==================== 🍔 LIFESTYLE HUB ==================== -->
+    <section id="lifestyle-hub" class="hub-section">
+        <div class="hub-header">
+            <h2>🍔 Lifestyle Hub</h2>
+            <p>खाना, कपड़े, सेहत, घूमना — सब कुछ!</p>
         </div>
-
-        <div class="lang-section">
-            <h2 style="text-align:center;margin-bottom:20px;">🔗 Quick Links</h2>
-            <div style="display:flex;flex-wrap:wrap;gap:15px;justify-content:center;">
-                <a href="https://singhji-api.onrender.com/api/health" target="_blank" class="test-btn" style="text-decoration:none;">🏥 Health</a>
-                <a href="https://singhji-api.onrender.com/api/status" target="_blank" class="test-btn" style="text-decoration:none;">📊 Status</a>
-                <a href="https://singhji-api.onrender.com/api/admin/stats" target="_blank" class="test-btn" style="text-decoration:none;">⚡ Admin Stats</a>
-                <a href="admin.html" class="test-btn" style="text-decoration:none;background:linear-gradient(90deg,#138808,#00ff88);">🔐 Admin Panel</a>
+        
+        <div class="hub-grid">
+            <!-- 🍕 FOOD -->
+            <div class="hub-card food-card" onclick="openFood()">
+                <div class="card-icon">🍕</div>
+                <h3>🍽️ Food & Recipes</h3>
+                <p>रेसिपी, रेस्टोरेंट, ऑर्डर</p>
+                <button class="btn-enter">Enter</button>
+            </div>
+            
+            <!-- 👗 FASHION -->
+            <div class="hub-card fashion-card" onclick="openFashion()">
+                <div class="card-icon">👗</div>
+                <h3>👔 Fashion</h3>
+                <p>कपड़े, ट्रेंड्स, शॉपिंग</p>
+                <button class="btn-enter">Enter</button>
+            </div>
+            
+            <!-- 💊 HEALTH -->
+            <div class="hub-card health-card" onclick="openHealth()">
+                <div class="card-icon">💊</div>
+                <h3>🏥 Health</h3>
+                <p>डॉक्टर, दवा, योगा, टिप्स</p>
+                <button class="btn-enter">Enter</button>
+            </div>
+            
+            <!-- ✈️ TRAVEL -->
+            <div class="hub-card travel-card" onclick="openTravel()">
+                <div class="card-icon">✈️</div>
+                <h3>🌍 Travel</h3>
+                <p>घूमना, होटल, टिकट, प्लान</p>
+                <button class="btn-enter">Enter</button>
+            </div>
+            
+            <!-- 🛒 SHOPPING -->
+            <div class="hub-card shopping-card" onclick="openShopping()">
+                <div class="card-icon">🛒</div>
+                <h3>🛍️ Shopping</h3>
+                <p>ऑनलाइन शॉपिंग, डील्स, ऑफर</p>
+                <button class="btn-enter">Enter</button>
             </div>
         </div>
-    </div>
+    </section>
 
-    <div class="footer">
-        <p>🦁 Singh Ji AI Ultra v5.0</p>
-        <p style="margin-top:10px;">Made with ❤️ in India</p>
-        <p style="margin-top:10px;font-size:0.8em;">Backend: <a href="https://singhji-api.onrender.com" style="color:#ff9933;">singhji-api.onrender.com</a></p>
-    </div>
+    <!-- ==================== 🏦 BANKING HUB (COMING SOON) ==================== -->
+    <section id="banking-hub" class="hub-section coming-soon">
+        <div class="hub-header">
+            <h2>🏦 Banking Hub</h2>
+            <p>UPI, Banking, Investment, Insurance — Coming Soon!</p>
+        </div>
+    </section>
 
-    <script>
-        const API_BASE = "https://singhji-api.onrender.com";
+    <!-- ==================== 📚 EDUCATION HUB (COMING SOON) ==================== -->
+    <section id="education-hub" class="hub-section coming-soon">
+        <div class="hub-header">
+            <h2>📚 Education Hub</h2>
+            <p>Courses, Exams, Certificates — Coming Soon!</p>
+        </div>
+    </section>
 
-        async function loadLanguages() {
-            try {
-                const res = await fetch(`${API_BASE}/api/language/list`);
-                const data = await res.json();
-                const grid = document.getElementById('lang-grid');
-                
-                if (data.languages) {
-                    Object.entries(data.languages).forEach(([code, lang]) => {
-                        const div = document.createElement('div');
-                        div.className = 'lang-item';
-                        div.innerHTML = `<div class="lang-hello">${lang.hello}</div><div class="lang-name">${lang.name}</div>`;
-                        div.onclick = () => sayHello(code);
-                        grid.appendChild(div);
-                    });
-                }
-            } catch (e) { console.error('Error:', e); }
-        }
+    <!-- ==================== 🌍 GLOBAL HUB (COMING SOON) ==================== -->
+    <section id="global-hub" class="hub-section coming-soon">
+        <div class="hub-header">
+            <h2>🌍 Global Hub</h2>
+            <p>26 Languages, World Services — Coming Soon!</p>
+        </div>
+    </section>
 
-        async function sayHello(code) {
-            const div = document.getElementById('hello-response');
-            div.classList.add('show'); div.textContent = 'Loading...';
-            try {
-                const res = await fetch(`${API_BASE}/api/language/hello/${code}`);
-                const data = await res.json();
-                div.textContent = JSON.stringify(data, null, 2);
-            } catch (e) { div.textContent = 'Error: ' + e.message; }
-        }
+    <!-- ==================== 🦶 FOOTER ==================== -->
+    <footer class="main-footer">
+        <p>🙏 Jai Shri Ram | 👑 Singh Ji AI Ultra v5.0 | 🍌 KELA Mode ON</p>
+        <p>केला नहीं होता भाई अकेला!</p>
+    </footer>
 
-        async function checkStatus() {
-            const div = document.getElementById('status-response');
-            div.classList.add('show'); div.textContent = 'Loading...';
-            try {
-                const res = await fetch(`${API_BASE}/api/status`);
-                const data = await res.json();
-                div.textContent = JSON.stringify(data, null, 2);
-                document.getElementById('modules-count').textContent = `${data.working}/${data.total} Modules Loaded`;
-            } catch (e) { div.textContent = 'Error: ' + e.message; }
-        }
-
-        async function testModule(module) {
-            const div = document.getElementById(`${module}-response`);
-            div.classList.add('show'); div.textContent = 'Loading...';
-            const endpoints = {
-                language: '/api/language/health', telegram: '/api/telegram/health',
-                plant: '/api/plant/health', memory: '/api/memory/health', admin: '/api/admin/health'
-            };
-            try {
-                const res = await fetch(`${API_BASE}${endpoints[module]}`);
-                const data = await res.json();
-                div.textContent = JSON.stringify(data, null, 2);
-            } catch (e) { div.textContent = 'Error: ' + e.message; }
-        }
-
-        loadLanguages(); checkStatus();
-    </script>
+    <script src="script.js"></script>
 </body>
 </html>
