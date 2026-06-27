@@ -164,6 +164,11 @@ def root():
         }
     }
 
+@app.head("/")
+def head_root():
+    return {"status": "🦁 LIVE"}
+
+# ========== MAIN ==========
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=10000)
