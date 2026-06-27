@@ -1,13 +1,26 @@
 from fastapi import APIRouter
-from core.config import settings
+import os
+
 router = APIRouter()
+
 @router.get("/")
-def ai_chat_home():
-    return {"module": "ai_chat", "status": "ok", "app": settings.APP_NAME}
-@router.post("/chat")
-def chat(message: str = ""):
+def ai_home():
     return {
-        "reply": f"🦁 Singh Ji AI: '{message}' ka jawab...",
         "module": "ai_chat",
-        "status": "active"
+        "status": "ok",
+        "gemini_key_exists": bool(os.getenv("GEMINI_API_KEY")),
+        "groq_key_exists": bool(os.getenv("GROQ_API_KEY"))
+    }
+
+@router.post("/chat")
+def chat(request: dict):
+    GEMINI_KEY = os.getenv("GEMINI_API_KEY")
+    GROQ_KEY = os.getenv("GROQ_API_KEY")
+    
+    # ... AI logic ...
+    
+    return {
+        "response": "AI response here",
+        "model": "gemini/groq",
+        "source": "ai_chat"
     }
