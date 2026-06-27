@@ -22,8 +22,8 @@ app.include_router(music_router)
 app.include_router(video_router)
 app.include_router(ramayan_router)
 app.include_router(gaming_router)
-# 🏦 Banking Router — Phase 4 ← यहाँ जोड़ो!
-from banking.handler import router as banking_router
+# 🏦 Banking Router — Phase 4
+app.include_router(banking_router)
 
 # ===== CORS — सबको allow करो (Frontend GitHub Pages se) =====
 app.add_middleware(
