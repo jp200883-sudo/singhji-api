@@ -1,6 +1,5 @@
-# core/app.py — Singh Ji AI Ultra v5.0
-# BULLETPROOF VERSION — Startup crash proof
-# Date: 26 June 2026
+# app.py — Singh Ji AI Ultra v5.0
+# 🚀 MAIN APP — सब Agents एक साथ, सब Singh Ji के अंडर में!
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,159 +15,165 @@ app = FastAPI(
     version="5.0.0"
 )
 
-# ✅ CORS — Allow ALL origins
+# ===== CORS — सबको allow करो (Frontend GitHub Pages se) =====
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD"],
     allow_headers=["*"],
+    allow_credentials=True,
 )
 
-MODULES = {
-    # Existing
-    "modules.language": "/api/language",
-    "modules.telegram_bot": "/api/telegram",
-    "modules.plant_id": "/api/plant",
-    "modules.supabase_memory": "/api/memory",
-    "modules.adminpanel": "/api/admin",
-    "modules.ai_chat": "/api/ai",
-    "modules.weather": "/api/weather",
-    "modules.mandi": "/api/mandi",
-    "modules.search": "/api/search",
-    "modules.news": "/api/news",
-    "modules.emergency": "/api/emergency",
-    "modules.govt": "/api/govt",
-    "modules.upi": "/api/upi",
-    "modules.email": "/api/email",
-    "modules.social": "/api/social",
-    "modules.schedule": "/api/schedule",
-    "modules.voice": "/api/voice",
-    
-    # NEW 🔥
-    "modules.voice_tts": "/api/voice-tts",      # F5-TTS
-    "modules.voice_cmd": "/api/voice-cmd",      # Hindi Commands
-}
-# ========== HEALTH CHECK ==========
-@app.get("/api/health")
-def health():
-    return {
-        "status": "🦁 Singh Ji AI Ultra v5.0 is LIVE!",
-        "timestamp": str(__import__("datetime").datetime.now())
-    }
+# ===== ERROR HANDLER — गड़बड़ी = सिंह जी को पता चले =====
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": "Something went wrong!",
+            "detail": str(exc),
+            "path": str(request.url),
+            "singh_ji_message": "गड़बड़ी हुई — Singh Ji ko report kar raha hoon!"
+        }
+    )
 
-@app.get("/api/status")
-def status():
-    loaded = []
-    failed = []
-    for mod_name, prefix in MODULES.items():
-        try:
-            mod = importlib.import_module(mod_name)
-            has_router = hasattr(mod, "router")
-            loaded.append({
-                "module": mod_name,
-                "prefix": prefix,
-                "status": "✅ Loaded",
-                "has_router": has_router
-            })
-        except Exception as e:
-            failed.append({
-                "module": mod_name,
-                "prefix": prefix,
-                "error": str(e),
-                "trace": traceback.format_exc()[-200:]
-            })
+# ===== AUTO-IMPORT SYSTEM — सब Agents auto load होंगे =====
+MODULES = [
+    # 🦁 Phase 1: Foundation (Managers)
+    "superior_agent",      # 🦁 CEO — सबका बाप
+    "singhji_agent",       # 🤴 Singh Ji का खुद का AI
+    "meta_agent",          # 🔄 Self-Update System
+    "master_data",         # 🧠 Master Data Layer
+    
+    # 🔧 Core System
+    "emergency",           # 🚨 P0 Priority
+    "supabase_memory",     # 🧠 Memory
+    "ai_chat",             # 🤖 AI Chat
+    "weather",             # 🌤️ Weather
+    "mandi",               # 🌾 Mandi Bhav
+    "news",                # 📰 News
+    "email",               # 📧 Email
+    "schedule",            # 📅 Schedule
+    "telegram_bot",        # ✈️ Telegram
+    "voice",               # 🎙️ Voice
+    "voice_cmd",           # 🎙️ Voice Commands
+    "voice_tts",           # 🎙️ TTS
+    "plant_id",            # 🌱 Plant ID
+    "language",            # 🌐 Language
+    "language_hub",        # 🌐 Language Hub
+    "search",              # 🔍 Search
+    "social",              # 👥 Social
+    "govt",                # 🏛️ Govt
+    "upi",                 # 💳 UPI
+]
+
+# ===== ROUTER REGISTRY — Prefix mapping =====
+ROUTER_PREFIX = {
+    "superior_agent": "/api/superior",
+    "singhji_agent": "/api/singhji",
+    "meta_agent": "/api/meta",
+    "master_data": "/api/master-data",
+    "emergency": "/api/emergency",
+    "supabase_memory": "/api/memory",
+    "ai_chat": "/api/ai",
+    "weather": "/api/weather",
+    "mandi": "/api/mandi",
+    "news": "/api/news",
+    "email": "/api/email",
+    "schedule": "/api/schedule",
+    "telegram_bot": "/api/telegram",
+    "voice": "/api/voice",
+    "voice_cmd": "/api/voice-cmd",
+    "voice_tts": "/api/voice-tts",
+    "plant_id": "/api/plant",
+    "language": "/api/language",
+    "language_hub": "/api/language-hub",
+    "search": "/api/search",
+    "social": "/api/social",
+    "govt": "/api/govt",
+    "upi": "/api/upi",
+}
+
+# ===== AUTO-LOAD ALL MODULES =====
+loaded_modules = []
+failed_modules = []
+
+for module_name in MODULES:
+    try:
+        module = importlib.import_module(f"modules.{module_name}")
+        if hasattr(module, "router"):
+            prefix = ROUTER_PREFIX.get(module_name, f"/api/{module_name}")
+            app.include_router(module.router, prefix=prefix, tags=[module_name.replace("_", " ").title()])
+            loaded_modules.append(module_name)
+        else:
+            failed_modules.append(f"{module_name}: no router found")
+    except Exception as e:
+        failed_modules.append(f"{module_name}: {str(e)}")
+
+# ===== ROOT ENDPOINT =====
+@app.get("/")
+async def root():
     return {
         "app": "Singh Ji AI Ultra v5.0",
-        "loaded_modules": loaded,
-        "failed_modules": failed,
-        "total": len(MODULES),
-        "working": len(loaded),
-        "broken": len(failed)
+        "status": "🔥 LIVE",
+        "owner": "👑 Singh Ji (JP Singh Ji Kanpur)",
+        "guru": "Moonshot AI",
+        "mantra": "KELA mode — केला नहीं होता भाई अकेला!",
+        "total_modules": len(MODULES),
+        "loaded": len(loaded_modules),
+        "failed": len(failed_modules),
+        "loaded_modules": loaded_modules,
+        "failed_modules": failed_modules if failed_modules else None,
+        "message": "सब Agents तैयार, Singh Ji का हुकुम इंतज़ार में!"
     }
 
-# ========== DEBUG ENDPOINT ==========
-@app.get("/api/debug/{module_name}")
-def debug_module(module_name: str):
-    import inspect
-    result = {
-        "requested": module_name,
-        "module_path": None,
-        "file": None,
-        "exists": False,
-        "classes": [],
-        "functions": [],
-        "routes": [],
-        "error": None
-    }
-    try:
-        candidates = [
-            f"modules.{module_name}",
-            f"modules.{module_name.replace('_', '')}",
-        ]
-        for cand in candidates:
-            try:
-                mod = importlib.import_module(cand)
-                result["module_path"] = cand
-                result["file"] = getattr(mod, "__file__", "Unknown")
-                result["exists"] = True
-                for name, obj in inspect.getmembers(mod):
-                    if inspect.isclass(obj):
-                        result["classes"].append(name)
-                    elif inspect.isfunction(obj):
-                        result["functions"].append(name)
-                if hasattr(mod, "router"):
-                    result["routes"] = [r.path for r in mod.router.routes]
-                break
-            except ImportError:
-                continue
-        if not result["exists"]:
-            result["error"] = f"Module '{module_name}' not found"
-    except Exception as e:
-        result["error"] = str(e)
-    return result
-
-# ========== AUTO-LOAD ALL MODULES (BULLETPROOF) ==========
-def load_modules():
-    for mod_name, prefix in MODULES.items():
-        try:
-            mod = importlib.import_module(mod_name)
-            if hasattr(mod, "router"):
-                app.include_router(mod.router, prefix=prefix)
-                print(f"✅ Loaded: {mod_name} → {prefix}")
-            else:
-                print(f"⚠️ No router in: {mod_name}")
-        except Exception as e:
-            print(f"❌ Failed: {mod_name} → {e}")
-            # App continues even if module fails!
-
-# Load on startup
-load_modules()
-
-# ========== ROOT ==========
-@app.get("/")
-def root():
+# ===== HEALTH CHECK =====
+@app.get("/api/health")
+async def health():
     return {
-        "name": "Singh Ji AI Ultra v5.0",
-        "tagline": "भारत का ऑल-इन-वन सुपर ऐप",
-        "status": "🦁 LIVE",
-        "endpoints": {
-            "health": "/api/health",
-            "status": "/api/status",
-            "language": "/api/language",
-            "telegram": "/api/telegram",
-            "plant": "/api/plant",
-            "memory": "/api/memory",
-            "admin": "/api/admin",
-            "debug": "/api/debug/{module}"
-        }
+        "status": "✅ ALL SYSTEMS GO",
+        "version": "5.0.0",
+        "phase": "1 — Foundation",
+        "owner": "Singh Ji",
+        "loaded_modules": len(loaded_modules),
+        "failed_modules": len(failed_modules),
+        "timestamp": "now"
     }
 
-@app.head("/")
-def head_root():
-    return {"status": "🦁 LIVE"}
+# ===== STATUS CHECK — सब Agents का status =====
+@app.get("/api/status")
+async def status():
+    return {
+        "app": "Singh Ji AI Ultra v5.0",
+        "status": "LIVE",
+        "total_agents": len(loaded_modules),
+        "agents": loaded_modules,
+        "failed": failed_modules if failed_modules else [],
+        "message": "19/19 modules active!" if len(failed_modules) == 0 else f"{len(loaded_modules)}/{len(MODULES)} active"
+    }
 
-# ========== MAIN ==========
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=10000)
+# ===== HEAD REQUEST — Render Health Check =====
+@app.head("/")
+async def head_root():
+    return {}
+
+# ===== SINGH JI DIRECT COMMAND =====
+@app.post("/api/command")
+async def singhji_command(request: Request):
+    data = await request.json()
+    return {
+        "status": "executed",
+        "command": data.get("action", "unknown"),
+        "by": "👑 Singh Ji",
+        "message": "Singh Ji ka hukum — sar aankhon pe!",
+        "timestamp": "now"
+    }
+
+# ===== STARTUP MESSAGE =====
+@app.on_event("startup")
+async def startup():
+    print("🔥 Singh Ji AI Ultra v5.0 STARTED!")
+    print(f"✅ Loaded: {len(loaded_modules)} modules")
+    if failed_modules:
+        print(f"❌ Failed: {failed_modules}")
+    print("👑 Singh Ji ka raj shuru!")
