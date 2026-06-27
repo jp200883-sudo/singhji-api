@@ -3,11 +3,12 @@
 All settings in one place — FastAPI Version
 """
 
+from dotenv import load_dotenv
 from fastapi import APIRouter
 from core.config import settings
 
-router = APIRouter()  
-
+load_dotenv() 
+router = APIRouter()
 # ... existing code ...
 load_dotenv()
 
