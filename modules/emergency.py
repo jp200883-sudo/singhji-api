@@ -1,27 +1,16 @@
-import os
-from dotenv import load_dotenv
 from fastapi import APIRouter
-from core.config import settings
 
-load_dotenv()
 router = APIRouter()
-def emergency_home():
+
+@router.get("/sos")
+async def emergency_sos():
     return {
-        "module": "emergency",
-        "status": "ok",
-        "contacts": {
-            "police": settings.POLICE,
-            "ambulance": settings.AMBULANCE,
-            "fire": settings.FIRE,
-            "women_helpline": settings.WOMEN_HELPLINE,
-            "child_helpline": settings.CHILD_HELPLINE
-        }
+        "police": "100",
+        "ambulance": "108",
+        "fire": "101",
+        "women_helpline": "1091"
     }
-@router.get("/contacts")
-def emergency_contacts():
-        "emergency_numbers": {
-            "police": "100",
-            "ambulance": "108",
-            "fire": "101",
-            "women_helpline": "1091",
-            "child_helpline": "1098"
+
+@router.get("/")
+async def emergency_root():
+    return {"status": "emergency module active"}
