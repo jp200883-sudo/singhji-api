@@ -1,16 +1,16 @@
-import os
-from dotenv import load_dotenv
 from fastapi import APIRouter
-from core.config import settings
 
-load_dotenv()
 router = APIRouter()
-def govt_home():
-    return {
-        "module": "govt",
-        "status": "ok",
-        "schemes_count": len(settings.GOVT_SCHEMES)
-    }
+
 @router.get("/schemes")
-def govt_schemes():
-        "schemes": settings.GOVT_SCHEMES
+async def govt_schemes():
+    return {
+        "schemes": [
+            {"name": "PM Kisan", "url": "https://pmkisan.gov.in"},
+            {"name": "Ayushman Bharat", "url": "https://abha.abdm.gov.in"}
+        ]
+    }
+
+@router.get("/")
+async def govt_root():
+    return {"status": "govt module active"}
