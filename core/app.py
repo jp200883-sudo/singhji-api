@@ -9,7 +9,7 @@ import sys
 import os
 import traceback
 from entertainment import music_router, video_router, ramayan_router, gaming_router
-
+from banking.handler import router as banking_router
 app = FastAPI(
     title="Singh Ji AI Ultra v5.0",
     description="भारत का ऑल-इन-वन सुपर ऐप — ज़ीरो फोन लोड, फुल ऑटोमेशन",
@@ -22,7 +22,8 @@ app.include_router(music_router)
 app.include_router(video_router)
 app.include_router(ramayan_router)
 app.include_router(gaming_router)
-
+# 🏦 Banking Router — Phase 4 ← यहाँ जोड़ो!
+from banking.handler import router as banking_router
 
 # ===== CORS — सबको allow करो (Frontend GitHub Pages se) =====
 app.add_middleware(
