@@ -1,8 +1,10 @@
+import os
+from dotenv import load_dotenv
 from fastapi import APIRouter
 from core.config import settings
 
+load_dotenv()
 router = APIRouter()
-@router.get("/")
 def upi_home():
     return {
         "module": "upi",
