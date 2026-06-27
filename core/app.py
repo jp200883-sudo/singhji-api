@@ -3,28 +3,40 @@
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 import importlib
 import sys
 import os
 import traceback
-from entertainment import music_router, video_router, ramayan_router, gaming_router
-from banking.handler import router as banking_router
 
 app = FastAPI(
     title="Singh Ji AI Ultra v5.0",
     description="भारत का ऑल-इन-वन सुपर ऐप — ज़ीरो फोन लोड, फुल ऑटोमेशन",
     version="5.0.0"
 )
+
 # ============================================
-# 🎬 ENTERTAINMENT ROUTERS — NEW जोड़ें!
+# 🎬 ENTERTAINMENT ROUTERS — Direct Import
 # ============================================
-app.include_router(music_router)
-app.include_router(video_router)
-app.include_router(ramayan_router)
-app.include_router(gaming_router)
+try:
+    from entertainment import music_router, video_router, ramayan_router, gaming_router
+    app.include_router(music_router)
+    app.include_router(video_router)
+    app.include_router(ramayan_router)
+    app.include_router(gaming_router)
+    ENTERTAINMENT_LOADED = True
+except Exception as e:
+    ENTERTAINMENT_LOADED = False
+    print(f"⚠️ Entertainment load failed: {e}")
+
 # 🏦 Banking Router — Phase 4
-app.include_router(banking_router)
+try:
+    from banking.handler import router as banking_router
+    app.include_router(banking_router)
+    BANKING_LOADED = True
+except Exception as e:
+    BANKING_LOADED = False
+    print(f"⚠️ Banking load failed: {e}")
 
 # ===== CORS — सबको allow करो (Frontend GitHub Pages se) =====
 app.add_middleware(
@@ -120,6 +132,22 @@ for module_name in MODULES:
             failed_modules.append(f"{module_name}: no router found")
     except Exception as e:
         failed_modules.append(f"{module_name}: {str(e)}")
+
+# ===== REDIRECTS — Old paths → New /api paths =====
+@app.get("/weather/{city}")
+async def weather_redirect(city: str):
+    """Old /weather path → /api/weather"""
+    return RedirectResponse(f"/api/weather/{city}")
+
+@app.get("/plant/{plant_id}")
+async def plant_redirect(plant_id: str):
+    """Old /plant path → /api/plant"""
+    return RedirectResponse(f"/api/plant/{plant_id}")
+
+@app.get("/news/{topic}")
+async def news_redirect(topic: str):
+    """Old /news path → /api/news"""
+    return RedirectResponse(f"/api/news/{topic}")
 
 # ===== ROOT ENDPOINT =====
 @app.get("/")
