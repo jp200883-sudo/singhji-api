@@ -8,12 +8,21 @@ import importlib
 import sys
 import os
 import traceback
+from entertainment import music_router, video_router, ramayan_router, gaming_router
 
 app = FastAPI(
     title="Singh Ji AI Ultra v5.0",
     description="भारत का ऑल-इन-वन सुपर ऐप — ज़ीरो फोन लोड, फुल ऑटोमेशन",
     version="5.0.0"
 )
+# ============================================
+# 🎬 ENTERTAINMENT ROUTERS — NEW जोड़ें!
+# ============================================
+app.include_router(music_router)
+app.include_router(video_router)
+app.include_router(ramayan_router)
+app.include_router(gaming_router)
+
 
 # ===== CORS — सबको allow करो (Frontend GitHub Pages se) =====
 app.add_middleware(
