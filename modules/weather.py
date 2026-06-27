@@ -3,16 +3,14 @@ import requests
 import os
 
 router = APIRouter()
-WEATHER_KEY = os.getenv("WEATHER_API_KEY")
-
-@router.get("/")
-def weather_home():
-    return {"module": "weather", "status": "ok"}
 
 @router.get("/{city}")
 def weather_city(city: str):
+    # ✅ SAHI variable name
+    WEATHER_KEY = os.getenv("OPENWEATHER_API_KEY")
+    
     if not WEATHER_KEY:
-        return {"error": "API key missing", "source": "config_error"}
+        return {"error": "API key missing", "source": "config_error", "expected": "OPENWEATHER_API_KEY"}
     
     url = f"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={WEATHER_KEY}&units=metric"
     
