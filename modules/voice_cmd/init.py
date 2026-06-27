@@ -12,6 +12,10 @@ COMMANDS = {
     "yojana": {"module": "govt", "action": "schemes"},
 }
 
+@router.get("/")
+async def voice_cmd_root():
+    return {"status": "voice_cmd module active"}
+
 @router.post("/listen")
 def listen_command(text: str):
     """Listen to Hindi voice command"""
