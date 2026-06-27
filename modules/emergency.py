@@ -2,6 +2,10 @@ from fastapi import APIRouter
 
 router = APIRouter()
 
+@router.get("/")
+async def emergency_root():
+    return {"status": "emergency module active"}
+
 @router.get("/sos")
 async def emergency_sos():
     return {
@@ -10,7 +14,3 @@ async def emergency_sos():
         "fire": "101",
         "women_helpline": "1091"
     }
-
-@router.get("/")
-async def emergency_root():
-    return {"status": "emergency module active"}
