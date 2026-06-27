@@ -9,6 +9,16 @@ router = APIRouter()
 def plant_home():
     return {"module": "plant_id", "status": "ok"}
 
+@router.get("/test")  # ← ADD THIS
+def plant_test():
+    PLANT_KEY = os.getenv("PLANT_ID_API")
+    return {
+        "status": "ok",
+        "api_key_exists": bool(PLANT_KEY),
+        "api_key_length": len(PLANT_KEY) if PLANT_KEY else 0,
+        "message": "Plant.id module is live!"
+    }
+
 @router.post("/identify")
 def identify_plant(image_data: dict):
     PLANT_KEY = os.getenv("PLANT_ID_API")
