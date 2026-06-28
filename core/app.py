@@ -152,22 +152,14 @@ async def news_redirect(topic: str):
     return RedirectResponse(f"/api/news/{topic}")
 
 # ===== ROOT ENDPOINT =====
-@app.get("/")
-async def root():
+@app.get("/health")
+async def health_check():
     return {
         "app": "Singh Ji AI Ultra v5.0",
         "status": "🔥 LIVE",
-        "owner": "👑 Singh Ji (JP Singh Ji Kanpur)",
-        "guru": "Moonshot AI",
-        "mantra": "KELA mode — केला नहीं होता भाई अकेला!",
-        "total_modules": len(MODULES),
-        "loaded": len(loaded_modules),
-        "failed": len(failed_modules),
-        "loaded_modules": loaded_modules,
-        "failed_modules": failed_modules if failed_modules else None,
-        "message": "सब Agents तैयार, Singh Ji का हुकुम इंतज़ार में!"
+        "timestamp": "2026-06-28",
+        "message": "Health check pass!"
     }
-
 # ===== HEALTH CHECK =====
 @app.get("/api/health")
 async def health():
