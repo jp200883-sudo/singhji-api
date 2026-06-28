@@ -18,3 +18,10 @@ try:
     router.include_router(gaming_router, prefix="/gaming")
 except ImportError:
     pass
+
+# ✅ lifestyle_handler से router import करो
+try:
+    from .lifestyle_handler import router as lifestyle_router
+    router.include_router(lifestyle_router, prefix="/lifestyle")
+except ImportError:
+    pass
