@@ -1,4 +1,6 @@
 from fastapi import APIRouter
+import requests
+
 router = APIRouter()
 
 LANGUAGES = {
@@ -62,6 +64,18 @@ LANGUAGES = {
     "lt": {"name": "Lithuanian", "hello": "Labas", "native": "Lietuvių", "region": "Global"},
 }
 
+@router.get("/")
+async def language_root():
+    return {
+        "ok": True,
+        "module": "language",
+        "status": "✅ LIVE",
+        "total_languages": len(LANGUAGES),
+        "indian": 22,
+        "global": 36,
+        "message": "Language module ready — 58 languages supported!"
+    }
+
 @router.get("/health")
 def language_health():
     return {"module": "language", "status": "✅ OK", "total_languages": len(LANGUAGES), "indian": 22, "global": 36}
@@ -78,5 +92,33 @@ def say_hello(code: str):
     return {"ok": True, "code": code, "language": lang["name"], "native": lang["native"], "hello": lang["hello"], "region": lang["region"]}
 
 @router.post("/translate")
-async def translate_text(text: str, target: str = "hi"):
-    return {"ok": True, "original": text, "target_language": target, "translated": text, "note": "Bhashini API integration pending", "mode": "fallback"}
+async def translate_text(text: str, target: str = "hi", source: str = "auto"):
+    try:
+        # Google Translate FREE API (temp until Bhashini)
+        url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl={source}&tl={target}&dt=t&q={text}"
+        response = requests.get(url, timeout=10)
+        data = response.json()
+        translated = data[0][0][0] if data and data[0] else text
+        
+        return {
+            "ok": True,
+            "original": text,
+            "translated": translated,
+            "source_language": source,
+            "target_language": target,
+            "engine": "Google Translate (TEMP)",
+            "mode": "real",
+            "message": "Translation ho gaya!"
+        }
+    except Exception as e:
+        # Fallback
+        return {
+            "ok": True,
+            "original": text,
+            "translated": text,
+            "target_language": target,
+            "engine": "fallback",
+            "mode": "fallback",
+            "error": str(e),
+            "message": "Fallback mode — Bhashini integration pending"
+        }
