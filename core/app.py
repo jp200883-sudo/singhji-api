@@ -8,7 +8,6 @@ import importlib
 import sys
 import os
 import traceback
-
 app = FastAPI(
     title="Singh Ji AI Ultra v5.0",
     description="भारत का ऑल-इन-वन सुपर ऐप — ज़ीरो फोन लोड, फुल ऑटोमेशन",
