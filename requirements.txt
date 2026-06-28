@@ -12,7 +12,8 @@ supabase==2.0.3
 
 # Environment
 python-dotenv==1.0.0
-
+# Text-to-Speech (NEW!)
+gTTS==2.4.0
 # NEW — Fix missing modules
 pytz==2023.3
 apscheduler==3.10.4
