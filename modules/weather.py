@@ -1,45 +1,59 @@
-from fastapi import APIRouter
+# modules/weather.py — Singh Ji AI Ultra
 import os
 import requests
+from fastapi import APIRouter
 
 router = APIRouter()
+API_KEY = os.getenv("OPENWEATHER_API_KEY")
 
-WEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY", "")
-
-@router.get("/")
-def weather_home():
-    return {
-        "module": "weather",
-        "status": "✅ LIVE",
-        "api_configured": bool(WEATHER_API_KEY),
-        "message": "Weather module ready — Mausam ka haal bataoonga!"
-    }
-
-@router.get("/{city}")
-def get_weather(city: str):
-    if not WEATHER_API_KEY:
-        return {
-            "ok": False,
-            "error": "OPENWEATHER_API_KEY not set",
-            "message": "Render env mein key daalo!"
-        }
+@router.get("/current")
+def current_weather(city: str = "Kanpur"):
+    """Real-time weather — OpenWeather API"""
+    if not API_KEY:
+        return {"error": "OPENWEATHER_API_KEY not set", "mock": True, "city": city, "temp": 32, "condition": "Sunny ☀️"}
     
     try:
-        url = f"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={WEATHER_API_KEY}&units=metric"
-        response = requests.get(url, timeout=10)
-        data = response.json()
+        url = f"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={API_KEY}&units=metric&lang=hi"
+        res = requests.get(url, timeout=10)
+        data = res.json()
         
         return {
-            "ok": True,
-            "city": city,
-            "temperature": data.get("main", {}).get("temp", "N/A"),
-            "condition": data.get("weather", [{}])[0].get("description", "N/A"),
-            "humidity": data.get("main", {}).get("humidity", "N/A"),
-            "message": f"{city} ka mausam: {data.get('weather', [{}])[0].get('description', 'N/A')}"
+            "city": data["name"],
+            "country": data["sys"]["country"],
+            "temp": data["main"]["temp"],
+            "feels_like": data["main"]["feels_like"],
+            "humidity": data["main"]["humidity"],
+            "pressure": data["main"]["pressure"],
+            "wind_speed": data["wind"]["speed"],
+            "description": data["weather"][0]["description"],
+            "icon": f"https://openweathermap.org/img/wn/{data['weather'][0]['icon']}@2x.png",
+            "source": "openweather"
         }
     except Exception as e:
-        return {
-            "ok": False,
-            "error": str(e),
-            "message": "Weather fetch fail — baad mein try karo!"
-        }
+        return {"error": str(e), "city": city, "fallback": "mock"}
+
+@router.get("/forecast")
+def forecast(city: str = "Kanpur", days: int = 3):
+    """5-day forecast"""
+    if not API_KEY:
+        return {"error": "Key missing", "mock": True}
+    
+    url = f"https://api.openweathermap.org/data/2.5/forecast?q={city}&appid={API_KEY}&units=metric"
+    res = requests.get(url, timeout=10)
+    data = res.json()
+    
+    # Filter to one per day
+    daily = []
+    seen = set()
+    for item in data["list"]:
+        date = item["dt_txt"].split(" ")[0]
+        if date not in seen and len(seen) < days:
+            seen.add(date)
+            daily.append({
+                "date": date,
+                "temp": item["main"]["temp"],
+                "description": item["weather"][0]["description"],
+                "icon": item["weather"][0]["icon"]
+            })
+    
+    return {"city": city, "forecast": daily}
