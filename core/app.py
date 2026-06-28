@@ -200,6 +200,16 @@ async def singhji_command(request: Request):
 async def startup():
     print("🔥 Singh Ji AI Ultra v5.0 STARTED!")
     print(f"✅ Loaded: {len(loaded_modules)} modules")
+    
+    # ✅ MISSING MODULES PRINT करो
     if failed_modules:
         print(f"❌ Failed: {failed_modules}")
+    else:
+        print("🎉 ALL 29 MODULES LIVE!")
+    
+    # ✅ कौन सा module missing है — ये दिखाओ
+    missing = [m for m in MODULES if m not in loaded_modules]
+    if missing:
+        print(f"⚠️ Missing: {missing}")
+    
     print("👑 Singh Ji ka raj shuru!")
