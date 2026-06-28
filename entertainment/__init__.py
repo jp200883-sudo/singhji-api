@@ -1,18 +1,20 @@
-# Entertainment module
-from .gaming_handler import *
-from .lifestyle_handler import *
-from .music_handler import *
-from .ramayan_handler import *
-from .video_handler import *
+# modules/entertainment/__init__.py
 
 from fastapi import APIRouter
+
 router = APIRouter()
 
 @router.get("/")
-async def entertainment_root():
+def home():
     return {
-        "ok": True,
         "module": "entertainment",
-        "status": "✅ LIVE",
-        "message": "Entertainment module ready!"
+        "status": "live",
+        "message": "Singh Ji AI Ultra v5.0 🚀"
     }
+
+# ✅ gaming_handler से router import करो
+try:
+    from .gaming_handler import router as gaming_router
+    router.include_router(gaming_router, prefix="/gaming")
+except ImportError:
+    pass
