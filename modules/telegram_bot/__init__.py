@@ -1,47 +1,138 @@
-from fastapi import APIRouter, Request
+from fastapi import APIRouter
 import os
+import requests
 
 router = APIRouter()
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
-WEBHOOK_URL = os.getenv("WEBHOOK_URL", "https://singhji-api.onrender.com/api/telegram/webhook")
+TELEGRAM_WEBHOOK_URL = os.getenv("TELEGRAM_WEBHOOK_URL", "")
 
-@router.get("/health")
-def telegram_health():
-    return {"module": "telegram_bot", "status": "✅ OK", "bot_token_set": bool(TELEGRAM_BOT_TOKEN), "webhook_url": WEBHOOK_URL}
+@router.get("/")
+def telegram_home():
+    return {
+        "module": "telegram_bot",
+        "status": "✅ LIVE",
+        "bot_token_set": bool(TELEGRAM_BOT_TOKEN),
+        "webhook_url_set": bool(TELEGRAM_WEBHOOK_URL),
+        "message": "Telegram bot ready — Singh Ji ka messenger!",
+        "commands": ["/start", "/help", "/status", "/weather", "/news"]
+    }
 
-@router.get("/info")
-def telegram_info():
-    return {"module": "telegram_bot", "version": "1.0.0", "features": ["Webhook handler", "Message echo", "Command /start, /help", "Broadcast message"], "setup": "Set TELEGRAM_BOT_TOKEN in Render Environment Variables"}
+@router.get("/webhook")
+def webhook_info():
+    if not TELEGRAM_BOT_TOKEN:
+        return {
+            "ok": False,
+            "error": "TELEGRAM_BOT_TOKEN not set",
+            "message": "Render env mein TELEGRAM_BOT_TOKEN daalo!"
+        }
+    
+    try:
+        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getWebhookInfo"
+        response = requests.get(url, timeout=10)
+        data = response.json()
+        
+        return {
+            "ok": True,
+            "webhook": data.get("result", {}),
+            "bot_token_set": True,
+            "message": "Webhook info aa gayi!"
+        }
+    except Exception as e:
+        return {
+            "ok": False,
+            "error": str(e),
+            "message": "Webhook fetch fail — token check karo!"
+        }
 
 @router.post("/webhook")
-async def telegram_webhook(request: Request):
+def set_webhook(request: dict):
+    if not TELEGRAM_BOT_TOKEN:
+        return {
+            "ok": False,
+            "error": "TELEGRAM_BOT_TOKEN not set",
+            "message": "Token daalo pehle!"
+        }
+    
+    webhook_url = request.get("url", TELEGRAM_WEBHOOK_URL)
+    
     try:
-        data = await request.json()
-        message = data.get("message", {})
-        chat_id = message.get("chat", {}).get("id")
-        text = message.get("text", "")
-        if text == "/start":
-            reply = "🦁 Welcome to Singh Ji AI Ultra! Jai Hind! 🇮🇳"
-        elif text == "/help":
-            reply = "Commands: /start, /help, /status\nSend any message for AI response!"
-        elif text == "/status":
-            reply = "🦁 All systems operational! Singh Ji AI is LIVE."
-        else:
-            reply = f"🦁 Singh Ji AI received: {text}\n\nFull AI integration coming in v5.1!"
-        return {"ok": True, "chat_id": chat_id, "reply": reply, "echo": text}
+        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/setWebhook"
+        payload = {"url": webhook_url}
+        response = requests.post(url, json=payload, timeout=10)
+        data = response.json()
+        
+        return {
+            "ok": data.get("ok", False),
+            "result": data.get("description", "Done"),
+            "webhook_url": webhook_url,
+            "message": "Webhook set ho gaya!"
+        }
     except Exception as e:
-        return {"ok": False, "error": str(e)}
+        return {
+            "ok": False,
+            "error": str(e),
+            "message": "Webhook set fail!"
+        }
+
+@router.get("/me")
+def get_bot_info():
+    if not TELEGRAM_BOT_TOKEN:
+        return {
+            "ok": False,
+            "error": "TELEGRAM_BOT_TOKEN not set",
+            "message": "Token daalo pehle!"
+        }
+    
+    try:
+        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getMe"
+        response = requests.get(url, timeout=10)
+        data = response.json()
+        
+        return {
+            "ok": True,
+            "bot": data.get("result", {}),
+            "message": "Bot info aa gayi!"
+        }
+    except Exception as e:
+        return {
+            "ok": False,
+            "error": str(e),
+            "message": "Bot info fetch fail!"
+        }
 
 @router.post("/send")
-async def telegram_send_message(chat_id: str, message: str):
+def send_message(request: dict):
     if not TELEGRAM_BOT_TOKEN:
-        return {"ok": False, "error": "TELEGRAM_BOT_TOKEN not set"}
-    import requests
-    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    payload = {"chat_id": chat_id, "text": message}
+        return {
+            "ok": False,
+            "error": "TELEGRAM_BOT_TOKEN not set",
+            "message": "Token daalo pehle!"
+        }
+    
+    chat_id = request.get("chat_id", "")
+    text = request.get("text", "Hello from Singh Ji AI!")
+    
     try:
-        resp = requests.post(url, json=payload, timeout=10)
-        return resp.json()
+        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+        payload = {
+            "chat_id": chat_id,
+            "text": text,
+            "parse_mode": "HTML"
+        }
+        response = requests.post(url, json=payload, timeout=10)
+        data = response.json()
+        
+        return {
+            "ok": data.get("ok", False),
+            "message_id": data.get("result", {}).get("message_id"),
+            "chat_id": chat_id,
+            "text": text,
+            "message": "Message bhej diya!"
+        }
     except Exception as e:
-        return {"ok": False, "error": str(e)}
+        return {
+            "ok": False,
+            "error": str(e),
+            "message": "Message bhejne mein fail!"
+        }
