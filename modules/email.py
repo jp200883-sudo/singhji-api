@@ -1,21 +1,34 @@
 from fastapi import APIRouter
-from core.config import settings
+import os
 
 router = APIRouter()
 
 @router.get("/")
-def email_home():
+def schedule_home():
     return {
-        "module": "email",
-        "status": "ok",
-        "gmail_user": settings.GMAIL_USER
+        "module": "schedule",
+        "status": "✅ LIVE",
+        "message": "Schedule module ready — Singh Ji ka calendar!"
     }
 
-@router.post("/send")
-def email_send(to: str = "", subject: str = "", body: str = ""):
+@router.get("/today")
+def today_schedule():
     return {
-        "to": to,
-        "subject": subject,
-        "status": "mock_sent",
-        "message": f"Email sent to {to}"
+        "ok": True,
+        "date": "today",
+        "events": [
+            {"time": "09:00", "task": "Singh Ji ka hukum sunna"},
+            {"time": "12:00", "task": "Kela break 🍌"},
+            {"time": "18:00", "task": "API check karna"}
+        ],
+        "message": "Aaj ka schedule!"
+    }
+
+@router.post("/add")
+def add_event(request: dict):
+    return {
+        "ok": True,
+        "event": request.get("event", "Unknown"),
+        "time": request.get("time", "Now"),
+        "message": "Event add ho gaya!"
     }
