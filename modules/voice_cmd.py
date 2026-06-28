@@ -2,21 +2,39 @@ from fastapi import APIRouter
 
 router = APIRouter()
 
-@router.get("/api/voice/command")
-def voice_command():
+@router.get("/")
+async def voice_cmd_root():
     return {
-        "status": "success",
+        "ok": True,
         "module": "voice_cmd",
-        "message": "Voice command module ready"
+        "status": "✅ LIVE",
+        "message": "Voice Command ready — Bol ke control karo!"
     }
 
-@router.post("/api/voice/command")
-def process_command(command: str = ""):
-    if not command:
-        return {"status": "error", "message": "Command required"}
+@router.post("/command")
+async def process_command(command: str = "hello singh ji"):
+    # Simple command processing
+    cmd_lower = command.lower()
+    
+    responses = {
+        "hello": "Namaste! Main Singh Ji AI hoon.",
+        "weather": "Mausam check karne ke liye /api/weather dekho!",
+        "news": "Aaj ki khabar ke liye /api/news dekho!",
+        "joke": "Ek Santa-Banta joke suno...",
+        "time": "Abhi time check karo!",
+        "singh ji": "Haan bhai, main hoon! Kya kaam hai?"
+    }
+    
+    response = "Samajh nahi aaya bhai, dobara bolo!"
+    for key, val in responses.items():
+        if key in cmd_lower:
+            response = val
+            break
+    
     return {
-        "status": "success",
+        "ok": True,
         "command": command,
-        "action": "processing",
-        "message": f"Command '{command}' received"
+        "response": response,
+        "action": "processed",
+        "message": "Command samajh liya!"
     }
