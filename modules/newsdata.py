@@ -5,19 +5,32 @@ from fastapi import APIRouter
 import os
 import requests
 
-router = APIRouter()
+# ⬇️ FIX: Add prefix and tags
+router = APIRouter(prefix="/api/news", tags=["News"])
 
 NEWSDATA_API_KEY = os.getenv("NEWSDATA_API_KEY", "")
 
 @router.get("/")
-def newsdata_root():
-    return {"module": "newsdata", "status": "✅ Live", "source": "NewsData.io"}
+async def newsdata_root():
+    """News API Home"""
+    return {
+        "module": "newsdata",
+        "status": "✅ Live",
+        "source": "NewsData.io",
+        "endpoints": ["/india", "/hindi", "/english"],
+        "message": "Aaj ki taaza khabar!"
+    }
 
 @router.get("/india")
-def get_india_news(query: str = "India", language: str = "hi"):
+async def get_india_news(query: str = "India", language: str = "hi"):
     """India news from NewsData.io"""
     if not NEWSDATA_API_KEY:
-        return {"success": False, "error": "API Key not configured"}
+        return {
+            "success": False,
+            "error": "API Key not configured",
+            "message": "Add NEWSDATA_API_KEY to Render env vars",
+            "mock": True
+        }
 
     url = "https://newsdata.io/api/1/news"
     params = {
@@ -42,9 +55,9 @@ def get_india_news(query: str = "India", language: str = "hi"):
         return {"success": False, "error": str(e)}
 
 @router.get("/hindi")
-def get_hindi_news():
-    return get_india_news(query="India", language="hi")
+async def get_hindi_news():
+    return await get_india_news(query="India", language="hi")
 
 @router.get("/english")
-def get_english_news():
-    return get_india_news(query="India", language="en")
+async def get_english_news():
+    return await get_india_news(query="India", language="en")
