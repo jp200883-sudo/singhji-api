@@ -1,16 +1,106 @@
-# 🦁 Singh Ji AI Ultra — Render Deploy Config
+# Render.yaml — Singh Ji AI Ultra v5.0
+# Full deployment configuration with all dependencies
+
 services:
   - type: web
     name: singhji-api
     runtime: python
-    buildCommand: "pip install -r requirements.txt"
-    startCommand: "gunicorn app:app --bind 0.0.0.0:$PORT --workers 4"
+    plan: free
+    region: singapore
+
+    buildCommand: |
+      echo "🦁 Installing Singh Ji AI dependencies..."
+      pip install --upgrade pip
+      pip install fastapi==0.104.1
+      pip install uvicorn==0.24.0
+      pip install python-multipart==0.0.6
+      pip install requests==2.31.0
+      pip install supabase==2.0.3
+      pip install python-dotenv==1.0.0
+      pip install pytz==2023.3
+      pip install apscheduler==3.10.4
+      pip install qrcode==7.4.2
+      pip install Pillow==10.0.0
+      pip install pandas==2.1.3
+      pip install numpy==1.26.2
+      pip install openai==1.3.6
+      pip install groq==0.4.2
+      pip install jsonschema==4.20.0
+      echo "✅ All dependencies installed!"
+
+    startCommand: |
+      echo "🚀 Starting Singh Ji AI Ultra v5.0..."
+      echo "👑 Singh Ji ka Raj Shuru!"
+      uvicorn app:app --host 0.0.0.0 --port $PORT
+
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
-      - key: FLASK_ENV
-        value: production
+
       - key: PORT
         value: 10000
+
+      # API Keys — Replace with your actual keys
+      - key: NEWSDATA_API_KEY
+        sync: false
+
+      - key: CURRENTS_API_KEY
+        sync: false
+
+      - key: OPENAI_API_KEY
+        sync: false
+
+      - key: GROQ_API_KEY
+        sync: false
+
+      - key: GEMINI_API_KEY
+        sync: false
+
+      - key: WEATHER_API_KEY
+        sync: false
+
+      - key: PLANT_ID_API_KEY
+        sync: false
+
+      - key: SUPABASE_URL
+        sync: false
+
+      - key: SUPABASE_KEY
+        sync: false
+
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+
+      - key: SMTP_SERVER
+        sync: false
+
+      - key: SMTP_PORT
+        sync: false
+
+      - key: SMTP_USER
+        sync: false
+
+      - key: SMTP_PASSWORD
+        sync: false
+
+      - key: UPI_ID
+        value: jp200883@sbi
+
+      - key: MERCHANT_NAME
+        value: Singh Ji AI
+
+      - key: ADMIN_KEY
+        value: singhji-admin-2026
+
+    healthCheckPath: /api/health
+
     autoDeploy: true
-    healthCheckPath: /api/v1/health
+
+    # Disk for temporary files
+    disk:
+      name: singhji-data
+      mountPath: /data
+      sizeGB: 1
