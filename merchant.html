@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>🦁 Singh Ji Gateway — Merchant</title>
+    <style>
+        body { font-family: Arial; background: #f0f0f0; }
+        .dashboard { max-width: 800px; margin: 0 auto; padding: 20px; }
+        .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+        .card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .qr-section { text-align: center; margin: 30px 0; }
+        .qr-code { width: 250px; height: 250px; margin: 20px auto; background: white; padding: 20px; border-radius: 15px; }
+        .btn { background: #667eea; color: white; padding: 15px 30px; border: none; border-radius: 25px; cursor: pointer; font-size: 16px; }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <h1>🦁 Singh Ji Gateway</h1>
+        <p>Merchant ID: <strong>SJ12345</strong></p>
+        
+        <div class="stats">
+            <div class="card">
+                <h3>💰 Total Sales</h3>
+                <h2>₹5,23,450</h2>
+            </div>
+            <div class="card">
+                <h3>📊 Commission (2%)</h3>
+                <h2>₹10,469</h2>
+            </div>
+            <div class="card">
+                <h3>👥 Customers</h3>
+                <h2>1,234</h2>
+            </div>
+        </div>
+        
+        <div class="qr-section">
+            <h2>Your QR Code</h2>
+            <div class="qr-code">
+                <img src="singhji-merchant-qr.png" alt="Merchant QR" style="width:100%">
+            </div>
+            <button class="btn" onclick="downloadQR()">⬇️ Download QR</button>
+            <button class="btn" onclick="shareQR()">📤 Share QR</button>
+        </div>
+        
+        <div class="card" style="margin-top:20px">
+            <h3>🌍 Accept Payments From:</h3>
+            <p>🇮🇳 UPI | 💳 Cards | 🌏 International | 📱 All Apps</p>
+        </div>
+    </div>
+    
+    <script>
+        function downloadQR() {
+            alert('QR Downloaded! 🦁');
+        }
+        function shareQR() {
+            alert('QR Shared! 🌍');
+        }
+    </script>
+</body>
+</html>
