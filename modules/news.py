@@ -1,102 +1,54 @@
-from fastapi import APIRouter
+# modules/news.py — Singh Ji AI Ultra
 import os
-import sys
-
-# services folder ko path mein add karo
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-
-try:
-    from services.travily_search import search_news  # ya jo function hai
-    TAVILY_AVAILABLE = True
-except:
-    TAVILY_AVAILABLE = False
+import requests
+from fastapi import APIRouter
 
 router = APIRouter()
 
-TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
-TAVILY_URL = os.getenv("TAVILY_URL", "https://api.tavily.com/search")
-
-@router.get("/")
-def news_home():
-    return {
-        "module": "news",
-        "status": "🔥 LIVE",
-        "source": "Tavily AI Search",
-        "tavily_service": "✅ Available" if TAVILY_AVAILABLE else "❌ Not Found",
-        "tavily_key": "✅ SET" if TAVILY_API_KEY else "❌ MISSING",
-        "message": "Singh Ji ka news engine ready!"
-    }
+RAPIDAPI_KEY = os.getenv("RAPIDAPI_KEY")
 
 @router.get("/latest")
-def get_latest_news(topic: str = "India", max_results: int = 5):
-    if not TAVILY_API_KEY:
+def latest_news(category: str = "general", country: str = "in"):
+    """Latest news — RapidAPI"""
+    if not RAPIDAPI_KEY:
         return {
-            "ok": False,
-            "error": "TAVILY_API_KEY not set",
-            "message": "Render Dashboard → Environment → Key daalo!"
+            "status": "mock",
+            "category": category,
+            "headlines": [
+                {"title": "🦁 Singh Ji AI Launch hone wala hai!", "source": "Singh Ji Times", "time": "Just now"},
+                {"title": "Bharat ka sabse tez AI super app", "source": "Tech India", "time": "1 hour ago"}
+            ]
         }
     
     try:
-        import requests
-        
-        headers = {"Content-Type": "application/json"}
-        payload = {
-            "api_key": TAVILY_API_KEY,
-            "query": f"latest news {topic}",
-            "search_depth": "basic",
-            "topic": "news",
-            "time_range": "day",
-            "max_results": max_results
+        url = "https://news-api14.p.rapidapi.com/v2/search/publishers"
+        headers = {
+            "X-RapidAPI-Key": RAPIDAPI_KEY,
+            "X-RapidAPI-Host": "news-api14.p.rapidapi.com"
         }
+        # Or use specific news endpoint
+        url = "https://news-api14.p.rapidapi.com/top-headlines"
+        querystring = {"country": country, "language": "en", "pageSize": 10, "category": category}
         
-        response = requests.post(TAVILY_URL, json=payload, headers=headers, timeout=15)
-        data = response.json()
-        
-        if "results" not in data:
-            return {"ok": False, "error": "No results", "raw": data}
+        res = requests.get(url, headers=headers, params=querystring, timeout=10)
+        data = res.json()
         
         articles = []
-        for item in data["results"]:
+        for item in data.get("articles", [])[:5]:
             articles.append({
                 "title": item.get("title", "No title"),
+                "description": item.get("description", ""),
                 "url": item.get("url", ""),
-                "content": item.get("content", "")[:300] + "...",
-                "published": item.get("published_date", "Recent"),
-                "source": item.get("source", "Unknown")
+                "image": item.get("urlToImage", ""),
+                "source": item.get("source", {}).get("name", "Unknown"),
+                "published": item.get("publishedAt", "Now")
             })
         
-        return {
-            "ok": True,
-            "topic": topic,
-            "total": len(articles),
-            "articles": articles,
-            "powered_by": "Tavily AI via services/travily_search.py",
-            "singh_ji_message": f"🦁 {topic} ki taza khabar!"
-        }
-        
+        return {"status": "live", "category": category, "count": len(articles), "news": articles}
     except Exception as e:
-        return {
-            "ok": False,
-            "error": str(e),
-            "message": "News fetch fail — baad mein try karo!"
-        }
+        return {"error": str(e), "fallback": "mock"}
 
-@router.get("/india")
-def india_news():
-    return get_latest_news(topic="India")
-
-@router.get("/tech")
-def tech_news():
-    return get_latest_news(topic="technology India")
-
-@router.get("/sports")
-def sports_news():
-    return get_latest_news(topic="sports India")
-
-@router.get("/business")
-def business_news():
-    return get_latest_news(topic="business India")
-
-@router.get("/bollywood")
-def bollywood_news():
-    return get_latest_news(topic="Bollywood entertainment")
+@router.get("/headlines")
+def headlines():
+    """Quick headlines"""
+    return latest_news(category="general")
