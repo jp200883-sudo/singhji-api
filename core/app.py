@@ -15,7 +15,7 @@ app = FastAPI(
     version="5.0.0"
 )
 
-# ===== CORS — सबको allow करो (Frontend GitHub Pages se) =====
+# ===== CORS — सबको allow करो =====
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -24,7 +24,7 @@ app.add_middleware(
     allow_credentials=True,
 )
 
-# ===== ERROR HANDLER — गड़बड़ी = सिंह जी को पता चले =====
+# ===== ERROR HANDLER =====
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     return JSONResponse(
@@ -37,64 +37,60 @@ async def global_exception_handler(request: Request, exc: Exception):
         }
     )
 
-# ===== AUTO-IMPORT SYSTEM — सब Agents auto load होंगे =====
-# ===== AUTO-IMPORT SYSTEM — सब Agents auto load होंगे =====
+# ===== MODULES LIST — सब यहाँ =====
 MODULES = [
-    # 🦁 Phase 1: Foundation (Managers)
-    "superior_agent",      # 🦁 CEO — सबका बाप
-    "singhji_agent",       # 🤴 Singh Ji का खुद का AI
-    "meta_agent",          # 🔄 Self-Update System
-    "master_data",         # 🧠 Master Data Layer
+    # 🦁 Phase 1: Foundation
+    "superior_agent",
+    "singhji_agent",
+    "meta_agent",
+    "master_data",
     
     # 🔧 Core System
-    "emergency",           # 🚨 P0 Priority
-    "supabase_memory",     # 🧠 Memory
-    "ai_chat",             # 🤖 AI Chat
-    "weather",             # 🌤️ Weather
-    "mandi",               # 🌾 Mandi Bhav
-    "newsdata",            # 📰 News (FIXED!)
+    "emergency",
+    "supabase_memory",
+    "ai_chat",
+    "weather",
+    "mandi",
+    "newsdata",            # 📰 News
     "news_scheduler",      # 📰 News Scheduler
     "currents_api",        # 📰 World News
-    "email",               # 📧 Email
-    "schedule",            # 📅 Schedule
-    "telegram_bot",        # ✈️ Telegram
-    "voice",               # 🎙️ Voice
-    "voice_cmd",           # 🎙️ Voice Commands
-    "voice_tts",           # 🎙️ TTS
-    "plant_id",            # 🌱 Plant ID
-    "language",            # 🌐 Language
-    "language_hub",        # 🌐 Language Hub
-    "search",              # 🔍 Search
-    "social",              # 👥 Social
-    "govt",                # 🏛️ Govt
-    "upi",                 # 💳 UPI
-    "adminpanel",          # 🎛️ Admin Panel
+    "email",
+    "schedule",
+    "telegram_bot",
+    "voice",
+    "voice_cmd",
+    "voice_tts",
+    "plant_id",
+    "language",
+    "language_hub",
+    "search",
+    "social",
+    "govt",
+    "upi",                 # 💳 UPI (एक बार!)
+    "adminpanel",
     
     # 🎬 Entertainment
-    "entertainment",       # 🎬 Entertainment Hub
+    "entertainment",
     
-    # 🏦 Banking
-    "banking",             # 🏦 Banking
-    
-    # 💱 Currency
-    "currency",            # 💱 Currency Exchange
+    # 🏦 Banking & Currency
+    "banking",
+    "currency",
     
     # 🚂 Railway
-    "railway",             # 🚂 Railway PNR/Tracking
+    "railway",
     
-    # 💰 NEW: Gateway & Commission
-    "gateway",             # 💳 Payment Gateway
-    "commission_tracker",  # 📊 Commission System
-    "upi",                 # 💰 UPI Payments
+    # 🆕 v6.0 Modules
+    "karmachari",
+    "pani",
+    "rozgar",
+    "sewer",
     
-    # 🆕 NEW: v6.0 Modules
-    "karmachari",          # 👷 Karmachari (Workers)
-    "pani",                # 💧 Jal Jeevan Mission
-    "rozgar",              # 💼 Jobs/Rozgar
-    "sewer",               # 🚰 Sewer Management
+    # 🚫 FUTURE — Payment Gateway (अभी मत चालू करो!)
+    # "gateway",           # 💰 Future mein
+    # "commission_tracker",  # 💰 Future mein
 ]
 
-# ===== ROUTER REGISTRY — Prefix mapping =====
+# ===== ROUTER PREFIX — सबका route =====
 ROUTER_PREFIX = {
     "superior_agent": "/api/superior",
     "singhji_agent": "/api/singhji",
@@ -105,7 +101,9 @@ ROUTER_PREFIX = {
     "ai_chat": "/api/ai",
     "weather": "/api/weather",
     "mandi": "/api/mandi",
-    "news": "/api/news",
+    "newsdata": "/api/news",           # 📰 News
+    "news_scheduler": "/api/news-scheduler",
+    "currents_api": "/api/currents",   # 🌍 World News
     "email": "/api/email",
     "schedule": "/api/schedule",
     "telegram_bot": "/api/telegram",
@@ -124,6 +122,10 @@ ROUTER_PREFIX = {
     "banking": "/api/banking",
     "currency": "/api/currency",
     "railway": "/api/railway",
+    "karmachari": "/api/karmachari",
+    "pani": "/api/pani",
+    "rozgar": "/api/rozgar",
+    "sewer": "/api/sewer",
 }
 
 # ===== AUTO-LOAD ALL MODULES =====
@@ -142,7 +144,7 @@ for module_name in MODULES:
     except Exception as e:
         failed_modules.append(f"{module_name}: {str(e)}")
 
-# ===== ROOT ENDPOINT — / =====
+# ===== ROOT ENDPOINT =====
 @app.get("/")
 async def root():
     return {
@@ -157,30 +159,21 @@ async def root():
         "message": f"{len(loaded_modules)}/{len(MODULES)} modules active!"
     }
 
-# ===== HEALTH CHECK — /health =====
+# ===== HEALTH CHECKS =====
 @app.get("/health")
 async def health_check():
-    return {
-        "app": "Singh Ji AI Ultra v5.0",
-        "status": "🔥 LIVE",
-        "timestamp": "2026-06-28",
-        "message": "Health check pass!"
-    }
+    return {"app": "Singh Ji AI Ultra v5.0", "status": "🔥 LIVE", "timestamp": "2026-06-28"}
 
-# ===== API HEALTH — /api/health =====
 @app.get("/api/health")
 async def health():
     return {
         "status": "✅ ALL SYSTEMS GO",
         "version": "5.0.0",
         "phase": "5 — ULTRA",
-        "owner": "Singh Ji",
         "loaded_modules": len(loaded_modules),
-        "failed_modules": len(failed_modules),
-        "timestamp": "now"
+        "failed_modules": len(failed_modules)
     }
 
-# ===== STATUS CHECK — /api/status =====
 @app.get("/api/status")
 async def status():
     return {
@@ -188,16 +181,13 @@ async def status():
         "status": "LIVE",
         "total_agents": len(loaded_modules),
         "agents": loaded_modules,
-        "failed": failed_modules if failed_modules else [],
-        "message": f"{len(loaded_modules)}/{len(MODULES)} modules active!"
+        "failed": failed_modules if failed_modules else []
     }
 
-# ===== HEAD REQUEST — Render Health Check =====
 @app.head("/")
 async def head_root():
     return {}
 
-# ===== SINGH JI DIRECT COMMAND =====
 @app.post("/api/command")
 async def singhji_command(request: Request):
     data = await request.json()
@@ -205,11 +195,10 @@ async def singhji_command(request: Request):
         "status": "executed",
         "command": data.get("action", "unknown"),
         "by": "👑 Singh Ji",
-        "message": "Singh Ji ka hukum — sar aankhon pe!",
-        "timestamp": "now"
+        "message": "Singh Ji ka hukum — sar aankhon pe!"
     }
 
-# ===== STARTUP MESSAGE =====
+# ===== STARTUP =====
 @app.on_event("startup")
 async def startup():
     print("🔥 Singh Ji AI Ultra v5.0 STARTED!")
