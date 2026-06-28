@@ -88,6 +88,7 @@ MODULES = [
     "social",              # 👥 Social
     "govt",                # 🏛️ Govt
     "upi",                 # 💳 UPI
+    "adminpanel",          # 🎛️ Admin Panel — NEW!
 ]
 
 # ===== ROUTER REGISTRY — Prefix mapping =====
@@ -115,6 +116,7 @@ ROUTER_PREFIX = {
     "social": "/api/social",
     "govt": "/api/govt",
     "upi": "/api/upi",
+    "adminpanel": "/api/admin",  # ← NEW!
 }
 
 # ===== AUTO-LOAD ALL MODULES =====
@@ -188,7 +190,7 @@ async def status():
         "total_agents": len(loaded_modules),
         "agents": loaded_modules,
         "failed": failed_modules if failed_modules else [],
-        "message": "19/19 modules active!" if len(failed_modules) == 0 else f"{len(loaded_modules)}/{len(MODULES)} active"
+        "message": "24/24 modules active!" if len(failed_modules) == 0 else f"{len(loaded_modules)}/{len(MODULES)} active"
     }
 
 # ===== HEAD REQUEST — Render Health Check =====
