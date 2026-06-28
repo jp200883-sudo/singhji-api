@@ -337,5 +337,11 @@ def lifestyle_root():
             "ayurveda": "/lifestyle/ayurveda/remedies, /lifestyle/ayurveda/dosha-quiz, /lifestyle/ayurveda/yoga",
             "pet": "/lifestyle/pet/services, /lifestyle/pet/vet-finder",
             "vehicle": "/lifestyle/vehicle/services, /lifestyle/vehicle/fuel-price/{city}, /lifestyle/vehicle/mechanic"
-        }
+    # ✅ main.py इसको import कर रहा है — ये add करो!
+def get_lifestyle_content():
+    return {
+        "status": "live",
+        "content": "Lifestyle content loaded!",
+        "hub": "Lifestyle Hub",
+        "modules": ["Food & Recipes", "Fitness & Health", "Shopping Deals", "Home Services", "Fashion & Beauty", "Ayurveda & Wellness", "Pet Care", "Vehicle Care"]
     }
