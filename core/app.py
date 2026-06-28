@@ -38,6 +38,7 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 # ===== AUTO-IMPORT SYSTEM — सब Agents auto load होंगे =====
+# ===== AUTO-IMPORT SYSTEM — सब Agents auto load होंगे =====
 MODULES = [
     # 🦁 Phase 1: Foundation (Managers)
     "superior_agent",      # 🦁 CEO — सबका बाप
@@ -51,7 +52,9 @@ MODULES = [
     "ai_chat",             # 🤖 AI Chat
     "weather",             # 🌤️ Weather
     "mandi",               # 🌾 Mandi Bhav
-    "news",                # 📰 News
+    "newsdata",            # 📰 News (FIXED!)
+    "news_scheduler",      # 📰 News Scheduler
+    "currents_api",        # 📰 World News
     "email",               # 📧 Email
     "schedule",            # 📅 Schedule
     "telegram_bot",        # ✈️ Telegram
@@ -67,17 +70,28 @@ MODULES = [
     "upi",                 # 💳 UPI
     "adminpanel",          # 🎛️ Admin Panel
     
-    # 🎬 Entertainment — NEW!
+    # 🎬 Entertainment
     "entertainment",       # 🎬 Entertainment Hub
     
-    # 🏦 Banking — NEW!
+    # 🏦 Banking
     "banking",             # 🏦 Banking
     
-    # 💱 Currency — NEW!
+    # 💱 Currency
     "currency",            # 💱 Currency Exchange
     
-    # 🚂 Railway — NEW!
+    # 🚂 Railway
     "railway",             # 🚂 Railway PNR/Tracking
+    
+    # 💰 NEW: Gateway & Commission
+    "gateway",             # 💳 Payment Gateway
+    "commission_tracker",  # 📊 Commission System
+    "upi",                 # 💰 UPI Payments
+    
+    # 🆕 NEW: v6.0 Modules
+    "karmachari",          # 👷 Karmachari (Workers)
+    "pani",                # 💧 Jal Jeevan Mission
+    "rozgar",              # 💼 Jobs/Rozgar
+    "sewer",               # 🚰 Sewer Management
 ]
 
 # ===== ROUTER REGISTRY — Prefix mapping =====
