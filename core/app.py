@@ -15,29 +15,6 @@ app = FastAPI(
     version="5.0.0"
 )
 
-# ============================================
-# 🎬 ENTERTAINMENT ROUTERS — Direct Import
-# ============================================
-try:
-    from entertainment import music_router, video_router, ramayan_router, gaming_router
-    app.include_router(music_router)
-    app.include_router(video_router)
-    app.include_router(ramayan_router)
-    app.include_router(gaming_router)
-    ENTERTAINMENT_LOADED = True
-except Exception as e:
-    ENTERTAINMENT_LOADED = False
-    print(f"⚠️ Entertainment load failed: {e}")
-
-# 🏦 Banking Router — Phase 4
-try:
-    from banking.handler import router as banking_router
-    app.include_router(banking_router)
-    BANKING_LOADED = True
-except Exception as e:
-    BANKING_LOADED = False
-    print(f"⚠️ Banking load failed: {e}")
-
 # ===== CORS — सबको allow करो (Frontend GitHub Pages se) =====
 app.add_middleware(
     CORSMiddleware,
@@ -88,7 +65,19 @@ MODULES = [
     "social",              # 👥 Social
     "govt",                # 🏛️ Govt
     "upi",                 # 💳 UPI
-    "adminpanel",          # 🎛️ Admin Panel — NEW!
+    "adminpanel",          # 🎛️ Admin Panel
+    
+    # 🎬 Entertainment — NEW!
+    "entertainment",       # 🎬 Entertainment Hub
+    
+    # 🏦 Banking — NEW!
+    "banking",             # 🏦 Banking
+    
+    # 💱 Currency — NEW!
+    "currency",            # 💱 Currency Exchange
+    
+    # 🚂 Railway — NEW!
+    "railway",             # 🚂 Railway PNR/Tracking
 ]
 
 # ===== ROUTER REGISTRY — Prefix mapping =====
@@ -116,7 +105,11 @@ ROUTER_PREFIX = {
     "social": "/api/social",
     "govt": "/api/govt",
     "upi": "/api/upi",
-    "adminpanel": "/api/admin",  # ← NEW!
+    "adminpanel": "/api/admin",
+    "entertainment": "/api/entertainment",
+    "banking": "/api/banking",
+    "currency": "/api/currency",
+    "railway": "/api/railway",
 }
 
 # ===== AUTO-LOAD ALL MODULES =====
@@ -135,23 +128,22 @@ for module_name in MODULES:
     except Exception as e:
         failed_modules.append(f"{module_name}: {str(e)}")
 
-# ===== REDIRECTS — Old paths → New /api paths =====
-@app.get("/weather/{city}")
-async def weather_redirect(city: str):
-    """Old /weather path → /api/weather"""
-    return RedirectResponse(f"/api/weather/{city}")
+# ===== ROOT ENDPOINT — / =====
+@app.get("/")
+async def root():
+    return {
+        "app": "Singh Ji AI Ultra v5.0",
+        "status": "🔥 LIVE",
+        "owner": "👑 Singh Ji (JP Singh Ji Kanpur)",
+        "guru": "🤖 Moonshot AI",
+        "mantra": "KELA mode — केला नहीं होता भाई अकेला!",
+        "total_modules": len(loaded_modules),
+        "loaded": loaded_modules,
+        "failed": failed_modules if failed_modules else [],
+        "message": f"{len(loaded_modules)}/{len(MODULES)} modules active!"
+    }
 
-@app.get("/plant/{plant_id}")
-async def plant_redirect(plant_id: str):
-    """Old /plant path → /api/plant"""
-    return RedirectResponse(f"/api/plant/{plant_id}")
-
-@app.get("/news/{topic}")
-async def news_redirect(topic: str):
-    """Old /news path → /api/news"""
-    return RedirectResponse(f"/api/news/{topic}")
-
-# ===== ROOT ENDPOINT =====
+# ===== HEALTH CHECK — /health =====
 @app.get("/health")
 async def health_check():
     return {
@@ -160,20 +152,21 @@ async def health_check():
         "timestamp": "2026-06-28",
         "message": "Health check pass!"
     }
-# ===== HEALTH CHECK =====
+
+# ===== API HEALTH — /api/health =====
 @app.get("/api/health")
 async def health():
     return {
         "status": "✅ ALL SYSTEMS GO",
         "version": "5.0.0",
-        "phase": "1 — Foundation",
+        "phase": "5 — ULTRA",
         "owner": "Singh Ji",
         "loaded_modules": len(loaded_modules),
         "failed_modules": len(failed_modules),
         "timestamp": "now"
     }
 
-# ===== STATUS CHECK — सब Agents का status =====
+# ===== STATUS CHECK — /api/status =====
 @app.get("/api/status")
 async def status():
     return {
@@ -182,7 +175,7 @@ async def status():
         "total_agents": len(loaded_modules),
         "agents": loaded_modules,
         "failed": failed_modules if failed_modules else [],
-        "message": "24/24 modules active!" if len(failed_modules) == 0 else f"{len(loaded_modules)}/{len(MODULES)} active"
+        "message": f"{len(loaded_modules)}/{len(MODULES)} modules active!"
     }
 
 # ===== HEAD REQUEST — Render Health Check =====
