@@ -1,32 +1,45 @@
 from fastapi import APIRouter
-import requests
 import os
+import requests
 
 router = APIRouter()
 
+WEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY", "")
+
+@router.get("/")
+def weather_home():
+    return {
+        "module": "weather",
+        "status": "✅ LIVE",
+        "api_configured": bool(WEATHER_API_KEY),
+        "message": "Weather module ready — Mausam ka haal bataoonga!"
+    }
+
 @router.get("/{city}")
-def weather_city(city: str):
-    # ✅ SAHI variable name
-    WEATHER_KEY = os.getenv("OPENWEATHER_API_KEY")
-    
-    if not WEATHER_KEY:
-        return {"error": "API key missing", "source": "config_error", "expected": "OPENWEATHER_API_KEY"}
-    
-    url = f"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={WEATHER_KEY}&units=metric"
+def get_weather(city: str):
+    if not WEATHER_API_KEY:
+        return {
+            "ok": False,
+            "error": "OPENWEATHER_API_KEY not set",
+            "message": "Render env mein key daalo!"
+        }
     
     try:
-        res = requests.get(url, timeout=10)
-        data = res.json()
-        
-        if res.status_code != 200:
-            return {"error": data.get("message", "Unknown error"), "source": "api_error"}
+        url = f"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={WEATHER_API_KEY}&units=metric"
+        response = requests.get(url, timeout=10)
+        data = response.json()
         
         return {
+            "ok": True,
             "city": city,
-            "temp": f"{data['main']['temp']}°C",
-            "condition": data["weather"][0]["main"],
-            "humidity": f"{data['main']['humidity']}%",
-            "source": "openweathermap"
+            "temperature": data.get("main", {}).get("temp", "N/A"),
+            "condition": data.get("weather", [{}])[0].get("description", "N/A"),
+            "humidity": data.get("main", {}).get("humidity", "N/A"),
+            "message": f"{city} ka mausam: {data.get('weather', [{}])[0].get('description', 'N/A')}"
         }
     except Exception as e:
-        return {"error": str(e), "source": "exception"}
+        return {
+            "ok": False,
+            "error": str(e),
+            "message": "Weather fetch fail — baad mein try karo!"
+        }
