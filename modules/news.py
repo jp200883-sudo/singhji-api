@@ -1,7 +1,15 @@
 from fastapi import APIRouter
 import os
-import requests
-import json
+import sys
+
+# services folder ko path mein add karo
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
+try:
+    from services.travily_search import search_news  # ya jo function hai
+    TAVILY_AVAILABLE = True
+except:
+    TAVILY_AVAILABLE = False
 
 router = APIRouter()
 
@@ -10,30 +18,27 @@ TAVILY_URL = os.getenv("TAVILY_URL", "https://api.tavily.com/search")
 
 @router.get("/")
 def news_home():
-    key_status = "✅ SET" if TAVILY_API_KEY else "❌ MISSING"
-    url_status = "✅ SET" if TAVILY_URL else "❌ MISSING"
-    
     return {
         "module": "news",
         "status": "🔥 LIVE",
         "source": "Tavily AI Search",
-        "tavily_key": key_status,
-        "tavily_url": url_status,
-        "message": "Real news fetch ready — Singh Ji ka hukum do!"
+        "tavily_service": "✅ Available" if TAVILY_AVAILABLE else "❌ Not Found",
+        "tavily_key": "✅ SET" if TAVILY_API_KEY else "❌ MISSING",
+        "message": "Singh Ji ka news engine ready!"
     }
 
 @router.get("/latest")
 def get_latest_news(topic: str = "India", max_results: int = 5):
-    """Tavily se real news fetch karo"""
-    
     if not TAVILY_API_KEY:
         return {
             "ok": False,
             "error": "TAVILY_API_KEY not set",
-            "message": "Render Dashboard → Environment → TAVILY_API_KEY add karo!"
+            "message": "Render Dashboard → Environment → Key daalo!"
         }
     
     try:
+        import requests
+        
         headers = {"Content-Type": "application/json"}
         payload = {
             "api_key": TAVILY_API_KEY,
@@ -48,13 +53,8 @@ def get_latest_news(topic: str = "India", max_results: int = 5):
         data = response.json()
         
         if "results" not in data:
-            return {
-                "ok": False,
-                "error": "No results from Tavily",
-                "raw": data
-            }
+            return {"ok": False, "error": "No results", "raw": data}
         
-        # Clean format
         articles = []
         for item in data["results"]:
             articles.append({
@@ -62,8 +62,7 @@ def get_latest_news(topic: str = "India", max_results: int = 5):
                 "url": item.get("url", ""),
                 "content": item.get("content", "")[:300] + "...",
                 "published": item.get("published_date", "Recent"),
-                "source": item.get("source", "Unknown"),
-                "score": round(item.get("score", 0), 2)
+                "source": item.get("source", "Unknown")
             })
         
         return {
@@ -71,41 +70,33 @@ def get_latest_news(topic: str = "India", max_results: int = 5):
             "topic": topic,
             "total": len(articles),
             "articles": articles,
-            "powered_by": "Tavily AI",
-            "singh_ji_message": f"🦁 {topic} ki taza khabar aa gayi!"
+            "powered_by": "Tavily AI via services/travily_search.py",
+            "singh_ji_message": f"🦁 {topic} ki taza khabar!"
         }
         
     except Exception as e:
         return {
             "ok": False,
             "error": str(e),
-            "message": "News fetch fail — baad mein try karo bhai!"
+            "message": "News fetch fail — baad mein try karo!"
         }
 
 @router.get("/india")
 def india_news():
-    return get_latest_news(topic="India", max_results=5)
+    return get_latest_news(topic="India")
 
 @router.get("/tech")
 def tech_news():
-    return get_latest_news(topic="technology India", max_results=5)
+    return get_latest_news(topic="technology India")
 
 @router.get("/sports")
 def sports_news():
-    return get_latest_news(topic="sports India", max_results=5)
+    return get_latest_news(topic="sports India")
 
 @router.get("/business")
 def business_news():
-    return get_latest_news(topic="business India", max_results=5)
+    return get_latest_news(topic="business India")
 
-@router.get("/entertainment")
-def entertainment_news():
-    return get_latest_news(topic="Bollywood entertainment India", max_results=5)
-
-@router.get("/politics")
-def politics_news():
-    return get_latest_news(topic="Indian politics", max_results=5)
-
-@router.get("/weather-news")
-def weather_news():
-    return get_latest_news(topic="weather India", max_results=5)
+@router.get("/bollywood")
+def bollywood_news():
+    return get_latest_news(topic="Bollywood entertainment")
