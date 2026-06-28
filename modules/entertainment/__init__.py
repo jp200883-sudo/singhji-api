@@ -1,43 +1,27 @@
 # modules/entertainment/__init__.py
-# 🎬 Entertainment Hub — Singh Ji AI Ultra v5.0
 
 from fastapi import APIRouter
-
-# Sab handlers import karo
-from .gaming_handler import get_gaming_content
-from .lifestyle_handler import get_lifestyle_content
-from .music_handler import get_music_content
-from .ramayan_handler import get_ramayan_content
-from .video_handler import get_video_content
 
 router = APIRouter()
 
 @router.get("/")
-async def entertainment_root():
+def home():
     return {
-        "ok": True,
         "module": "entertainment",
-        "status": "✅ LIVE",
-        "categories": ["gaming", "lifestyle", "music", "ramayan", "video"],
-        "message": "Entertainment module ready — Haso, gao, khelo, dekho!"
+        "status": "live",
+        "message": "Singh Ji AI Ultra v5.0 🚀"
     }
 
-@router.get("/gaming")
-async def gaming():
-    return get_gaming_content()
+# ✅ gaming_handler से router import करो
+try:
+    from .gaming_handler import router as gaming_router
+    router.include_router(gaming_router, prefix="/gaming")
+except ImportError:
+    pass
 
-@router.get("/lifestyle")
-async def lifestyle():
-    return get_lifestyle_content()
-
-@router.get("/music")
-async def music():
-    return get_music_content()
-
-@router.get("/ramayan")
-async def ramayan():
-    return get_ramayan_content()
-
-@router.get("/video")
-async def video():
-    return get_video_content()
+# ✅ lifestyle_handler से router import करो
+try:
+    from .lifestyle_handler import router as lifestyle_router
+    router.include_router(lifestyle_router, prefix="/lifestyle")
+except ImportError:
+    pass
