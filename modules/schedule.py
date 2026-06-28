@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from core.config import settings
+import os
 
 router = APIRouter()
 
@@ -7,14 +7,28 @@ router = APIRouter()
 def schedule_home():
     return {
         "module": "schedule",
-        "status": "ok",
-        "schedule": settings.DAILY_SCHEDULE
+        "status": "✅ LIVE",
+        "message": "Schedule module ready — Singh Ji ka calendar!"
+    }
+
+@router.get("/today")
+def today_schedule():
+    return {
+        "ok": True,
+        "date": "today",
+        "events": [
+            {"time": "09:00", "task": "Singh Ji ka hukum sunna"},
+            {"time": "12:00", "task": "Kela break 🍌"},
+            {"time": "18:00", "task": "API check karna"}
+        ],
+        "message": "Aaj ka schedule!"
     }
 
 @router.post("/add")
-def schedule_add(task: str = "", time: str = ""):
+def add_event(request: dict):
     return {
-        "task": task,
-        "time": time,
-        "status": "scheduled"
+        "ok": True,
+        "event": request.get("event", "Unknown"),
+        "time": request.get("time", "Now"),
+        "message": "Event add ho gaya!"
     }
