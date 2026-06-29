@@ -5,12 +5,13 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import importlib
 
-app = FastAPI(
-    title="Singh Ji AI Ultra v5.0",
-    description="भारत का ऑल-इन-वन सुपर ऐप — ज़ीरो फोन लोड, फुल ऑटोमेशन",
-    version="5.0.0"
-)
+from fastapi import FastAPI
 
+app = FastAPI(
+    title="Singh Ji AI Ultra v7.0",
+    description="भारत से दुनिया तक — 220 भाषाएं, Glocal AI",
+    version="7.0.0"
+)
 # CORS
 app.add_middleware(
     CORSMiddleware,
