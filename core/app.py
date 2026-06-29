@@ -1,4 +1,4 @@
-# app.py — Singh Ji AI Ultra v5.0
+# app.py — Singh Ji AI Ultra v5.0 (FIXED)
 # 🚀 MAIN APP — सब Agents एक साथ, सब Singh Ji के अंडर में!
 
 from fastapi import FastAPI, Request
@@ -8,6 +8,7 @@ import importlib
 import sys
 import os
 import traceback
+
 app = FastAPI(
     title="Singh Ji AI Ultra v5.0",
     description="भारत का ऑल-इन-वन सुपर ऐप — ज़ीरो फोन लोड, फुल ऑटोमेशन",
@@ -43,7 +44,7 @@ MODULES = [
     "singhji_agent",
     "meta_agent",
     "master_data",
-    "api", 
+    
     # 🔧 Core System
     "emergency",
     "supabase_memory",
@@ -91,7 +92,6 @@ MODULES = [
 
 # ===== ROUTER PREFIX — सबका route =====
 ROUTER_PREFIX = {
-    "api": "/api",                     # ← ADD THIS!
     "superior_agent": "/api/superior",
     "singhji_agent": "/api/singhji",
     "meta_agent": "/api/meta",
@@ -162,7 +162,7 @@ async def root():
 # ===== HEALTH CHECKS =====
 @app.get("/health")
 async def health_check():
-    return {"app": "Singh Ji AI Ultra v5.0", "status": "🔥 LIVE", "timestamp": "2026-06-28"}
+    return {"app": "Singh Ji AI Ultra v5.0", "status": "🔥 LIVE", "timestamp": "2026-06-29"}
 
 @app.get("/api/health")
 async def health():
