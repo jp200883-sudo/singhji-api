@@ -1,4 +1,13 @@
 # api.py (ROOT LEVEL)
+import sys
+import os
+from pathlib import Path
+
+# ✅ ADD THIS: Ensure core/ is in Python path
+BASE_DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(BASE_DIR))
+sys.path.insert(0, str(BASE_DIR / "core"))
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import importlib
@@ -13,6 +22,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+print(f"🔍 Python path: {sys.path}")
+print(f"🔍 BASE_DIR: {BASE_DIR}")
+print(f"🔍 core exists: {(BASE_DIR / 'core').exists()}")
+print(f"🔍 core/__init__.py exists: {(BASE_DIR / 'core' / '__init__.py').exists()}")
+
 modules_loaded = []
 modules_failed = []
 
@@ -26,10 +40,9 @@ module_names = [
     "upi", "voice", "voice_cmd", "voice_tts", "weather"
 ]
 
-# Load flat modules (direct .py files)
+# Load flat modules
 for mod_name in module_names:
     try:
-        # ✅ CORRECT: importlib.import_module
         mod = importlib.import_module(f"core.modules.{mod_name}")
         if hasattr(mod, "router"):
             app.include_router(mod.router)
@@ -39,7 +52,7 @@ for mod_name in module_names:
         modules_failed.append(f"{mod_name}: {str(e)}")
         print(f"❌ Failed: {mod_name}: {str(e)}")
 
-# Load folder modules (with handler.py)
+# Load folder modules
 folder_modules = [
     "adminpanel", "banking", "currency", "entertainment",
     "language", "language_hub", "railway", "telegram_bot"
@@ -47,7 +60,6 @@ folder_modules = [
 
 for mod_name in folder_modules:
     try:
-        # ✅ CORRECT: import handler from folder
         mod = importlib.import_module(f"core.modules.{mod_name}.handler")
         if hasattr(mod, "router"):
             app.include_router(mod.router)
