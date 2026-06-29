@@ -1,12 +1,13 @@
 # api.py
 """
 Singh Ji AI Ultra v7.0 - Main API
-Render Deployment Ready
+Direct file loading - NO package imports
 """
 import os
 import sys
 import json
 import logging
+import importlib.util
 from datetime import datetime
 from typing import Dict, List, Optional, Any
 
@@ -21,82 +22,107 @@ logger = logging.getLogger(__name__)
 
 # ========== PATH SETUP ==========
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, BASE_DIR)
-sys.path.insert(0, os.path.join(BASE_DIR, 'core'))
+MODULES_DIR = os.path.join(BASE_DIR, 'core', 'modules')
+CONFIG_DIR = os.path.join(BASE_DIR, 'core', 'config')
+
 logger.info(f"📁 Base dir: {BASE_DIR}")
+logger.info(f"📁 Modules dir: {MODULES_DIR}")
+logger.info(f"📁 Modules dir exists: {os.path.exists(MODULES_DIR)}")
 
-# ========== SAFE IMPORTS ==========
-# Config
-try:
-    from core.config.settings import get_settings
-    logger.info("✅ Config loaded")
-except Exception as e:
-    logger.error(f"❌ Config import failed: {e}")
-    def get_settings():
-        return {"app_name": "Singh Ji AI", "version": "7.0.0"}
+# List files in modules dir if exists
+if os.path.exists(MODULES_DIR):
+    files = os.listdir(MODULES_DIR)
+    logger.info(f"📁 Files in modules: {files}")
+else:
+    logger.error(f"❌ Modules directory NOT FOUND!")
+    # Create it
+    os.makedirs(MODULES_DIR, exist_ok=True)
+    logger.info(f"📁 Created modules directory")
 
-# ========== MODULE LOADER ==========
+# ========== LOAD CONFIG ==========
+def load_config():
+    """Load settings from core/config/settings.py"""
+    try:
+        settings_path = os.path.join(CONFIG_DIR, 'settings.py')
+        if not os.path.exists(settings_path):
+            logger.warning(f"⚠️ settings.py not found at {settings_path}")
+            return None
+            
+        spec = importlib.util.spec_from_file_location("settings", settings_path)
+        settings_mod = importlib.util.module_from_spec(spec)
+        sys.modules["settings"] = settings_mod
+        spec.loader.exec_module(settings_mod)
+        
+        if hasattr(settings_mod, 'get_settings'):
+            logger.info("✅ Config loaded with get_settings")
+            return settings_mod.get_settings
+        else:
+            logger.warning("⚠️ get_settings not found in settings.py")
+            return None
+            
+    except Exception as e:
+        logger.error(f"❌ Config load failed: {e}")
+        return None
+
+get_settings_func = load_config()
+
+def get_settings():
+    if get_settings_func:
+        return get_settings_func()
+    return {"app_name": "Singh Ji AI Ultra", "version": "7.0.0"}
+
+# ========== DYNAMIC MODULE LOADER ==========
 MODULES_LOADED = []
 
-def safe_import(module_name, module_path):
-    """Safely import a module with fallback"""
+def load_module_from_file(module_name, file_path):
+    """Load a Python module directly from file path"""
     try:
-        # Try direct import first
-        module = __import__(module_path, fromlist=[module_name])
+        if not os.path.exists(file_path):
+            logger.warning(f"⚠️ File not found: {file_path}")
+            return None
+        
+        spec = importlib.util.spec_from_file_location(module_name, file_path)
+        if spec is None:
+            logger.warning(f"⚠️ Cannot create spec for: {file_path}")
+            return None
+            
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[module_name] = module
+        spec.loader.exec_module(module)
+        
         MODULES_LOADED.append(module_name)
         logger.info(f"✅ {module_name} loaded")
         return module
-    except ImportError as e:
-        logger.warning(f"⚠️ {module_name} import failed: {e}")
-        return None
+        
     except Exception as e:
-        logger.warning(f"⚠️ {module_name} error: {e}")
+        logger.warning(f"⚠️ {module_name} failed: {str(e)[:100]}")
         return None
 
 # ========== LOAD ALL MODULES ==========
 logger.info("🔄 Loading modules...")
 
-# List of all modules to load
-MODULE_LIST = [
-    ("ai_chat", "core.modules.ai_chat"),
-    ("weather", "core.modules.weather"),
-    ("news", "core.modules.news"),
-    ("translate", "core.modules.translate"),
-    ("calculator", "core.modules.calculator"),
-    ("unit_converter", "core.modules.unit_converter"),
-    ("dictionary", "core.modules.dictionary"),
-    ("jokes", "core.modules.jokes"),
-    ("quotes", "core.modules.quotes"),
-    ("horoscope", "core.modules.horoscope"),
-    ("qr_code", "core.modules.qr_code"),
-    ("youtube", "core.modules.youtube"),
-    ("pdf_tools", "core.modules.pdf_tools"),
-    ("password_gen", "core.modules.password_gen"),
-    ("url_shortener", "core.modules.url_shortener"),
-    ("text_to_speech", "core.modules.text_to_speech"),
-    ("speech_to_text", "core.modules.speech_to_text"),
-    ("code_runner", "core.modules.code_runner"),
-    ("json_formatter", "core.modules.json_formatter"),
-    ("base64_tools", "core.modules.base64_tools"),
-    ("hash_gen", "core.modules.hash_gen"),
-    ("ip_lookup", "core.modules.ip_lookup"),
-    ("domain_checker", "core.modules.domain_checker"),
-    ("email_validator_mod", "core.modules.email_validator"),
-    ("phone_validator", "core.modules.phone_validator"),
-    ("plant_id", "core.modules.plant_id"),
-    ("upi", "core.modules.upi"),
-    ("reminders", "core.modules.reminders"),
-    ("notes", "core.modules.notes"),
-    ("todo", "core.modules.todo"),
-    ("image_gen", "core.modules.image_gen"),
-    ("voice", "core.modules.voice"),
+MODULE_FILES = [
+    "ai_chat.py", "weather.py", "news.py", "translate.py",
+    "calculator.py", "unit_converter.py", "dictionary.py",
+    "jokes.py", "quotes.py", "horoscope.py",
+    "qr_code.py", "youtube.py", "pdf_tools.py",
+    "password_gen.py", "url_shortener.py",
+    "text_to_speech.py", "speech_to_text.py",
+    "code_runner.py", "json_formatter.py",
+    "base64_tools.py", "hash_gen.py",
+    "ip_lookup.py", "domain_checker.py",
+    "email_validator.py", "phone_validator.py",
+    "plant_id.py", "upi.py",
+    "reminders.py", "notes.py", "todo.py",
+    "image_gen.py", "voice.py"
 ]
 
-# Load each module
 modules_dict = {}
-for name, path in MODULE_LIST:
-    mod = safe_import(name, path)
-    modules_dict[name] = mod
+for filename in MODULE_FILES:
+    module_name = filename.replace('.py', '')
+    file_path = os.path.join(MODULES_DIR, filename)
+    mod = load_module_from_file(module_name, file_path)
+    modules_dict[module_name] = mod
 
 logger.info(f"🚀 Modules loaded: {len(MODULES_LOADED)}/33")
 
@@ -163,12 +189,11 @@ async def health_check():
 
 @app.get("/modules")
 async def list_modules():
-    all_modules = [m[0] for m in MODULE_LIST]
     return {
         "loaded": MODULES_LOADED,
         "count": len(MODULES_LOADED),
         "total": 33,
-        "missing": [m for m in all_modules if m not in MODULES_LOADED]
+        "missing": [f.replace('.py', '') for f in MODULE_FILES if f.replace('.py', '') not in MODULES_LOADED]
     }
 
 # ========== API ENDPOINTS ==========
