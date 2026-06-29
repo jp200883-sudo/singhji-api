@@ -1,81 +1,64 @@
-# modules/currents_api.py — Singh Ji AI Ultra v5.0 (FIXED)
-# Currents API — World News + India News (600/day free)
+# api.py (root level)
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
-import os
-import httpx
-from fastapi import APIRouter, Query
+app = FastAPI(title="Singh Ji AI Ultra v7.0")
 
-router = APIRouter()
+# CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-CURRENTS_API_KEY = os.getenv("CURRENTS_API_KEY", "")
+# Import modules from core.modules
+modules_loaded = []
+modules_failed = []
 
-# ========== FASTAPI ROUTES ==========
+module_names = [
+    "ai_chat", "currents_api", "email", "emergency", "govt",
+    "karmachari", "mandi", "master_data", "meta_agent",
+    "news_scheduler", "newsdata", "pani", "plant_id",
+    "rozgar", "schedule", "search", "sewer", "singhji_agent",
+    "singhji_tv", "social", "supabase_memory", "superior_agent",
+    "upi", "voice", "voice_cmd", "voice_tts", "weather",
+    # Folder modules with handler.py
+    "adminpanel.handler", "banking.handler", "currency.handler",
+    "entertainment.handler", "language.handler", "language_hub.handler",
+    "railway.handler", "telegram_bot.handler"
+]
 
-@router.get("/world")
-async def currents_world_news(keywords: str = Query(None), language: str = Query("en")):
-    """Get world news via Currents API"""
-    if not CURRENTS_API_KEY:
-        return {"success": False, "error": "CURRENTS_API_KEY not configured"}
-    
-    url = "https://api.currentsapi.services/v1/latest-news"
-    params = {"apiKey": CURRENTS_API_KEY, "language": language}
-    if keywords:
-        params["keywords"] = keywords
-    
+for mod_name in module_names:
     try:
-        response = httpx.get(url, params=params, timeout=10)
-        data = response.json()
-        if data.get("status") == "ok":
-            return {"success": True, "total": len(data.get("news", [])), "articles": data.get("news", [])}
-        return {"success": False, "error": data.get("msg", "API error")}
+        mod = __import__(f"core.modules.{mod_name}", fromlist=["router"])
+        if hasattr(mod, "router"):
+            app.include_router(mod.router)
+            modules_loaded.append(mod_name)
+            print(f"✅ Loaded: {mod_name}")
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        modules_failed.append(f"{mod_name}: {str(e)}")
+        print(f"❌ Failed: {mod_name}: {str(e)}")
 
-@router.get("/india")
-async def get_india_news():
-    """Get India news via Currents API"""
-    if not CURRENTS_API_KEY:
-        return {"success": False, "error": "CURRENTS_API_KEY not configured"}
-    
-    url = "https://api.currentsapi.services/v1/latest-news"
-    params = {"apiKey": CURRENTS_API_KEY, "country": "IN", "language": "en"}
-    
-    try:
-        response = httpx.get(url, params=params, timeout=10)
-        data = response.json()
-        if data.get("status") == "ok":
-            return {"success": True, "source": "currents_api", "country": "IN", "total": len(data.get("news", [])), "articles": data.get("news", [])}
-        return {"success": False, "error": data.get("msg", "API error")}
-    except Exception as e:
-        return {"success": False, "error": str(e)}
+print(f"\n🔥 Singh Ji AI Ultra v7.0 STARTED!")
+print(f"✅ Loaded: {len(modules_loaded)} modules")
+if modules_failed:
+    print(f"❌ Failed: {modules_failed}")
+print("👑 Singh Ji ka raj shuru!")
 
-@router.get("/search")
-async def currents_search(query: str = Query(..., description="Search keywords")):
-    """Search news via Currents API"""
-    if not CURRENTS_API_KEY:
-        return {"success": False, "error": "CURRENTS_API_KEY not configured"}
-    
-    url = "https://api.currentsapi.services/v1/search"
-    params = {"apiKey": CURRENTS_API_KEY, "keywords": query, "language": "en"}
-    
-    try:
-        response = httpx.get(url, params=params, timeout=10)
-        data = response.json()
-        if data.get("status") == "ok":
-            return {"success": True, "articles": data.get("news", [])}
-        return {"success": False, "error": data.get("msg")}
-    except Exception as e:
-        return {"success": False, "error": str(e)}
-
-@router.get("/")
-async def currents_home():
-    """Currents API home"""
+@app.get("/")
+def root():
     return {
-        "module": "currents_api",
-        "status": "active",
-        "endpoints": {
-            "world": "/api/currents/world",
-            "india": "/api/currents/india",
-            "search": "/api/currents/search"
-        }
+        "message": "👑 Singh Ji AI Ultra v7.0 - Bharat to the World!",
+        "loaded": len(modules_loaded),
+        "failed": len(modules_failed)
+    }
+
+@app.get("/health")
+def health():
+    return {
+        "status": "healthy",
+        "loaded": modules_loaded,
+        "failed": modules_failed
     }
