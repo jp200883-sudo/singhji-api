@@ -1,10 +1,10 @@
-# api.py (root level)
+# api.py (ROOT LEVEL)
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+import importlib
 
 app = FastAPI(title="Singh Ji AI Ultra v7.0")
 
-# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -13,26 +13,42 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Import modules from core.modules
 modules_loaded = []
 modules_failed = []
 
+# List of modules to load
 module_names = [
     "ai_chat", "currents_api", "email", "emergency", "govt",
     "karmachari", "mandi", "master_data", "meta_agent",
     "news_scheduler", "newsdata", "pani", "plant_id",
     "rozgar", "schedule", "search", "sewer", "singhji_agent",
     "singhji_tv", "social", "supabase_memory", "superior_agent",
-    "upi", "voice", "voice_cmd", "voice_tts", "weather",
-    # Folder modules with handler.py
-    "adminpanel.handler", "banking.handler", "currency.handler",
-    "entertainment.handler", "language.handler", "language_hub.handler",
-    "railway.handler", "telegram_bot.handler"
+    "upi", "voice", "voice_cmd", "voice_tts", "weather"
 ]
 
+# Load flat modules (direct .py files)
 for mod_name in module_names:
     try:
-        mod = __import__(f"core.modules.{mod_name}", fromlist=["router"])
+        # ✅ CORRECT: importlib.import_module
+        mod = importlib.import_module(f"core.modules.{mod_name}")
+        if hasattr(mod, "router"):
+            app.include_router(mod.router)
+            modules_loaded.append(mod_name)
+            print(f"✅ Loaded: {mod_name}")
+    except Exception as e:
+        modules_failed.append(f"{mod_name}: {str(e)}")
+        print(f"❌ Failed: {mod_name}: {str(e)}")
+
+# Load folder modules (with handler.py)
+folder_modules = [
+    "adminpanel", "banking", "currency", "entertainment",
+    "language", "language_hub", "railway", "telegram_bot"
+]
+
+for mod_name in folder_modules:
+    try:
+        # ✅ CORRECT: import handler from folder
+        mod = importlib.import_module(f"core.modules.{mod_name}.handler")
         if hasattr(mod, "router"):
             app.include_router(mod.router)
             modules_loaded.append(mod_name)
@@ -59,6 +75,6 @@ def root():
 def health():
     return {
         "status": "healthy",
-        "loaded": modules_loaded,
-        "failed": modules_failed
+        "loaded_modules": modules_loaded,
+        "failed_modules": modules_failed
     }
