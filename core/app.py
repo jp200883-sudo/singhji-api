@@ -43,7 +43,7 @@ MODULES = [
     "singhji_agent",
     "meta_agent",
     "master_data",
-    
+    "api", 
     # 🔧 Core System
     "emergency",
     "supabase_memory",
@@ -91,6 +91,7 @@ MODULES = [
 
 # ===== ROUTER PREFIX — सबका route =====
 ROUTER_PREFIX = {
+    "api": "/api",                     # ← ADD THIS!
     "superior_agent": "/api/superior",
     "singhji_agent": "/api/singhji",
     "meta_agent": "/api/meta",
