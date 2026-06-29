@@ -1,38 +1,14 @@
-# Render.yaml — MINIMAL (FIXED)
 services:
   - type: web
     name: singhji-api
-    runtime: python
+    env: python
     plan: free
     region: singapore
-
-    buildCommand: |
-      echo "🦁 Installing minimal deps..."
-      pip install --upgrade pip
-      pip install fastapi==0.104.1 uvicorn==0.24.0 python-multipart==0.0.6
-      pip install requests==2.31.0 httpx==0.25.2
-      pip install python-dotenv==1.0.0 pytz==2023.3 apscheduler==3.10.4
-      pip install gTTS==2.4.0
-      pip install qrcode==7.4.2 Pillow==10.0.0    # ← यह LINE ADD करो!
-      echo "✅ Minimal deps installed!"
-
-    startCommand: |
-      echo "🚀 Starting Singh Ji AI..."
-     startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT --workers 1
-
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT --workers 1
+    healthCheckPath: /health
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
       - key: PORT
         value: 10000
-      - key: CURRENTS_API_KEY
-        sync: false
-      - key: NEWSDATA_API_KEY
-        sync: false
-      - key: WEATHER_API_KEY
-        sync: false
-      - key: ADMIN_KEY
-        value: singhji-admin-2026
-
-    healthCheckPath: /health
-    autoDeploy: true
