@@ -15,7 +15,7 @@ services:
       pip install qrcode==7.4.2 Pillow==10.0.0
       echo "✅ Minimal deps installed!"
 
-    startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT --workers 1
+    startCommand: uvicorn core.app:app --host 0.0.0.0 --port $PORT --workers 1
 
     envVars:
       - key: PYTHON_VERSION
