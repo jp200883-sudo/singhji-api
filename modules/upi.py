@@ -28,22 +28,21 @@ OPTIONAL_WALLETS = {
 USER_WALLETS = {}
 TRANSACTIONS = []
 
-@router.get("/")
-def upi_wall():
-    """🏛️ Singh Ji UPI Wall — Entry Point"""
+@router.get("/wall/qr")
+def wall_qr(amount: float = None, note: str = "Singh Ji AI"):
+    """QR temporarily disabled — Use direct UPI instead"""
     return {
-        "module": "Singh Ji UPI Wall",
-        "version": "5.0",
-        "status": "✅ Live",
-        "primary_upi": SINGHJI_UPI,
+        "success": True,
+        "type": "PRIMARY",
+        "method": "Direct UPI (QR temporarily disabled)",
+        "upi_id": SINGHJI_UPI,
         "merchant": SINGHJI_NAME,
-        "philosophy": "Apna UPI, Apna Control!",
-        "features": {
-            "primary": ["QR Scan", "UPI ID Direct", "Singh Ji Pay"],
-            "optional": ["Paytm", "PhonePe", "GPay", "Amazon Pay"]
-        }
+        "amount": amount,
+        "note": note,
+        "message": "QR generation temporarily disabled. Use /wall/direct instead.",
+        "alternative": f"/api/upi/wall/direct?amount={amount}&note={note}",
+        "priority": 1
     }
-
 # ========== 🏛️ PRIMARY: SINGH JI UPI WALL ==========
 
 @router.get("/wall/qr")
