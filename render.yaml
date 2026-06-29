@@ -18,7 +18,7 @@ services:
 
     startCommand: |
       echo "🚀 Starting Singh Ji AI..."
-      uvicorn core.app:app --host 0.0.0.0 --port $PORT
+     startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT --workers 1
 
     envVars:
       - key: PYTHON_VERSION
