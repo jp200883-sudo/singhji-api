@@ -1,24 +1,39 @@
-# Singh Ji AI Ultra v5.0 — Requirements
+# Singh Ji AI Ultra v5.0 — Requirements (FIXED)
 # Core
 fastapi==0.104.1
 uvicorn==0.24.0
 python-multipart==0.0.6
 
-# HTTP Requests
+# HTTP Requests (SYNC + ASYNC)
 requests==2.31.0
+httpx==0.25.2          # ← ADD: Async HTTP for currents_api, etc.
 
 # Database
 supabase==2.0.3
 
+# Cache
+redis==5.0.1           # ← ADD: Redis caching
+
 # Environment
 python-dotenv==1.0.0
-# Text-to-Speech (NEW!)
+
+# Auth & Security
+python-jose==3.3.0     # ← ADD: JWT tokens
+passlib==1.7.4         # ← ADD: Password hashing
+
+# Text-to-Speech
 gTTS==2.4.0
-# NEW — Fix missing modules
+
+# Scheduler
 pytz==2023.3
 apscheduler==3.10.4
+
+# QR & Images
 qrcode==7.4.2
 Pillow==10.0.0
+
+# File Handling (Async)
+aiofiles==23.2.1       # ← ADD: Async file operations
 
 # Data Processing
 pandas==2.1.3
