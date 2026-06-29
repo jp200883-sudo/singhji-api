@@ -1,74 +1,81 @@
-# api.py — Singh Ji AI Ultra v5.0
-# 🚀 API ROUTES — सब endpoints यहाँ!
+# modules/currents_api.py — Singh Ji AI Ultra v5.0 (FIXED)
+# Currents API — World News + India News (600/day free)
 
-from fastapi import APIRouter, Request
 import os
+import httpx
+from fastapi import APIRouter, Query
 
-router = APIRouter(prefix="/api", tags=["API"])
+router = APIRouter()
+
+CURRENTS_API_KEY = os.getenv("CURRENTS_API_KEY", "")
+
+# ========== FASTAPI ROUTES ==========
+
+@router.get("/world")
+async def currents_world_news(keywords: str = Query(None), language: str = Query("en")):
+    """Get world news via Currents API"""
+    if not CURRENTS_API_KEY:
+        return {"success": False, "error": "CURRENTS_API_KEY not configured"}
+    
+    url = "https://api.currentsapi.services/v1/latest-news"
+    params = {"apiKey": CURRENTS_API_KEY, "language": language}
+    if keywords:
+        params["keywords"] = keywords
+    
+    try:
+        response = httpx.get(url, params=params, timeout=10)
+        data = response.json()
+        if data.get("status") == "ok":
+            return {"success": True, "total": len(data.get("news", [])), "articles": data.get("news", [])}
+        return {"success": False, "error": data.get("msg", "API error")}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@router.get("/india")
+async def get_india_news():
+    """Get India news via Currents API"""
+    if not CURRENTS_API_KEY:
+        return {"success": False, "error": "CURRENTS_API_KEY not configured"}
+    
+    url = "https://api.currentsapi.services/v1/latest-news"
+    params = {"apiKey": CURRENTS_API_KEY, "country": "IN", "language": "en"}
+    
+    try:
+        response = httpx.get(url, params=params, timeout=10)
+        data = response.json()
+        if data.get("status") == "ok":
+            return {"success": True, "source": "currents_api", "country": "IN", "total": len(data.get("news", [])), "articles": data.get("news", [])}
+        return {"success": False, "error": data.get("msg", "API error")}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@router.get("/search")
+async def currents_search(query: str = Query(..., description="Search keywords")):
+    """Search news via Currents API"""
+    if not CURRENTS_API_KEY:
+        return {"success": False, "error": "CURRENTS_API_KEY not configured"}
+    
+    url = "https://api.currentsapi.services/v1/search"
+    params = {"apiKey": CURRENTS_API_KEY, "keywords": query, "language": "en"}
+    
+    try:
+        response = httpx.get(url, params=params, timeout=10)
+        data = response.json()
+        if data.get("status") == "ok":
+            return {"success": True, "articles": data.get("news", [])}
+        return {"success": False, "error": data.get("msg")}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
 
 @router.get("/")
-async def api_home():
+async def currents_home():
+    """Currents API home"""
     return {
-        "app": "Singh Ji AI Ultra v5.0",
-        "status": "🔥 LIVE",
-        "message": "API home — sab routes yahan se!",
+        "module": "currents_api",
+        "status": "active",
         "endpoints": {
-            "health": "/api/health",
-            "status": "/api/status",
-            "weather": "/api/weather",
-            "news": "/api/news",
-            "mandi": "/api/mandi",
-            "ai": "/api/ai",
-            "language": "/api/language",
-            "voice": "/api/voice",
-            "search": "/api/search",
-            "social": "/api/social",
-            "govt": "/api/govt",
-            "upi": "/api/upi",
-            "banking": "/api/banking",
-            "currency": "/api/currency",
-            "railway": "/api/railway",
-            "entertainment": "/api/entertainment",
-            "telegram": "/api/telegram",
-            "email": "/api/email",
-            "schedule": "/api/schedule",
-            "plant": "/api/plant",
-            "memory": "/api/memory",
-            "emergency": "/api/emergency",
-            "admin": "/api/admin",
-            "karmachari": "/api/karmachari",
-            "pani": "/api/pani",
-            "rozgar": "/api/rozgar",
-            "sewer": "/api/sewer",
-            "currents": "/api/currents",
-            "news-scheduler": "/api/news-scheduler",
+            "world": "/api/currents/world",
+            "india": "/api/currents/india",
+            "search": "/api/currents/search"
         }
-    }
-
-@router.get("/health")
-async def api_health():
-    return {
-        "status": "✅ ALL SYSTEMS GO",
-        "version": "5.0.0",
-        "phase": "5 — ULTRA",
-        "owner": "Singh Ji",
-        "message": "Health check pass!"
-    }
-
-@router.get("/status")
-async def api_status():
-    return {
-        "app": "Singh Ji AI Ultra v5.0",
-        "status": "LIVE",
-        "message": "API status OK!"
-    }
-
-@router.post("/command")
-async def api_command(request: Request):
-    data = await request.json()
-    return {
-        "status": "executed",
-        "command": data.get("action", "unknown"),
-        "by": "👑 Singh Ji",
-        "message": "Singh Ji ka hukum — sar aankhon pe!"
     }
