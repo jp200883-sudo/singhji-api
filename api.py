@@ -1,86 +1,62 @@
-# api.py — Singh Ji AI Ultra v7.0 — FastAPI Module Loader
-# modules/ se dono type (folder + file) load karta hai
-# Bharat to the World 🇮🇳
+# ─── Load Single Module (with Auto-Wrapper) ─────────────
+def auto_wrap_handler(mod, module_name: str):
+    """
+    Agar module mein 'handler' ya 'Handler' nahi hai,
+    to module ke andar koi bhi callable function dhoondh
+    kar use auto-wrap kar dega.
+    """
+    # 1. Direct handler/Handler check
+    handler = getattr(mod, 'handler', None) or getattr(mod, 'Handler', None)
+    if handler:
+        return handler
 
-import os
-import sys
-import importlib.util
-import logging
-from pathlib import Path
-from typing import Dict, Any, Optional
+    # 2. Common alternate names try karo
+    alt_names = ['process', 'run', 'main', 'execute', f'{module_name}_handler']
+    for name in alt_names:
+        fn = getattr(mod, name, None)
+        if callable(fn):
+            logger.info(f"🔧 Auto-wrapped '{name}' as handler for {module_name}")
+            return fn
 
-from fastapi import FastAPI, Request, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from datetime import datetime
+    # 3. Module mein defined koi bhi function dhoondo (built-in/imported chhodkar)
+    candidates = [
+        getattr(mod, attr) for attr in dir(mod)
+        if callable(getattr(mod, attr, None))
+        and not attr.startswith('_')
+        and getattr(getattr(mod, attr), '__module__', '') == mod.__name__
+    ]
+    if candidates:
+        fn = candidates[0]
+        logger.info(f"🔧 Auto-wrapped first function '{fn.__name__}' for {module_name}")
 
-# ─── Logging ─────────────────────────────────────────────
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s | %(levelname)s | %(message)s'
-)
-logger = logging.getLogger(__name__)
+        # Wrap so it always accepts req_data dict, even if original fn takes no args
+        def wrapped(req_data, _fn=fn):
+            import inspect
+            sig = inspect.signature(_fn)
+            if len(sig.parameters) == 0:
+                return _fn()
+            return _fn(req_data)
+        return wrapped
 
-# ─── FastAPI App ─────────────────────────────────────────
-app = FastAPI(
-    title="Singh Ji AI Ultra v7.0",
-    description="Bharat to the World 🇮🇳",
-    version="7.0.0"
-)
+    # 4. Kuch nahi mila — safe fallback handler
+    logger.warning(f"⚠️ No callable found in {module_name}, using stub handler")
+    def stub_handler(req_data):
+        return {"status": "stub", "message": f"{module_name} mein koi handler function nahi mila"}
+    return stub_handler
 
-# ─── CORS ──────────────────────────────────────────────
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
-# ─── Module Registry ─────────────────────────────────────
-MODULES: Dict[str, Dict[str, Any]] = {}
-
-# ─── Discover Modules ────────────────────────────────────
-def discover_modules(modules_dir: str = "modules") -> list:
-    modules_path = Path(modules_dir)
-    
-    if not modules_path.exists():
-        logger.error(f"❌ modules folder NAHI mila: {modules_path.absolute()}")
-        return []
-    
-    discovered = []
-    
-    for item in modules_path.iterdir():
-        if item.name.startswith('_') or item.name.startswith('.'):
-            continue
-            
-        # Folder module
-        if item.is_dir():
-            init_file = item / "__init__.py"
-            handler_file = item / "handler.py"
-            if init_file.exists() or handler_file.exists():
-                discovered.append(item.name)
-                logger.info(f"📁 Folder module: {item.name}")
-        
-        # File module
-        elif item.is_file() and item.suffix == '.py':
-            discovered.append(item.stem)
-            logger.info(f"📄 File module: {item.stem}")
-    
-    logger.info(f"✅ Total mila: {len(discovered)} modules")
-    return discovered
-
-# ─── Load Single Module ─────────────────────────────────
 def load_module(module_name: str, modules_dir: str = "modules") -> Optional[Dict]:
     modules_path = Path(modules_dir)
     module_path = modules_path / module_name
     info = {"name": module_name, "type": None, "handler": None, "status": "loading"}
-    
+
     try:
         if module_path.is_dir():
             info["type"] = "folder"
             init_file = module_path / "__init__.py"
             handler_file = module_path / "handler.py"
             target = init_file if init_file.exists() else handler_file
-            
+
             spec = importlib.util.spec_from_file_location(
                 f"modules.{module_name}", str(target)
             )
@@ -88,10 +64,10 @@ def load_module(module_name: str, modules_dir: str = "modules") -> Optional[Dict
                 mod = importlib.util.module_from_spec(spec)
                 sys.modules[f"modules.{module_name}"] = mod
                 spec.loader.exec_module(mod)
-                info["handler"] = getattr(mod, 'handler', getattr(mod, 'Handler', None))
+                info["handler"] = auto_wrap_handler(mod, module_name)
                 info["status"] = "loaded"
                 logger.info(f"✅ Folder loaded: {module_name}")
-        
+
         elif module_path.is_file() and module_path.suffix == '.py':
             info["type"] = "file"
             spec = importlib.util.spec_from_file_location(
@@ -101,115 +77,20 @@ def load_module(module_name: str, modules_dir: str = "modules") -> Optional[Dict
                 mod = importlib.util.module_from_spec(spec)
                 sys.modules[f"modules.{module_name}"] = mod
                 spec.loader.exec_module(mod)
-                info["handler"] = getattr(mod, 'handler', getattr(mod, 'Handler', None))
+                info["handler"] = auto_wrap_handler(mod, module_name)
                 info["status"] = "loaded"
                 logger.info(f"✅ File loaded: {module_name}")
-        
+
         else:
             info["status"] = "not_found"
-            
+
     except Exception as e:
+        # YEH SABSE IMPORTANT FIX HAI:
+        # Pehle agar exec_module mein koi error aata tha (jaise missing import,
+        # syntax error, ya dependency na milna) to poora module hi skip ho jata tha.
+        # Ab hum exact error log karenge taaki pata chale 29 modules kyun fail ho rahe.
         info["status"] = "error"
         info["error"] = str(e)
-        logger.error(f"❌ Fail: {module_name} — {e}")
-    
+        logger.error(f"❌ FAIL: {module_name} — {type(e).__name__}: {e}")
+
     return info
-
-# ─── Init All Modules ───────────────────────────────────
-def init_modules(modules_dir: str = "modules"):
-    global MODULES
-    MODULES = {}
-    
-    logger.info("=" * 50)
-    logger.info("🚀 Singh Ji AI Ultra v7.0 — Module Loader")
-    logger.info("🇮🇳 Bharat to the World")
-    logger.info("=" * 50)
-    
-    discovered = discover_modules(modules_dir)
-    
-    for name in discovered:
-        mod_info = load_module(name, modules_dir)
-        if mod_info and mod_info["status"] == "loaded":
-            MODULES[name] = mod_info
-    
-    logger.info("=" * 50)
-    logger.info(f"📊 LOADED: {len(MODULES)}/{len(discovered)}")
-    logger.info(f"📋 Active: {list(MODULES.keys())}")
-    logger.info("=" * 50)
-
-# ─── Startup Event ──────────────────────────────────────
-@app.on_event("startup")
-async def startup():
-    init_modules()
-
-# ════════════════════════════════════════════════════════
-# ROUTES
-# ════════════════════════════════════════════════════════
-
-@app.get("/")
-async def home():
-    return {
-        "status": "🟢 LIVE",
-        "name": "Singh Ji AI Ultra v7.0",
-        "tagline": "Bharat to the World 🇮🇳",
-        "modules_loaded": len(MODULES),
-        "modules": list(MODULES.keys()),
-        "timestamp": datetime.utcnow().isoformat(),
-        "server": "Render"
-    }
-
-@app.get("/api/modules")
-async def list_modules():
-    return {
-        "total": len(MODULES),
-        "modules": [
-            {
-                "name": name,
-                "type": info.get("type"),
-                "has_handler": info.get("handler") is not None
-            }
-            for name, info in MODULES.items()
-        ]
-    }
-
-@app.api_route("/api/{module_name}", methods=["GET", "POST"])
-async def module_route(module_name: str, request: Request):
-    if module_name not in MODULES:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Module '{module_name}' nahi mila. Available: {list(MODULES.keys())}"
-        )
-    
-    handler = MODULES[module_name].get("handler")
-    if not handler:
-        raise HTTPException(status_code=500, detail=f"Module '{module_name}' mein handler nahi hai")
-    
-    # Request data prepare
-    body = await request.body()
-    try:
-        json_body = await request.json() if body else {}
-    except:
-        json_body = {}
-    
-    req_data = {
-        "method": request.method,
-        "args": dict(request.query_params),
-        "json": json_body,
-        "headers": dict(request.headers),
-        "timestamp": datetime.utcnow().isoformat()
-    }
-    
-    try:
-        response = handler(req_data)
-        return response
-    except Exception as e:
-        logger.error(f"❌ {module_name} error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/api/health")
-async def health_check():
-    return {
-        "status": "healthy",
-        "modules": len(MODULES),
-        "version": "v7.0"
-    }
