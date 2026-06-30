@@ -1,5 +1,5 @@
 # api.py — Singh Ji AI Ultra v7.0 — FastAPI Module Loader
-# core/modules/ se dono type load karta hai
+# modules/ se dono type (folder + file) load karta hai
 # Bharat to the World 🇮🇳
 
 import os
@@ -7,10 +7,9 @@ import sys
 import importlib.util
 import logging
 from pathlib import Path
-from typing import Dict, Any, Optional, Callable
+from typing import Dict, Any, Optional
 
 from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime
 
@@ -40,7 +39,7 @@ app.add_middleware(
 MODULES: Dict[str, Dict[str, Any]] = {}
 
 # ─── Discover Modules ────────────────────────────────────
-def discover_modules(modules_dir: str = "core/modules") -> list:
+def discover_modules(modules_dir: str = "modules") -> list:
     modules_path = Path(modules_dir)
     
     if not modules_path.exists():
@@ -70,7 +69,7 @@ def discover_modules(modules_dir: str = "core/modules") -> list:
     return discovered
 
 # ─── Load Single Module ─────────────────────────────────
-def load_module(module_name: str, modules_dir: str = "core/modules") -> Optional[Dict]:
+def load_module(module_name: str, modules_dir: str = "modules") -> Optional[Dict]:
     modules_path = Path(modules_dir)
     module_path = modules_path / module_name
     info = {"name": module_name, "type": None, "handler": None, "status": "loading"}
@@ -117,7 +116,7 @@ def load_module(module_name: str, modules_dir: str = "core/modules") -> Optional
     return info
 
 # ─── Init All Modules ───────────────────────────────────
-def init_modules(modules_dir: str = "core/modules"):
+def init_modules(modules_dir: str = "modules"):
     global MODULES
     MODULES = {}
     
