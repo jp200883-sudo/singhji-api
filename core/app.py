@@ -30,21 +30,15 @@ failed = {}
 
 # ─── Auto-Wrapper for File Modules (no handler function) ─────────────
 def auto_handler(name: str, mod):
-    """
-    Creates a smart handler for modules that don't export 'handler' or 'Handler'.
-    Tries common function names first, then falls back to any callable.
-    """
-    # Priority function names to try
-    priority_names = ["process", "main", "run", "chat", "get_data", "fetch", 
+    priority_names = ["process", "main", "run", "chat", "get_data", "fetch",
                       "search", "translate", "predict", "analyze", "handle"]
-    
+
     all_funcs = {
-        n: f for n, f in vars(mod).items() 
+        n: f for n, f in vars(mod).items()
         if callable(f) and not n.startswith('_')
     }
-    
+
     def handler(data=None):
-        # Try priority functions first
         for func_name in priority_names:
             if func_name in all_funcs:
                 f = all_funcs[func_name]
@@ -59,8 +53,7 @@ def auto_handler(name: str, mod):
                         return {"module": name, "status": "success", "data": f(data, **{})}
                 except Exception as e:
                     return {"module": name, "status": "error", "error": f"{func_name} failed: {str(e)}"}
-        
-        # Fallback: try ANY function
+
         for func_name, f in all_funcs.items():
             try:
                 sig = inspect.signature(f)
@@ -68,26 +61,19 @@ def auto_handler(name: str, mod):
                     return {"module": name, "status": "success", "data": f()}
                 else:
                     return {"module": name, "status": "success", "data": f(data)}
-            except Exception as e:
+            except Exception:
                 continue
-        
-        # Ultimate fallback
+
         return {"module": name, "status": "success", "message": f"{name} is active! 🦁"}
-    
+
     return handler
 
 # ─── Module Loader ───────────────────────────────────────────────────
 def load_module(name: str):
-    """
-    Dynamically loads a module from the modules/ directory.
-    Supports both folder modules (with __init__.py or handler.py) 
-    and file modules (.py files).
-    """
-    # Get absolute path to modules/ directory
     base_dir = Path(__file__).parent.parent  # core/ -> root/
     modules_dir = base_dir / "modules"
     module_path = modules_dir / name
-    
+
     info = {
         "name": name,
         "handler": None,
@@ -95,56 +81,57 @@ def load_module(name: str):
         "type": None,
         "error": None
     }
-    
+
     try:
-        # Determine module type and entry point
         if module_path.is_dir():
             info["type"] = "folder"
-            # Try __init__.py first, then handler.py
+            # Pehle __init__.py / handler.py try karo
             if (module_path / "__init__.py").exists():
                 entry_file = module_path / "__init__.py"
             elif (module_path / "handler.py").exists():
                 entry_file = module_path / "handler.py"
             else:
+                # FIX: koi bhi .py file folder ke andar ho to use lo
+                py_files = sorted(module_path.glob("*.py"))
+                entry_file = py_files[0] if py_files else None
+
+            if entry_file is None:
                 info["status"] = "not_found"
-                info["error"] = "No __init__.py or handler.py found"
+                info["error"] = "No .py file found in folder"
                 return info
-            
+
             spec = importlib.util.spec_from_file_location(f"modules.{name}", str(entry_file))
-            
+
         elif module_path.suffix == ".py" and module_path.is_file():
             info["type"] = "file"
             spec = importlib.util.spec_from_file_location(f"modules.{name}", str(module_path))
-            
+
         else:
             info["status"] = "not_found"
             info["error"] = "Not a valid Python module"
             return info
-        
-        # Load the module
+
         module = importlib.util.module_from_spec(spec)
         sys.modules[f"modules.{name}"] = module
         spec.loader.exec_module(module)
-        
-        # Find handler
+
         handler = getattr(module, "handler", None) or getattr(module, "Handler", None)
-        
+
         if handler:
             info["handler"] = handler
             info["status"] = "loaded"
             print(f"✅ {name} (native handler)")
         else:
-            # Use auto-wrapper
             info["handler"] = auto_handler(name, module)
             info["status"] = "loaded"
             print(f"✅ {name} (auto-wrapped)")
-            
+
     except Exception as e:
         info["status"] = "error"
         info["error"] = f"{type(e).__name__}: {str(e)}"
         print(f"❌ {name}: {info['error']}")
         traceback.print_exc()
-    
+
     return info
 
 # ─── Load All Modules ────────────────────────────────────────────────
@@ -156,18 +143,17 @@ modules_dir = base_dir / "modules"
 
 if modules_dir.exists() and modules_dir.is_dir():
     for item in sorted(modules_dir.iterdir()):
-        # Skip hidden files, __pycache__, non-.py files
         if item.name.startswith("_") or item.name.startswith("."):
             continue
         if item.is_file() and item.suffix != ".py":
             continue
         if item.is_dir() and item.name == "__pycache__":
             continue
-            
+
         module_name = item.stem if item.is_file() else item.name
         result = load_module(module_name)
         MODULES[module_name] = result
-        
+
         if result["status"] == "loaded":
             loaded.append(module_name)
         else:
@@ -187,25 +173,19 @@ if failed:
 @app.post("/api/{module_name}")
 @app.get("/api/{module_name}")
 async def api_route(module_name: str, request: Request):
-    """
-    Universal API endpoint for all modules.
-    POST: JSON body passed to handler
-    GET: Query params passed to handler
-    """
     if module_name not in MODULES or MODULES[module_name]["status"] != "loaded":
         return JSONResponse(
             status_code=404,
             content={"error": f"Module '{module_name}' not found or not loaded"}
         )
-    
+
     handler = MODULES[module_name].get("handler")
     if not handler:
         return JSONResponse(
             status_code=500,
             content={"error": f"Module '{module_name}' has no handler"}
         )
-    
-    # Parse request data
+
     try:
         if request.method == "POST":
             data = await request.json()
@@ -213,10 +193,8 @@ async def api_route(module_name: str, request: Request):
             data = dict(request.query_params)
     except Exception:
         data = {}
-    
-    # Execute handler
+
     try:
-        # Check if handler is async
         if inspect.iscoroutinefunction(handler):
             result = await handler(data)
         else:
@@ -267,5 +245,3 @@ def root():
 # ─── Render Deployment Note ─────────────────────────────────────────
 # Start Command (Render Dashboard):
 #   uvicorn core.app:app --host 0.0.0.0 --port $PORT
-#
-# Do NOT rely on __main__ block for Render — use the start command above.
