@@ -19,11 +19,10 @@ def auto_handler(name, mod):
     def handler(data=None):
         for fn in priority:
             if fn in funcs:
-                f = funcs[fn]
                 try:
-                    sig = inspect.signature(f)
-                    if len(list(sig.parameters)) == 0: return {"module":name,"status":"success","data":f()}
-                    else: return {"module":name,"status":"success","data":f(data)}
+                    sig = inspect.signature(funcs[fn])
+                    if len(list(sig.parameters)) == 0: return {"module":name,"status":"success","data":funcs[fn]()}
+                    else: return {"module":name,"status":"success","data":funcs[fn](data)}
                 except Exception as e: return {"module":name,"status":"error","error":f"{fn} failed: {str(e)}"}
         for fn,f in funcs.items():
             try:
@@ -35,22 +34,35 @@ def auto_handler(name, mod):
     return handler
 
 def load_module(name, modules_dir):
+    # FIX: Try with .py extension if not found
     p = modules_dir / name
+    if not p.exists() and not name.endswith('.py'):
+        p = modules_dir / (name + '.py')
+    
     info = {"name":name,"handler":None,"status":"loading","type":None,"error":None,"traceback":None}
     try:
         if p.is_dir():
             info["type"] = "folder"
             entry = p/"__init__.py" if (p/"__init__.py").exists() else p/"handler.py"
-            if not entry.exists(): info["status"]="not_found"; info["error"]="No __init__.py or handler.py"; return info
+            if not entry.exists():
+                py_files = sorted(p.glob("*.py"))
+                entry = py_files[0] if py_files else None
+            if entry is None: info["status"]="not_found"; info["error"]="No .py file found"; return info
             spec = importlib.util.spec_from_file_location(f"modules.{name}", str(entry))
-        elif p.suffix == ".py" and p.is_file():
+            
+        elif p.is_file():
             info["type"] = "file"
             spec = importlib.util.spec_from_file_location(f"modules.{name}", str(p))
-        else: info["status"]="not_found"; info["error"]="Not valid Python module"; return info
+            
+        else:
+            info["status"]="not_found"
+            info["error"]=f"Not found: {p}"
+            return info
         
         if spec is None: info["status"]="error"; info["error"]="spec_from_file_location returned None"; return info
         mod = importlib.util.module_from_spec(spec)
         sys.modules[f"modules.{name}"] = mod
+        
         try: spec.loader.exec_module(mod)
         except Exception as e:
             if f"modules.{name}" in sys.modules: del sys.modules[f"modules.{name}"]
@@ -64,6 +76,7 @@ def load_module(name, modules_dir):
     return info
 
 print("🚀 Loading Modules..."); print("="*60)
+
 paths = []
 try: paths.append(Path(__file__).resolve().parent.parent/"modules")
 except: pass
@@ -74,7 +87,7 @@ modules_dir = None
 for p in paths:
     if p and p.exists() and p.is_dir():
         try:
-            has = any(f.endswith(".py") for f in os.listdir(p) if os.path.isfile(p/f))
+            has = any(f.endswith(".py") or '.' not in f for f in os.listdir(p) if os.path.isfile(p/f))
             if has: modules_dir=p; print(f"📁 Found: {p}"); break
         except: pass
 
@@ -84,7 +97,7 @@ if not modules_dir:
         if "modules" in dirs:
             c=Path(root)/"modules"
             try:
-                if any(f.endswith(".py") for f in os.listdir(c)): modules_dir=c; print(f"📁 Found: {c}"); break
+                if any(f.endswith(".py") or '.' not in f for f in os.listdir(c)): modules_dir=c; print(f"📁 Found: {c}"); break
             except: pass
         dirs[:] = [d for d in dirs if d not in ("proc","sys","dev","tmp","var","boot")]
 
@@ -93,13 +106,11 @@ if modules_dir and modules_dir.exists():
     for item in sorted(modules_dir.iterdir()):
         if item.name.startswith("_") or item.name.startswith("."): continue
         if item.name in ("__pycache__","app.py","init.py"): continue
-        if item.is_file() and item.suffix != ".py": continue
+        if item.is_file() and item.suffix not in ('.py',''): continue  # Allow extensionless files
         n = item.stem if item.is_file() else item.name
         r = load_module(n, modules_dir); MODULES[n]=r
         if r["status"]=="loaded": loaded.append(n)
-        else: 
-            failed[n]=r.get("error","?"); print(f"❌ {n}: {r.get('error','?')[:100]}")
-            if r.get("traceback"): print(f"   TB: {r['traceback'][:300]}")
+        else: failed[n]=r.get("error","?"); print(f"❌ {n}: {r.get('error','?')[:100]}")
 else: print(f"❌ modules/ NOT FOUND! CWD:{Path.cwd()}")
 
 print("="*60); print(f"📊 LOADED: {len(loaded)}/{len(MODULES)}")
