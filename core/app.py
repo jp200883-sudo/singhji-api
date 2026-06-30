@@ -25,24 +25,37 @@ def load(name):
     p=Path("modules")/name;info={"name":name,"handler":None,"status":"loading"}
     try:
         if p.is_dir():
-            t=p/"__init__.py" if (p/"__init__.py").exists() else p/"handler.py"
-            if not t.exists():info["status"]="not_found";return info
+            # Pehle __init__.py ya handler.py dhoondo
+            t=None
+            if (p/"__init__.py").exists():t=p/"__init__.py"
+            elif (p/"handler.py").exists():t=p/"handler.py"
+            else:
+                # Koi bhi .py file mil jaye to use lo (FIX: yeh missing tha)
+                pyfiles=list(p.glob("*.py"))
+                t=pyfiles[0] if pyfiles else None
+            if t is None:
+                info["status"]="not_found";return info
             s=importlib.util.spec_from_file_location("m."+name,str(t))
         elif p.suffix==".py":
             s=importlib.util.spec_from_file_location("m."+name,str(p))
-        else:info["status"]="not_found";return info
+        else:
+            info["status"]="not_found";return info
+
         m=importlib.util.module_from_spec(s);sys.modules["m."+name]=m;s.loader.exec_module(m)
         h=getattr(m,"handler",getattr(m,"Handler",None))
         info["handler"]=h if h else auto_handler(name,m)
         info["status"]="loaded";print("✅ "+name)
-    except Exception as e:info["status"]="error";info["error"]=str(e);print("❌ "+name+": "+str(e))
+    except Exception as e:
+        info["status"]="error";info["error"]=str(e);print("❌ "+name+": "+str(e))
     return info
 
-print("🚀 Starting...");mp=Path("modules")
+print("🚀 Starting...")
+mp=Path("modules")
 if mp.exists():
     for i in mp.iterdir():
         n=i.stem if i.is_file() else i.name
-        if n.startswith("_") or (i.is_file() and i.suffix!=".py"):continue
+        if n.startswith("_") or (i.is_file() and i.suffix!=".py"):
+            continue
         x=load(n);MODULES[n]=x
         if x["status"]=="loaded":loaded.append(n)
         else:failed[n]=x.get("error","?")
@@ -61,8 +74,10 @@ async def api(m:str,request:Request):
 
 @app.get("/api/health")
 def health():return{"status":"🦁 LIVE","loaded":len(loaded),"total":len(MODULES)}
+
 @app.get("/api/status")
 def status():return{"loaded":len(loaded),"failed":len(failed),"modules":loaded}
+
 @app.get("/")
 def root():return{"name":"Singh Ji AI Ultra v7.0","modules":len(loaded)}
 
