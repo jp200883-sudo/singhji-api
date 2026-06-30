@@ -57,9 +57,12 @@ def discover_modules(modules_dir: str = "modules") -> list:
         if item.is_dir():
             init_file = item / "__init__.py"
             handler_file = item / "handler.py"
-            if init_file.exists() or handler_file.exists():
+            any_py_file = list(item.glob("*.py"))
+            if init_file.exists() or handler_file.exists() or any_py_file:
                 discovered.append(item.name)
                 logger.info(f"📁 Folder module: {item.name}")
+            else:
+                logger.warning(f"⚠️ Folder skipped (no .py files): {item.name}")
 
         elif item.is_file() and item.suffix == '.py':
             discovered.append(item.stem)
@@ -119,7 +122,20 @@ def load_module(module_name: str, modules_dir: str = "modules") -> Optional[Dict
             info["type"] = "folder"
             init_file = module_path / "__init__.py"
             handler_file = module_path / "handler.py"
-            target = init_file if init_file.exists() else handler_file
+            if init_file.exists():
+                target = init_file
+            elif handler_file.exists():
+                target = handler_file
+            else:
+                py_files = list(module_path.glob("*.py"))
+                target = py_files[0] if py_files else None
+
+            if target is None:
+                info["status"] = "error"
+                info["error"] = "No .py file found in folder"
+                FAILED_MODULES[module_name] = info["error"]
+                logger.error(f"❌ FAIL: {module_name} — No .py file found in folder")
+                return info
 
             spec = importlib.util.spec_from_file_location(
                 f"modules.{module_name}", str(target)
