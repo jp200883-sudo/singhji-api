@@ -1,65 +1,76 @@
 # ═══════════════════════════════════════════════════════
-#   SINGH JI AI ULTRA v7.0 — DEVLIPI (Developer Lipi)
-#   Auto-Handler Wrapper for File Modules
+#   SINGH JI AI ULTRA v7.0 — AUTO-WRAPPER FIX
+#   29 file modules → auto handler banega
 # ═══════════════════════════════════════════════════════
 
 import importlib.util
 import sys
+import inspect
 from pathlib import Path
 from typing import Optional, Dict, Callable, Any
+
+# ─── Logger (tumhara existing logger use karo) ──────────
+# import logging
+# logger = logging.getLogger(__name__)
+
 
 # ─── Auto Handler Wrapper ───────────────────────────────
 def create_auto_handler(module_name: str, module_obj) -> Callable:
     """
-    Devlipi: Agar module mein handler nahi hai,
-    toh auto-wrapper banao jo module ke functions ko call kare.
+    Agar module mein handler function nahi hai,
+    toh auto wrapper banao jo module ke functions ko call kare.
     """
     
     def auto_handler(request_data: Any = None) -> Dict:
-        """Auto-generated handler — Devlipi ka jadoo!"""
+        """Auto-generated handler for module"""
         
-        # Module ke saare functions dhoondo
+        # Module ke saare functions dhoondo (private nahi)
         functions = {
             name: func 
             for name, func in vars(module_obj).items()
             if callable(func) and not name.startswith('_')
         }
         
-        # Sabse pehla non-handler function lo
+        # Sabse pehla function lo (jo handler nahi hai)
         main_func = None
+        main_name = None
         for name, func in functions.items():
-            if name not in ('handler', 'Handler', 'create_auto_handler'):
+            if name not in ('handler', 'Handler', 'create_auto_handler', 'auto_handler'):
                 main_func = func
+                main_name = name
                 break
         
-        # Function call karo
+        # Agar function mila, toh call karo
         if main_func:
             try:
-                result = main_func(request_data)
+                # Pehle try with request_data
+                sig = inspect.signature(main_func)
+                if len(sig.parameters) > 0:
+                    result = main_func(request_data)
+                else:
+                    result = main_func()
                 return {
                     "module": module_name,
                     "status": "success",
-                    "source": "auto_handler",
+                    "handler_type": "auto",
+                    "function_called": main_name,
                     "data": result
                 }
-            except:
-                try:
-                    result = main_func()
-                    return {
-                        "module": module_name,
-                        "status": "success", 
-                        "source": "auto_handler",
-                        "data": result
-                    }
-                except:
-                    pass
+            except Exception as e:
+                return {
+                    "module": module_name,
+                    "status": "error",
+                    "handler_type": "auto",
+                    "error": str(e),
+                    "available_functions": list(functions.keys())
+                }
         
-        # Fallback
+        # Fallback — simple response
         return {
             "module": module_name,
             "status": "success",
-            "source": "auto_handler",
-            "message": f"{module_name} active via Devlipi!",
+            "handler_type": "auto",
+            "message": f"{module_name} module active via auto-wrapper!",
             "available_functions": list(functions.keys())
         }
     
@@ -68,24 +79,30 @@ def create_auto_handler(module_name: str, module_obj) -> Callable:
 
 # ─── Load Single Module ─────────────────────────────────
 def load_module(module_name: str, modules_dir: str = "modules") -> Optional[Dict]:
-    """Devlipi module loader — 37 modules, sab load honge!"""
-    
+    """
+    Module load karo — folder ho ya file, handler ho ya nahi!
+    """
     modules_path = Path(modules_dir)
     module_path = modules_path / module_name
     info = {
-        "name": module_name, 
-        "type": None, 
-        "handler": None, 
+        "name": module_name,
+        "type": None,
+        "handler": None,
         "status": "loading"
     }
     
     try:
+        # ═══ FOLDER MODULE ═══
         if module_path.is_dir():
-            # Folder module
             info["type"] = "folder"
             init_file = module_path / "__init__.py"
             handler_file = module_path / "handler.py"
             target = init_file if init_file.exists() else handler_file
+            
+            if not target.exists():
+                info["status"] = "not_found"
+                info["error"] = "No __init__.py or handler.py found"
+                return info
             
             spec = importlib.util.spec_from_file_location(
                 f"modules.{module_name}", str(target)
@@ -98,8 +115,8 @@ def load_module(module_name: str, modules_dir: str = "modules") -> Optional[Dict
                 info["status"] = "loaded"
                 print(f"✅ Folder loaded: {module_name}")
         
+        # ═══ FILE MODULE ═══
         elif module_path.is_file() and module_path.suffix == '.py':
-            # File module — YAHAN DEVLIPI KA JADOO HAI!
             info["type"] = "file"
             spec = importlib.util.spec_from_file_location(
                 f"modules.{module_name}", str(module_path)
@@ -113,18 +130,19 @@ def load_module(module_name: str, modules_dir: str = "modules") -> Optional[Dict
                 handler = getattr(mod, 'handler', getattr(mod, 'Handler', None))
                 
                 if handler:
-                    # Handler mil gaya
+                    # ✅ Handler mil gaya
                     info["handler"] = handler
                     info["status"] = "loaded"
                     print(f"✅ File loaded (handler found): {module_name}")
                 else:
-                    # Handler NAHI mila — Devlipi auto-wrapper banao!
+                    # ❌ Handler NAHI mila — AUTO WRAPPER banao!
                     info["handler"] = create_auto_handler(module_name, mod)
                     info["status"] = "loaded"
-                    print(f"✅ File loaded (Devlipi auto-wrapper): {module_name}")
+                    print(f"✅ File loaded (auto-wrapper): {module_name}")
         
         else:
             info["status"] = "not_found"
+            info["error"] = "Module not found or not a valid Python file"
             
     except Exception as e:
         info["status"] = "error"
@@ -132,42 +150,3 @@ def load_module(module_name: str, modules_dir: str = "modules") -> Optional[Dict
         print(f"❌ Fail: {module_name} — {e}")
     
     return info
-
-
-# ─── Load All Modules ───────────────────────────────────
-def load_all_modules(modules_dir: str = "modules") -> Dict[str, Dict]:
-    """Saare modules load karo — 37 mein se 37 load hone chahiye!"""
-    
-    modules_path = Path(modules_dir)
-    loaded = {}
-    
-    if not modules_path.exists():
-        print(f"❌ Modules directory not found: {modules_dir}")
-        return loaded
-    
-    # Sab .py files aur folders dhoondo
-    for item in modules_path.iterdir():
-        name = item.stem if item.is_file() else item.name
-        
-        # Skip __pycache__ aur hidden files
-        if name.startswith('_') or name.startswith('.'):
-            continue
-            
-        info = load_module(name, modules_dir)
-        loaded[name] = info
-    
-    # Summary print karo
-    total = len(loaded)
-    successful = sum(1 for v in loaded.values() if v["status"] == "loaded")
-    failed = sum(1 for v in loaded.values() if v["status"] == "error")
-    
-    print(f"\n{'='*50}")
-    print(f"🦁 SINGH JI AI v7.0 — DEVLIPI LOAD SUMMARY")
-    print(f"{'='*50}")
-    print(f"📁 Total modules found: {total}")
-    print(f"✅ Successfully loaded: {successful}")
-    print(f"❌ Failed: {failed}")
-    print(f"🎯 Target: 37/37 load hone chahiye!")
-    print(f"{'='*50}\n")
-    
-    return loaded
