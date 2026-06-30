@@ -111,3 +111,4 @@ def create_auto_handler(module_name: str, module_obj):
         }
     
     return auto_handler
+    
