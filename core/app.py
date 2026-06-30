@@ -169,6 +169,44 @@ if failed:
     print(f"❌ Failed: {list(failed.keys())}")
 
 # ─── API Routes ──────────────────────────────────────────────────────
+# IMPORTANT: Specific routes (health, status, root) MUST come before
+# the catch-all /api/{module_name} route, warna FastAPI catch-all hi
+# pehle match kar lega aur /api/status ko module samajh lega.
+
+@app.get("/api/health")
+def health_check():
+    return {
+        "status": "🦁 LIVE",
+        "version": "7.0.0",
+        "loaded": len(loaded),
+        "total": len(MODULES),
+        "modules": loaded
+    }
+
+@app.get("/api/status")
+def status():
+    return {
+        "loaded_count": len(loaded),
+        "failed_count": len(failed),
+        "loaded_modules": loaded,
+        "failed_modules": failed,
+        "all_modules": {k: v["status"] for k, v in MODULES.items()}
+    }
+
+@app.get("/")
+def root():
+    return {
+        "name": "Singh Ji AI Ultra v7.0",
+        "tagline": "🇮🇳 India's AI Super App",
+        "modules_loaded": len(loaded),
+        "modules_total": len(MODULES),
+        "status": "🦁 LIVE",
+        "endpoints": {
+            "health": "/api/health",
+            "status": "/api/status",
+            "module_api": "/api/{module_name}"
+        }
+    }
 
 @app.post("/api/{module_name}")
 @app.get("/api/{module_name}")
@@ -207,40 +245,6 @@ async def api_route(module_name: str, request: Request):
             content={"error": f"Handler error in {module_name}: {str(e)}"}
         )
 
-@app.get("/api/health")
-def health_check():
-    return {
-        "status": "🦁 LIVE",
-        "version": "7.0.0",
-        "loaded": len(loaded),
-        "total": len(MODULES),
-        "modules": loaded
-    }
-
-@app.get("/api/status")
-def status():
-    return {
-        "loaded_count": len(loaded),
-        "failed_count": len(failed),
-        "loaded_modules": loaded,
-        "failed_modules": failed,
-        "all_modules": {k: v["status"] for k, v in MODULES.items()}
-    }
-
-@app.get("/")
-def root():
-    return {
-        "name": "Singh Ji AI Ultra v7.0",
-        "tagline": "🇮🇳 India's AI Super App",
-        "modules_loaded": len(loaded),
-        "modules_total": len(MODULES),
-        "status": "🦁 LIVE",
-        "endpoints": {
-            "health": "/api/health",
-            "status": "/api/status",
-            "module_api": "/api/{module_name}"
-        }
-    }
 
 # ─── Render Deployment Note ─────────────────────────────────────────
 # Start Command (Render Dashboard):
