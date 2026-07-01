@@ -1,286 +1,139 @@
-# api.py — Singh Ji AI Ultra v7.0 — FastAPI Module Loader
-# modules/ se dono type (folder + file) load karta hai
-# Bharat to the World 🇮🇳
-
+"""
+🦁 SINGH JI AI ULTRA v7.0 - PHASE 1 (15 MODULES)
+Dynamic Module Loader
+"""
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 import os
 import sys
-import inspect
 import importlib.util
-import logging
-from pathlib import Path
-from typing import Dict, Any, Optional
-
-from fastapi import FastAPI, Request, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime
+import logging
 
-# ─── Logging ─────────────────────────────────────────────
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s | %(levelname)s | %(message)s'
-)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# ─── FastAPI App ─────────────────────────────────────────
-app = FastAPI(
-    title="Singh Ji AI Ultra v7.0",
-    description="Bharat to the World 🇮🇳",
-    version="7.0.0"
-)
+# 🦁 SINGH JI AI ULTRA v7.0 - ALL 26 API KEYS
+CEREBRAS_API_KEY = os.getenv("CEREBRAS_API_KEY")
+CF_ACCOUNT_ID = os.getenv("CF_ACCOUNT_ID")
+CF_API_TOKEN = os.getenv("CF_API_TOKEN")
+CURRENTS_API_KEY = os.getenv("CURRENTS_API_KEY")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+HUGGINGFACE_TOKEN = os.getenv("HUGGINGFACE_TOKEN")
+MAGIC_HOUR_API_KEY = os.getenv("MAGIC_HOUR_API_KEY")
+MANDI_API_KEY = os.getenv("MANDI_API_KEY")
+MONGO_URI = os.getenv("MONGO_URI")
+NEWSDATA_API_KEY = os.getenv("NEWSDATA_API_KEY")
+OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
+PLANT_ID_API = os.getenv("PLANT_ID_API")
+PLANT_ID_URL = os.getenv("PLANT_ID_URL")
+PYTHON_VERSION = os.getenv("PYTHON_VERSION", "3.11")
+RAPIDAPI_KEY = os.getenv("RAPIDAPI_KEY")
+RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID")
+RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
+TAVILY_URL = os.getenv("TAVILY_URL")
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+TWILIO_SID = os.getenv("TWILIO_SID")
+TWILIO_TOKEN = os.getenv("TWILIO_TOKEN")
+TZ = os.getenv("TZ", "Asia/Kolkata")
 
-# ─── CORS ──────────────────────────────────────────────
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+app = FastAPI(title="🦁 Singh Ji AI Ultra v7.0", version="7.0.0-phase1")
 
-# ─── Module Registry ─────────────────────────────────────
-MODULES: Dict[str, Dict[str, Any]] = {}
-FAILED_MODULES: Dict[str, str] = {}
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
-# ─── Discover Modules ────────────────────────────────────
-def discover_modules(modules_dir: str = "modules") -> list:
-    modules_path = Path(modules_dir)
+MODULES = {}
+MODULES_DIR = os.path.join(os.path.dirname(__file__), "..", "modules")
 
-    if not modules_path.exists():
-        logger.error(f"❌ modules folder NAHI mila: {modules_path.absolute()}")
-        return []
+def discover_modules():
+    modules = {}
+    if not os.path.exists(MODULES_DIR): return modules
+    for item in os.listdir(MODULES_DIR):
+        item_path = os.path.join(MODULES_DIR, item)
+        if os.path.isdir(item_path) and not item.startswith("__"):
+            handler_path = os.path.join(item_path, "handler.py")
+            if os.path.exists(handler_path): modules[item] = {"type": "folder", "path": handler_path}
+        elif item.endswith(".py") and not item.startswith("__"):
+            modules[item[:-3]] = {"type": "file", "path": item_path}
+    return modules
 
-    discovered = []
-
-    for item in modules_path.iterdir():
-        if item.name.startswith('_') or item.name.startswith('.'):
-            continue
-
-        if item.is_dir():
-            init_file = item / "__init__.py"
-            handler_file = item / "handler.py"
-            any_py_file = list(item.glob("*.py"))
-            if init_file.exists() or handler_file.exists() or any_py_file:
-                discovered.append(item.name)
-                logger.info(f"📁 Folder module: {item.name}")
-            else:
-                logger.warning(f"⚠️ Folder skipped (no .py files): {item.name}")
-
-        elif item.is_file() and item.suffix == '.py':
-            discovered.append(item.stem)
-            logger.info(f"📄 File module: {item.stem}")
-
-    logger.info(f"✅ Total mila: {len(discovered)} modules")
-    return discovered
-
-# ─── Auto-Wrapper: Handler Detect Karta Hai ─────────────
-def auto_wrap_handler(mod, module_name: str):
-    """
-    Agar module mein 'handler' ya 'Handler' nahi hai,
-    to module ke andar koi bhi callable function dhoondh
-    kar use auto-wrap kar dega. Kabhi None nahi return karega.
-    """
-    handler = getattr(mod, 'handler', None) or getattr(mod, 'Handler', None)
-    if callable(handler):
-        return handler
-
-    alt_names = ['process', 'run', 'main', 'execute', f'{module_name}_handler']
-    for name in alt_names:
-        fn = getattr(mod, name, None)
-        if callable(fn):
-            logger.info(f"🔧 Auto-wrapped '{name}' as handler for {module_name}")
-            return fn
-
-    candidates = [
-        getattr(mod, attr) for attr in dir(mod)
-        if callable(getattr(mod, attr, None))
-        and not attr.startswith('_')
-        and getattr(getattr(mod, attr), '__module__', '') == mod.__name__
-    ]
-    if candidates:
-        fn = candidates[0]
-        logger.info(f"🔧 Auto-wrapped first function '{fn.__name__}' for {module_name}")
-
-        def wrapped(req_data, _fn=fn):
-            sig = inspect.signature(_fn)
-            if len(sig.parameters) == 0:
-                return _fn()
-            return _fn(req_data)
-        return wrapped
-
-    logger.warning(f"⚠️ No callable found in {module_name}, using stub handler")
-    def stub_handler(req_data):
-        return {"status": "stub", "message": f"{module_name} mein koi handler function nahi mila"}
-    return stub_handler
-
-# ─── Load Single Module ─────────────────────────────────
-def load_module(module_name: str, modules_dir: str = "modules") -> Optional[Dict]:
-    modules_path = Path(modules_dir)
-    module_path = modules_path / module_name
-    info = {"name": module_name, "type": None, "handler": None, "status": "loading"}
-
+def load_module(name, info):
     try:
-        if module_path.is_dir():
-            info["type"] = "folder"
-            init_file = module_path / "__init__.py"
-            handler_file = module_path / "handler.py"
-            if init_file.exists():
-                target = init_file
-            elif handler_file.exists():
-                target = handler_file
-            else:
-                py_files = list(module_path.glob("*.py"))
-                target = py_files[0] if py_files else None
-
-            if target is None:
-                info["status"] = "error"
-                info["error"] = "No .py file found in folder"
-                FAILED_MODULES[module_name] = info["error"]
-                logger.error(f"❌ FAIL: {module_name} — No .py file found in folder")
-                return info
-
-            spec = importlib.util.spec_from_file_location(
-                f"modules.{module_name}", str(target)
-            )
-            if spec and spec.loader:
-                mod = importlib.util.module_from_spec(spec)
-                sys.modules[f"modules.{module_name}"] = mod
-                spec.loader.exec_module(mod)
-                info["handler"] = auto_wrap_handler(mod, module_name)
-                info["status"] = "loaded"
-                logger.info(f"✅ Folder loaded: {module_name}")
-
-        elif module_path.is_file() and module_path.suffix == '.py':
-            info["type"] = "file"
-            spec = importlib.util.spec_from_file_location(
-                f"modules.{module_name}", str(module_path)
-            )
-            if spec and spec.loader:
-                mod = importlib.util.module_from_spec(spec)
-                sys.modules[f"modules.{module_name}"] = mod
-                spec.loader.exec_module(mod)
-                info["handler"] = auto_wrap_handler(mod, module_name)
-                info["status"] = "loaded"
-                logger.info(f"✅ File loaded: {module_name}")
-
+        if info["type"] == "folder":
+            spec = importlib.util.spec_from_file_location(f"modules.{name}", info["path"])
+            module = importlib.util.module_from_spec(spec)
+            sys.modules[f"modules.{name}"] = module
+            spec.loader.exec_module(module)
+            return getattr(module, "handler", None)
         else:
-            info["status"] = "not_found"
-
+            spec = importlib.util.spec_from_file_location(name, info["path"])
+            module = importlib.util.module_from_spec(spec)
+            sys.modules[name] = module
+            spec.loader.exec_module(module)
+            return getattr(module, "handler", None)
     except Exception as e:
-        info["status"] = "error"
-        info["error"] = f"{type(e).__name__}: {e}"
-        FAILED_MODULES[module_name] = info["error"]
-        logger.error(f"❌ FAIL: {module_name} — {info['error']}")
+        logger.error(f"Failed {name}: {e}")
+        return None
 
-    return info
+def load_all_modules():
+    global MODULES
+    for name, info in discover_modules().items():
+        handler = load_module(name, info)
+        if handler:
+            MODULES[name] = handler
+            logger.info(f"✅ {name}")
+        else:
+            logger.warning(f"⚠️ {name}")
+    return len(MODULES)
 
-# ─── Init All Modules ───────────────────────────────────
-def init_modules(modules_dir: str = "modules"):
-    global MODULES, FAILED_MODULES
-    MODULES = {}
-    FAILED_MODULES = {}
-
-    logger.info("=" * 50)
-    logger.info("🚀 Singh Ji AI Ultra v7.0 — Module Loader")
-    logger.info("🇮🇳 Bharat to the World")
-    logger.info("=" * 50)
-
-    discovered = discover_modules(modules_dir)
-
-    for name in discovered:
-        mod_info = load_module(name, modules_dir)
-        if mod_info and mod_info["status"] == "loaded":
-            MODULES[name] = mod_info
-
-    logger.info("=" * 50)
-    logger.info(f"📊 LOADED: {len(MODULES)}/{len(discovered)}")
-    logger.info(f"📋 Active: {list(MODULES.keys())}")
-    if FAILED_MODULES:
-        logger.info(f"❌ FAILED ({len(FAILED_MODULES)}):")
-        for name, err in FAILED_MODULES.items():
-            logger.info(f"   • {name}: {err}")
-    logger.info("=" * 50)
-
-# ─── Startup Event ──────────────────────────────────────
 @app.on_event("startup")
 async def startup():
-    init_modules()
+    logger.info(f"🦁 Phase 1 - {load_all_modules()} modules loaded!")
 
-# ════════════════════════════════════════════════════════
-# ROUTES
-# ════════════════════════════════════════════════════════
+@app.api_route("/", methods=["GET", "HEAD"])
+async def root():
+    return {"name": "🦁 Singh Ji AI Ultra v7.0", "version": "7.0.0-phase1", "modules_loaded": len(MODULES), "status": "🦁 LIVE", "timestamp": datetime.now().isoformat()}
 
-@app.get("/")
-async def home():
-    return {
-        "status": "🟢 LIVE",
-        "name": "Singh Ji AI Ultra v7.0",
-        "tagline": "Bharat to the World 🇮🇳",
-        "modules_loaded": len(MODULES),
-        "modules": list(MODULES.keys()),
-        "timestamp": datetime.utcnow().isoformat(),
-        "server": "Render"
-    }
+@app.api_route("/api/health", methods=["GET", "HEAD"])
+async def health():
+    return {"status": "ok", "timestamp": datetime.now().isoformat()}
 
-@app.get("/api/modules")
-async def list_modules():
-    return {
-        "total": len(MODULES),
-        "modules": [
-            {
-                "name": name,
-                "type": info.get("type"),
-                "has_handler": info.get("handler") is not None
-            }
-            for name, info in MODULES.items()
-        ],
-        "failed": FAILED_MODULES
-    }
+@app.get("/api/status")
+async def status():
+    return {"name": "Singh Ji AI v7.0 Phase 1", "loaded": len(MODULES), "modules": list(MODULES.keys()), "status": "🦁 LIVE"}
 
-@app.api_route("/api/{module_name}", methods=["GET", "POST"])
-async def module_route(module_name: str, request: Request):
-    if module_name not in MODULES:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Module '{module_name}' nahi mila. Available: {list(MODULES.keys())}"
-        )
-
-    handler = MODULES[module_name].get("handler")
-    if not handler:
-        raise HTTPException(status_code=500, detail=f"Module '{module_name}' mein handler nahi hai")
-
-    body = await request.body()
+# 🦁 TELEGRAM WEBHOOK - DEDICATED ROUTE
+@app.post("/api/telegram/webhook")
+async def telegram_webhook(request: Request):
+    """Telegram Bot Webhook Handler"""
     try:
-        json_body = await request.json() if body else {}
-    except Exception:
-        json_body = {}
-
-    req_data = {
-        "method": request.method,
-        "args": dict(request.query_params),
-        "json": json_body,
-        "headers": dict(request.headers),
-        "timestamp": datetime.utcnow().isoformat()
-    }
-
-    try:
-        response = handler(req_data)
-        return response
+        data = await request.json()
+        logger.info(f"📩 Telegram webhook received: {data}")
+        
+        # Forward to telegram_bot module if loaded
+        if "telegram_bot" in MODULES:
+            return await MODULES["telegram_bot"](request)
+        
+        # Basic acknowledgment if module not loaded
+        return JSONResponse(status_code=200, content={"status": "ok", "message": "Webhook received, telegram_bot module not loaded yet"})
     except Exception as e:
-        logger.error(f"❌ {module_name} error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Telegram webhook error: {e}")
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
-@app.get("/api/health")
-async def health_check():
-    return {
-        "status": "healthy",
-        "modules": len(MODULES),
-        "failed": len(FAILED_MODULES),
-        "version": "v7.0"
-    }
+@app.api_route("/api/{module_name}", methods=["GET", "POST", "HEAD"])
+async def router(request: Request, module_name: str):
+    if module_name not in MODULES:
+        return JSONResponse(status_code=404, content={"status": "error", "message": f"'{module_name}' not found", "available": list(MODULES.keys())})
+    try:
+        return await MODULES[module_name](request)
+    except Exception as e:
+        logger.error(f"Error {module_name}: {e}")
+        return JSONResponse(status_code=500, content={"status": "error", "module": module_name, "error": str(e)})
 
-@app.get("/api/debug/failed-modules")
-async def failed_modules():
-    """Yeh route dikhata hai konse modules kyun fail hue — exact error ke saath"""
-    return {
-        "failed_count": len(FAILED_MODULES),
-        "failed_modules": FAILED_MODULES
-    }
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", 8000)))
