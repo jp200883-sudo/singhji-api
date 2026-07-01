@@ -1,6 +1,6 @@
 """
-🦁 SINGH JI AI ULTRA v7.0 - LIGHTWEIGHT (Render Free Tier Optimized)
-Lazy Loading + No Frontend
+🦁 SINGH JI AI ULTRA v7.0 - LIGHTWEIGHT + NEWS SCHEDULER
+Lazy Loading + Background Jobs
 """
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,14 +14,13 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# API Keys (जब जरूरत हो तब use करो, startup पे नहीं)
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 
 app = FastAPI(title="🦁 Singh Ji AI Ultra v7.0", version="7.0.0-light")
 
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
-MODULES = {}  # Lazy load — खाली शुरुआत
+MODULES = {}
 MODULES_DIR = os.path.join(os.path.dirname(__file__), "..", "modules")
 
 def discover_modules():
@@ -56,7 +55,8 @@ def load_module(name, info):
 
 @app.on_event("startup")
 async def startup():
-    logger.info("🦁 Singh Ji AI v7.0 started (lazy loading enabled)")
+    logger.info("🦁 Singh Ji AI v7.0 started")
+    # News scheduler auto-load होगा module से
 
 @app.api_route("/", methods=["GET", "HEAD"])
 async def root():
@@ -85,10 +85,9 @@ async def telegram_webhook(request: Request):
         logger.error(f"Telegram error: {e}")
         return JSONResponse(status_code=200, content={"status": "ok"})
 
-# 🦁 LAZY LOAD ROUTER — जब call हो तब load
+# 🦁 LAZY LOAD ROUTER
 @app.api_route("/api/{module_name}", methods=["GET", "POST", "HEAD"])
 async def router(request: Request, module_name: str):
-    # Lazy load on first call
     if module_name not in MODULES:
         all_modules = discover_modules()
         if module_name in all_modules:
