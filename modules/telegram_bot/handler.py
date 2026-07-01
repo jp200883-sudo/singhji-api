@@ -1,64 +1,207 @@
-# modules/telegram_bot/handler.py
-
+# telegram_bot/handler.py
 import os
-import logging
-import aiohttp
-from fastapi import Request
-from fastapi.responses import JSONResponse
+import json
+import requests
+import time
+from typing import Dict, Any
 
-logger = logging.getLogger(__name__)
+# ========== CONFIG ==========
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+BOT_URL = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}" if TELEGRAM_TOKEN else None
 
-async def send_message(chat_id: int, text: str):
-    """Send reply to Telegram"""
-    try:
-        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-        payload = {
-            "chat_id": chat_id,
-            "text": text,
-            "parse_mode": "HTML"
+# ========== TELEGRAM BOT MODULE ==========
+class TelegramBotModule:
+    def __init__(self):
+        self.token = TELEGRAM_TOKEN
+        self.base_url = BOT_URL
+    
+    def send_message(self, chat_id: str, text: str, parse_mode: str = "HTML") -> Dict[str, Any]:
+        """Send message to Telegram chat"""
+        if not self.token:
+            return {"success": False, "error": "No Telegram token set"}
+        
+        try:
+            url = f"{self.base_url}/sendMessage"
+            data = {
+                "chat_id": chat_id,
+                "text": text,
+                "parse_mode": parse_mode
+            }
+            resp = requests.post(url, json=data, timeout=15)
+            resp.raise_for_status()
+            result = resp.json()
+            
+            return {
+                "success": result.get("ok", False),
+                "message_id": result.get("result", {}).get("message_id"),
+                "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
+            }
+            
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+    
+    def send_photo(self, chat_id: str, photo_url: str, caption: str = "") -> Dict[str, Any]:
+        """Send photo to Telegram chat"""
+        if not self.token:
+            return {"success": False, "error": "No Telegram token set"}
+        
+        try:
+            url = f"{self.base_url}/sendPhoto"
+            data = {
+                "chat_id": chat_id,
+                "photo": photo_url,
+                "caption": caption,
+                "parse_mode": "HTML"
+            }
+            resp = requests.post(url, json=data, timeout=15)
+            resp.raise_for_status()
+            return {"success": True, "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+    
+    def set_webhook(self, webhook_url: str) -> Dict[str, Any]:
+        """Set webhook for bot"""
+        if not self.token:
+            return {"success": False, "error": "No Telegram token set"}
+        
+        try:
+            url = f"{self.base_url}/setWebhook"
+            data = {"url": webhook_url, "drop_pending_updates": True}
+            resp = requests.post(url, json=data, timeout=15)
+            resp.raise_for_status()
+            result = resp.json()
+            return {
+                "success": result.get("ok", False),
+                "description": result.get("description", ""),
+                "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
+            }
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+    
+    def get_webhook_info(self) -> Dict[str, Any]:
+        """Get current webhook info"""
+        if not self.token:
+            return {"success": False, "error": "No Telegram token set"}
+        
+        try:
+            url = f"{self.base_url}/getWebhookInfo"
+            resp = requests.get(url, timeout=15)
+            resp.raise_for_status()
+            result = resp.json()
+            return {
+                "success": result.get("ok", False),
+                "info": result.get("result", {}),
+                "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
+            }
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+    
+    def delete_webhook(self) -> Dict[str, Any]:
+        """Delete webhook"""
+        if not self.token:
+            return {"success": False, "error": "No Telegram token set"}
+        
+        try:
+            url = f"{self.base_url}/deleteWebhook"
+            resp = requests.get(url, timeout=15)
+            resp.raise_for_status()
+            return {"success": True, "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+    
+    def get_updates(self, offset: int = None) -> Dict[str, Any]:
+        """Get updates (for polling mode)"""
+        if not self.token:
+            return {"success": False, "error": "No Telegram token set"}
+        
+        try:
+            url = f"{self.base_url}/getUpdates"
+            params = {"limit": 10}
+            if offset:
+                params["offset"] = offset
+            
+            resp = requests.get(url, params=params, timeout=15)
+            resp.raise_for_status()
+            result = resp.json()
+            return {
+                "success": result.get("ok", False),
+                "updates": result.get("result", []),
+                "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
+            }
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+    
+    def health_check(self) -> Dict[str, Any]:
+        return {
+            "module": "telegram_bot",
+            "token_set": bool(self.token),
+            "status": "✅ Ready" if self.token else "❌ No Token"
         }
-        
-        async with aiohttp.ClientSession() as session:
-            async with session.post(url, json=payload) as resp:
-                result = await resp.json()
-                logger.info(f"📤 Reply sent: {result.get('ok')}")
-                return result
-                
-    except Exception as e:
-        logger.error(f"❌ Send failed: {e}")
-        return {"ok": False, "error": str(e)}
 
-async def handler(request: Request):
-    """Telegram Bot Handler"""
-    try:
-        data = await request.json()
-        logger.info(f"📩 Telegram update: {data}")
+
+# ========== RENDER HANDLER ==========
+def handler(request):
+    if request.method == "GET":
+        t = TelegramBotModule()
+        params = request.args if hasattr(request, 'args') else {}
+        action = params.get("action", "info")
         
-        if "message" not in data:
-            return JSONResponse({"status": "ok", "message": "No message"})
-        
-        message = data["message"]
-        chat_id = message["chat"]["id"]
-        text = message.get("text", "")
-        
-        # Commands
-        if text == "/start":
-            reply = "🦁 <b>सिंह जी AI में आपका स्वागत है!</b>\n\nमैं आपका भारतीय सुपर ऐप असिस्टेंट हूँ।\n\nकैसे मदद करूँ?"
-        elif text == "/help":
-            reply = "🦁 <b>मदद</b>\n\n/start - शुरुआत\n/help - मदद\n/status - स्टेटस"
+        if action == "webhook_info":
+            result = t.get_webhook_info()
+        elif action == "delete_webhook":
+            result = t.delete_webhook()
+        elif action == "health":
+            result = t.health_check()
         else:
-            reply = f"🦁 आपने लिखा: <b>{text}</b>\n\nमैं सिंह जी AI हूँ, जल्द और फीचर्स आ रहे हैं!"
+            result = {
+                "module": "telegram_bot",
+                "status": "LIVE",
+                "health": t.health_check()
+            }
         
-        # Send reply
-        await send_message(chat_id, reply)
-        
-        return JSONResponse({
-            "status": "ok",
-            "chat_id": chat_id,
-            "reply": reply[:50]
-        })
-        
-    except Exception as e:
-        logger.error(f"❌ Bot handler error: {e}")
-        return JSONResponse({"status": "error", "message": str(e)})
+        return {
+            "statusCode": 200,
+            "headers": {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Origin": "*"
+            },
+            "body": json.dumps(result, ensure_ascii=False)
+        }
+    
+    elif request.method == "POST":
+        try:
+            body = json.loads(request.body) if hasattr(request, 'body') else request.json()
+            action = body.get("action", "send_message")
+            
+            t = TelegramBotModule()
+            
+            if action == "send_message":
+                result = t.send_message(body.get("chat_id"), body.get("text"), body.get("parse_mode", "HTML"))
+            elif action == "send_photo":
+                result = t.send_photo(body.get("chat_id"), body.get("photo_url"), body.get("caption", ""))
+            elif action == "set_webhook":
+                result = t.set_webhook(body.get("webhook_url"))
+            elif action == "get_updates":
+                result = t.get_updates(body.get("offset"))
+            else:
+                result = {"error": "Unknown action"}
+            
+            return {
+                "statusCode": 200,
+                "headers": {
+                    "Content-Type": "application/json",
+                    "Access-Control-Allow-Origin": "*"
+                },
+                "body": json.dumps(result, ensure_ascii=False)
+            }
+            
+        except Exception as e:
+            return {"statusCode": 500, "body": json.dumps({"error": str(e)})}
+    
+    return {"statusCode": 405, "body": json.dumps({"error": "Method not allowed"})}
+
+
+if __name__ == "__main__":
+    t = TelegramBotModule()
+    print("🦁 SINGH JI AI ULTRA v7.0 — Telegram Bot Module")
+    print("Health:", t.health_check())
