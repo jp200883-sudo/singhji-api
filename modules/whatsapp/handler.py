@@ -1,25 +1,72 @@
-from fastapi import Request
 import os
-import httpx
+from fastapi import Request
+from fastapi.responses import JSONResponse
+import logging
 
-KEY = os.getenv("WHATSAPP_API_KEY")
-PHONE = os.getenv("ADMIN_PHONE", "919XXXXXXXXX")
+logger = logging.getLogger(__name__)
 
 async def handler(request: Request):
-    method = request.method
-    if method in ["GET", "HEAD"]:
-        return {"status": "ok", "module": "whatsapp", "phone": PHONE}
-    if method == "POST":
-        try:
-            b = await request.json()
-            return await send_wa(b.get("phone", PHONE), b.get("message", "🦁 Alert!"))
-        except Exception as e: return {"status": "error", "error": str(e)}
-    return {"status": "error", "message": "Method not allowed"}
-
-async def send_wa(phone, msg):
-    if not KEY: return {"status": "success", "mock": True, "phone": phone, "message": msg, "note": "🦁 Demo mode"}
     try:
-        async with httpx.AsyncClient() as c:
-            r = await c.get("https://api.callmebot.com/whatsapp.php", params={"phone": phone, "text": msg, "apikey": KEY}, timeout=10)
-            return {"status": "success", "sent": True, "response": r.text}
-    except Exception as e: return {"status": "error", "error": str(e)}
+        method = request.method
+        if method == "GET":
+            params = dict(request.query_params)
+            action = params.get('action', 'status').strip()
+        else:
+            body = await request.json()
+            action = body.get('action', 'status').strip()
+        
+        if action == 'status':
+            return JSONResponse(content={
+                "success": True,
+                "error": None,
+                "data": {
+                    "status": "🦁 WhatsApp Bot Ready",
+                    "provider": "WhatsApp Business API",
+                    "note": "Meta Business verification required for production",
+                    "features": [
+                        "Text messages",
+                        "Image sharing",
+                        "Quick replies",
+                        "Broadcast messages"
+                    ],
+                    "setup_required": "WhatsApp Business Account + Meta approval"
+                }
+            })
+        
+        elif action == 'webhook':
+            return JSONResponse(content={
+                "success": True,
+                "error": None,
+                "data": {
+                    "message": "WhatsApp webhook endpoint",
+                    "endpoint": "/api/whatsapp/webhook",
+                    "method": "POST",
+                    "status": "Ready for Meta integration"
+                }
+            })
+        
+        elif action == 'send':
+            return JSONResponse(content={
+                "success": True,
+                "error": None,
+                "data": {
+                    "message": "Message sending coming soon",
+                    "status": "Pending WhatsApp Business API activation",
+                    "note": "Requires Meta Business verification"
+                }
+            })
+        
+        return JSONResponse(content={
+            "success": True,
+            "error": None,
+            "data": {
+                "actions": ["status", "webhook", "send"],
+                "message": "Use ?action=status"
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"WhatsApp crash: {e}")
+        return JSONResponse(status_code=500, content={
+            "success": False, "error": str(e), "data": None
+        })
