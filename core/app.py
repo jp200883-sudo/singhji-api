@@ -9,8 +9,9 @@ import os
 import sys
 import asyncio
 import aiohttp
+import requests 
 import importlib.util
-import inspect  # ✅ NAYA — function async hai ya normal check karne ke liye
+import inspect  
 from datetime import datetime
 import logging
 
