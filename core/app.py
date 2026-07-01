@@ -118,21 +118,38 @@ async def status():
 async def telegram_webhook(request: Request):
     try:
         data = await request.json()
-        logger.info(f"📩 Telegram: {data.get('message', {}).get('text', 'no text')}")
+        message = data.get('message', {})
+        text = message.get('text', '')
+        chat_id = message.get('chat', {}).get('id')
         
-        if "telegram_bot" in MODULES:
-            handler = MODULES["telegram_bot"]
-            # ✅ SAHI — pehle check karo async hai ya normal
-            if inspect.iscoroutinefunction(handler):
-                return await handler(request)
-            else:
-                return handler(request)
+        logger.info(f"📩 Telegram: {text} from chat {chat_id}")
+        
+        # ✅ Reply decide karo
+        if text == '/start':
+            reply = "🦁 <b>Singh Ji AI Bot</b>\n\nShuruwat ho gayi!\n\nCommands:\n/start — Shuruwat\n/help — Madad\n/status — System check"
+        elif text == '/help':
+            reply = "🦁 <b>Madad</b>\n\n/start — Bot shuru\n/status — API status\nKuch bhi likho — Main jawab dunga!"
+        elif text == '/status':
+            reply = "🟢 <b>Singh Ji AI Status</b>\n\n✅ Bot Active\n✅ API Connected\n🦁 Singh Ji AI v7.0"
+        else:
+            reply = f"🦁 Aapne likha: <b>{text}</b>\n\nMain abhi sirf commands samajhta hoon:\n/start, /help, /status"
+        
+        # ✅ Telegram ko reply bhejo
+        if TELEGRAM_TOKEN and chat_id:
+            import requests
+            url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+            requests.post(url, json={
+                "chat_id": chat_id,
+                "text": reply,
+                "parse_mode": "HTML"
+            }, timeout=10)
+            logger.info(f"✅ Reply sent to {chat_id}")
         
         return JSONResponse(status_code=200, content={"status": "ok"})
+        
     except Exception as e:
         logger.error(f"Telegram error: {e}")
         return JSONResponse(status_code=200, content={"status": "ok"})
-
 # ============================================================
 # 🦁 LAZY LOAD ROUTER — FIXED!
 # ============================================================
