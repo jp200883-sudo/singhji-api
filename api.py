@@ -1,6 +1,6 @@
 """
 🦁 SINGH JI AI ULTRA v7.0 - PHASE 1 (15 MODULES)
-Dynamic Module Loader
+Dynamic Module Loader — RENDER OPTIMIZED
 """
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -44,19 +44,30 @@ TZ = os.getenv("TZ", "Asia/Kolkata")
 
 app = FastAPI(title="🦁 Singh Ji AI Ultra v7.0", version="7.0.0-phase1")
 
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"]
+)
 
 MODULES = {}
-MODULES_DIR = os.path.join(os.path.dirname(__file__), "..", "modules")
+
+# ✅ FIXED: modules folder path (same directory as main.py)
+MODULES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "modules")
 
 def discover_modules():
     modules = {}
-    if not os.path.exists(MODULES_DIR): return modules
+    if not os.path.exists(MODULES_DIR):
+        logger.warning(f"⚠️ modules/ folder not found at {MODULES_DIR}")
+        return modules
     for item in os.listdir(MODULES_DIR):
         item_path = os.path.join(MODULES_DIR, item)
         if os.path.isdir(item_path) and not item.startswith("__"):
             handler_path = os.path.join(item_path, "handler.py")
-            if os.path.exists(handler_path): modules[item] = {"type": "folder", "path": handler_path}
+            if os.path.exists(handler_path):
+                modules[item] = {"type": "folder", "path": handler_path}
         elif item.endswith(".py") and not item.startswith("__"):
             modules[item[:-3]] = {"type": "file", "path": item_path}
     return modules
@@ -76,27 +87,37 @@ def load_module(name, info):
             spec.loader.exec_module(module)
             return getattr(module, "handler", None)
     except Exception as e:
-        logger.error(f"Failed {name}: {e}")
+        logger.error(f"❌ Failed to load {name}: {e}")
         return None
 
 def load_all_modules():
     global MODULES
-    for name, info in discover_modules().items():
+    discovered = discover_modules()
+    logger.info(f"🔍 Found {len(discovered)} potential modules")
+    for name, info in discovered.items():
         handler = load_module(name, info)
         if handler:
             MODULES[name] = handler
-            logger.info(f"✅ {name}")
+            logger.info(f"✅ {name} loaded")
         else:
-            logger.warning(f"⚠️ {name}")
+            logger.warning(f"⚠️ {name} failed to load")
     return len(MODULES)
 
 @app.on_event("startup")
 async def startup():
-    logger.info(f"🦁 Phase 1 - {load_all_modules()} modules loaded!")
+    count = load_all_modules()
+    logger.info(f"🦁 Phase 1 — {count} modules loaded!")
 
 @app.api_route("/", methods=["GET", "HEAD"])
 async def root():
-    return {"name": "🦁 Singh Ji AI Ultra v7.0", "version": "7.0.0-phase1", "modules_loaded": len(MODULES), "status": "🦁 LIVE", "timestamp": datetime.now().isoformat()}
+    return {
+        "name": "🦁 Singh Ji AI Ultra v7.0",
+        "version": "7.0.0-phase1",
+        "modules_loaded": len(MODULES),
+        "modules": list(MODULES.keys()),
+        "status": "🦁 LIVE",
+        "timestamp": datetime.now().isoformat()
+    }
 
 @app.api_route("/api/health", methods=["GET", "HEAD"])
 async def health():
@@ -104,36 +125,47 @@ async def health():
 
 @app.get("/api/status")
 async def status():
-    return {"name": "Singh Ji AI v7.0 Phase 1", "loaded": len(MODULES), "modules": list(MODULES.keys()), "status": "🦁 LIVE"}
+    return {
+        "name": "Singh Ji AI v7.0 Phase 1",
+        "loaded": len(MODULES),
+        "modules": list(MODULES.keys()),
+        "status": "🦁 LIVE"
+    }
 
-# 🦁 TELEGRAM WEBHOOK - DEDICATED ROUTE
+# 🦁 TELEGRAM WEBHOOK — DEDICATED ROUTE
 @app.post("/api/telegram/webhook")
 async def telegram_webhook(request: Request):
-    """Telegram Bot Webhook Handler"""
     try:
         data = await request.json()
-        logger.info(f"📩 Telegram webhook received: {data}")
-        
-        # Forward to telegram_bot module if loaded
+        logger.info(f"📩 Telegram webhook: {data}")
         if "telegram_bot" in MODULES:
             return await MODULES["telegram_bot"](request)
-        
-        # Basic acknowledgment if module not loaded
-        return JSONResponse(status_code=200, content={"status": "ok", "message": "Webhook received, telegram_bot module not loaded yet"})
+        return JSONResponse(status_code=200, content={"status": "ok", "message": "telegram_bot module not loaded"})
     except Exception as e:
         logger.error(f"Telegram webhook error: {e}")
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
-@app.api_route("/api/{module_name}", methods=["GET", "POST", "HEAD"])
+# 🦁 DYNAMIC MODULE ROUTER
+@app.api_route("/api/{module_name}", methods=["GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS"])
 async def router(request: Request, module_name: str):
     if module_name not in MODULES:
-        return JSONResponse(status_code=404, content={"status": "error", "message": f"'{module_name}' not found", "available": list(MODULES.keys())})
+        return JSONResponse(
+            status_code=404,
+            content={
+                "status": "error",
+                "message": f"Module '{module_name}' not found",
+                "available": list(MODULES.keys()),
+                "hint": f"Create modules/{module_name}/handler.py"
+            }
+        )
     try:
         return await MODULES[module_name](request)
     except Exception as e:
-        logger.error(f"Error {module_name}: {e}")
+        logger.error(f"❌ Error in {module_name}: {e}")
         return JSONResponse(status_code=500, content={"status": "error", "module": module_name, "error": str(e)})
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", 8000)))
+    port = int(os.getenv("PORT", 8000))
+    logger.info(f"🚀 Starting on port {port}")
+    uvicorn.run(app, host="0.0.0.0", port=port)
