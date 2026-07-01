@@ -1,63 +1,40 @@
-# modules/news_scheduler.py — FIXED
+# modules/news_scheduler.py
 
-from apscheduler.schedulers.background import BackgroundScheduler
+import os
+import logging
 from datetime import datetime
-import pytz
-from fastapi import APIRouter  # ⬅️ ADD THIS
 
-IST = pytz.timezone('Asia/Kolkata')
+logger = logging.getLogger(__name__)
 
-# ⬅️ ADD THIS LINE
-router = APIRouter(prefix="/api/news-scheduler", tags=["News Scheduler"])
+async def handler(request):
+    """News Scheduler - API endpoint"""
+    return {"status": "ok", "message": "News scheduler active"}
 
-# ===== SCHEDULER FUNCTIONS (same as before) =====
-def fetch_and_store_news(category="india", language="hi"):
-    """Har ghante news fetch + store + notify"""
-    from modules import newsdata, currents_api, supabase_memory
-    
-    if category == "india":
-        news = newsdata.get_india_news(language=language)
-    elif category == "world":
-        news = currents_api.get_world_news()
-    else:
-        news = {"success": False, "error": "Unknown category"}
-    
-    if news.get("success"):
-        supabase_memory.store_news(
-            category=category,
-            language=language,
-            articles=news["articles"],
-            timestamp=datetime.now(IST).isoformat()
-        )
-        return True
-    return False
+def fetch_and_store_news():
+    """Background job - every hour"""
+    try:
+        # Lazy import - जब जरूरत हो तब
+        from modules.newsdata.handler import get_india_news
+        
+        languages = ["en", "hi"]
+        for lang in languages:
+            try:
+                news = get_india_news(language=lang)
+                logger.info(f"✅ News fetched: {lang} - {len(news) if news else 0} items")
+            except Exception as e:
+                logger.error(f"❌ News fetch failed {lang}: {e}")
+                # Crash नहीं होगा - log करके आगे बढ़ेगा
+                
+    except Exception as e:
+        logger.error(f"❌ Scheduler error: {e}")
+        # Module missing हो तो भी crash नहीं
 
-# Scheduler
-scheduler = BackgroundScheduler(timezone=IST)
-scheduler.add_job(fetch_and_store_news, 'cron', hour='6-21', minute=0, args=["india", "hi"])
-scheduler.add_job(fetch_and_store_news, 'cron', hour='6-21', minute=5, args=["world", "en"])
-scheduler.start()
-
-# ⬅️ ADD THESE ROUTES
-@router.get("/")
-async def news_scheduler_home():
-    return {
-        "app": "News Scheduler",
-        "status": "active",
-        "schedule": "Every hour 6AM-9PM",
-        "timezone": "Asia/Kolkata",
-        "jobs": 2,
-        "message": "News auto-fetch chal raha hai!"
-    }
-
-@router.get("/status")
-async def scheduler_status():
-    return {
-        "scheduler": "active",
-        "next_run": "Check /api/news-scheduler/",
-        "jobs": [
-            {"name": "India News", "time": "Every hour :00", "category": "india"},
-            {"name": "World News", "time": "Every hour :05", "category": "world"}
-        ],
-        "message": "6AM se 9PM tak har ghante news!"
-    }
+# APScheduler setup - safe
+try:
+    from apscheduler.schedulers.background import BackgroundScheduler
+    scheduler = BackgroundScheduler()
+    scheduler.add_job(fetch_and_store_news, 'cron', hour='6-21', minute='0')
+    scheduler.start()
+    logger.info("✅ News scheduler started")
+except Exception as e:
+    logger.error(f"❌ Scheduler start failed: {e}")
