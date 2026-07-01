@@ -4,6 +4,8 @@ import json
 import requests
 import time
 from typing import Dict, Any
+from fastapi import Request
+from fastapi.responses import JSONResponse
 
 # ========== CONFIG ==========
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
@@ -139,12 +141,15 @@ class TelegramBotModule:
         }
 
 
-# ========== RENDER HANDLER ==========
-def handler(request):
+# ========== RENDER HANDLER — FastAPI Compatible ==========
+async def handler(request: Request):
+    """FastAPI compatible handler — async def + JSONResponse"""
+    
     if request.method == "GET":
         t = TelegramBotModule()
-        params = request.args if hasattr(request, 'args') else {}
-        action = params.get("action", "info")
+        
+        # ✅ FastAPI mein query params
+        action = request.query_params.get("action", "info")
         
         if action == "webhook_info":
             result = t.get_webhook_info()
@@ -159,26 +164,29 @@ def handler(request):
                 "health": t.health_check()
             }
         
-        return {
-            "statusCode": 200,
-            "headers": {
-                "Content-Type": "application/json",
-                "Access-Control-Allow-Origin": "*"
-            },
-            "body": json.dumps(result, ensure_ascii=False)
-        }
+        # ✅ FastAPI JSONResponse
+        return JSONResponse(content=result)
     
     elif request.method == "POST":
         try:
-            body = json.loads(request.body) if hasattr(request, 'body') else request.json()
+            # ✅ FastAPI mein: await request.json()
+            body = await request.json()
             action = body.get("action", "send_message")
             
             t = TelegramBotModule()
             
             if action == "send_message":
-                result = t.send_message(body.get("chat_id"), body.get("text"), body.get("parse_mode", "HTML"))
+                result = t.send_message(
+                    body.get("chat_id"), 
+                    body.get("text"), 
+                    body.get("parse_mode", "HTML")
+                )
             elif action == "send_photo":
-                result = t.send_photo(body.get("chat_id"), body.get("photo_url"), body.get("caption", ""))
+                result = t.send_photo(
+                    body.get("chat_id"), 
+                    body.get("photo_url"), 
+                    body.get("caption", "")
+                )
             elif action == "set_webhook":
                 result = t.set_webhook(body.get("webhook_url"))
             elif action == "get_updates":
@@ -186,19 +194,13 @@ def handler(request):
             else:
                 result = {"error": "Unknown action"}
             
-            return {
-                "statusCode": 200,
-                "headers": {
-                    "Content-Type": "application/json",
-                    "Access-Control-Allow-Origin": "*"
-                },
-                "body": json.dumps(result, ensure_ascii=False)
-            }
+            # ✅ FastAPI JSONResponse
+            return JSONResponse(content=result)
             
         except Exception as e:
-            return {"statusCode": 500, "body": json.dumps({"error": str(e)})}
+            return JSONResponse(status_code=500, content={"error": str(e)})
     
-    return {"statusCode": 405, "body": json.dumps({"error": "Method not allowed"})}
+    return JSONResponse(status_code=405, content={"error": "Method not allowed"})
 
 
 if __name__ == "__main__":
