@@ -1,63 +1,48 @@
-# modules/newsdata.py — Singh Ji AI Ultra v5.0
-# NewsData.io API — India News + Hindi News
+# modules/newsdata/handler.py
 
-from fastapi import APIRouter
 import os
-import requests
+import logging
 
-# ⬇️ FIX: Add prefix and tags
-router = APIRouter(prefix="/api/news", tags=["News"])
+logger = logging.getLogger(__name__)
+NEWSDATA_API_KEY = os.getenv("NEWSDATA_API_KEY")
 
-NEWSDATA_API_KEY = os.getenv("NEWSDATA_API_KEY", "")
-
-@router.get("/")
-async def newsdata_root():
-    """News API Home"""
-    return {
-        "module": "newsdata",
-        "status": "✅ Live",
-        "source": "NewsData.io",
-        "endpoints": ["/india", "/hindi", "/english"],
-        "message": "Aaj ki taaza khabar!"
-    }
-
-@router.get("/india")
-async def get_india_news(query: str = "India", language: str = "hi"):
-    """India news from NewsData.io"""
-    if not NEWSDATA_API_KEY:
-        return {
-            "success": False,
-            "error": "API Key not configured",
-            "message": "Add NEWSDATA_API_KEY to Render env vars",
-            "mock": True
-        }
-
-    url = "https://newsdata.io/api/1/news"
-    params = {
-        "apikey": NEWSDATA_API_KEY,
-        "q": query,
-        "language": language,
-        "country": "in"
-    }
-
+def get_india_news(language="en"):
+    """Fetch India news from NewsData API"""
     try:
+        import requests
+        
+        if not NEWSDATA_API_KEY:
+            logger.warning("⚠️ NEWSDATA_API_KEY missing")
+            return []
+        
+        url = "https://newsdata.io/api/1/news"
+        params = {
+            "apikey": NEWSDATA_API_KEY,
+            "country": "in",
+            "language": language,
+            "category": "top"
+        }
+        
         response = requests.get(url, params=params, timeout=10)
         data = response.json()
-
+        
         if data.get("status") == "success":
-            return {
-                "success": True,
-                "total": len(data.get("results", [])),
-                "articles": data.get("results", [])
-            }
-        return {"success": False, "error": data.get("message", "API error")}
+            results = data.get("results", [])
+            logger.info(f"✅ NewsData: {len(results)} articles ({language})")
+            return results
+        else:
+            logger.error(f"❌ NewsData API error: {data.get('message', 'unknown')}")
+            return []
+            
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        logger.error(f"❌ get_india_news error: {e}")
+        return []  # Empty return - crash नहीं होगा
 
-@router.get("/hindi")
-async def get_hindi_news():
-    return await get_india_news(query="India", language="hi")
-
-@router.get("/english")
-async def get_english_news():
-    return await get_india_news(query="India", language="en")
+async def handler(request):
+    """API endpoint for news"""
+    try:
+        from fastapi.responses import JSONResponse
+        news = get_india_news(language="en")
+        return JSONResponse({"status": "ok", "count": len(news), "news": news[:5]})
+    except Exception as e:
+        return JSONResponse({"status": "error", "message": str(e)})
