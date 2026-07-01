@@ -1,12 +1,14 @@
 """
-🦁 SINGH JI AI ULTRA v7.0 - LIGHTWEIGHT + NEWS SCHEDULER
-Lazy Loading + Background Jobs
+🦁 SINGH JI AI ULTRA v7.0 - LIGHTWEIGHT + SELF-PING
+Lazy Loading + Auto Ping (Har 10 min mein Render ko jagaye)
 """
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import os
 import sys
+import asyncio
+import aiohttp
 import importlib.util
 from datetime import datetime
 import logging
@@ -53,10 +55,32 @@ def load_module(name, info):
         logger.error(f"Failed {name}: {e}")
         return None
 
+# ============================================================
+# 🦁 SELF-PING SYSTEM — Render ko sone nahi dega!
+# ============================================================
+async def self_ping():
+    """Har 10 minute mein Render ko ping karega — server hamesha live"""
+    await asyncio.sleep(60)  # Pehla ping 1 min baad (startup ke baad)
+    
+    while True:
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    "https://singhji-api.onrender.com/api/health",
+                    timeout=aiohttp.ClientTimeout(total=10)
+                ) as resp:
+                    logger.info(f"🦁 Self-ping: {resp.status} | Render awake!")
+        except Exception as e:
+            logger.error(f"❌ Self-ping failed: {e}")
+        
+        await asyncio.sleep(10 * 60)  # 10 minute = 600 seconds
+
 @app.on_event("startup")
 async def startup():
     logger.info("🦁 Singh Ji AI v7.0 started")
-    # News scheduler auto-load होगा module से
+    logger.info("🦁 Self-ping enabled — Render will never sleep!")
+    # Self-ping start karo
+    asyncio.create_task(self_ping())
 
 @app.api_route("/", methods=["GET", "HEAD"])
 async def root():
@@ -70,7 +94,9 @@ async def health():
 async def status():
     return {"loaded": len(MODULES), "modules": list(MODULES.keys()), "status": "🦁 LIVE"}
 
+# ============================================================
 # 🦁 TELEGRAM WEBHOOK
+# ============================================================
 @app.post("/telegram/webhook")
 async def telegram_webhook(request: Request):
     try:
@@ -85,7 +111,9 @@ async def telegram_webhook(request: Request):
         logger.error(f"Telegram error: {e}")
         return JSONResponse(status_code=200, content={"status": "ok"})
 
+# ============================================================
 # 🦁 LAZY LOAD ROUTER
+# ============================================================
 @app.api_route("/api/{module_name}", methods=["GET", "POST", "HEAD"])
 async def router(request: Request, module_name: str):
     if module_name not in MODULES:
