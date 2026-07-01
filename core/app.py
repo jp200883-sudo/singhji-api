@@ -106,25 +106,29 @@ async def health():
 async def status():
     return {"name": "Singh Ji AI v7.0 Phase 1", "loaded": len(MODULES), "modules": list(MODULES.keys()), "status": "🦁 LIVE"}
 
-# 🦁 TELEGRAM WEBHOOK - DEDICATED ROUTE (BEFORE generic router)
-@app.post("/api/telegram/webhook")
+# ============================================================
+# 🦁 TELEGRAM WEBHOOK — /api/ हटा दिया, अब कोई टकराव नहीं
+# ============================================================
+@app.post("/telegram/webhook")
 async def telegram_webhook(request: Request):
     """Telegram Bot Webhook Handler"""
     try:
         data = await request.json()
-        logger.info(f"📩 Telegram webhook: {data.get('message', {}).get('text', 'no text')}")
+        logger.info(f"📩 Telegram webhook received: {data}")
         
-        # Forward to telegram_bot module if loaded
+        # अगर telegram_bot मॉड्यूल लोड हुआ है तो उसे भेजो
         if "telegram_bot" in MODULES:
             return await MODULES["telegram_bot"](request)
         
-        # Basic acknowledgment
-        return JSONResponse(status_code=200, content={"status": "ok", "message": "Webhook received, telegram_bot module not loaded yet"})
+        # नहीं तो बेसिक जवाब दो
+        return JSONResponse(status_code=200, content={"status": "ok", "message": "Webhook received"})
     except Exception as e:
         logger.error(f"Telegram webhook error: {e}")
         return JSONResponse(status_code=200, content={"status": "ok", "error": str(e)})
 
-# Generic router - AFTER specific routes
+# ============================================================
+# 🦁 GENERIC ROUTER — /api/ वाले सब मॉड्यूल यहाँ से चलेंगे
+# ============================================================
 @app.api_route("/api/{module_name}", methods=["GET", "POST", "HEAD"])
 async def router(request: Request, module_name: str):
     if module_name not in MODULES:
