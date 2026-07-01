@@ -8,59 +8,30 @@ OPENWEATHER_API_KEY = os.environ.get('OPENWEATHER_API_KEY', '')
 
 @weather_bp.route('/current', methods=['GET'])
 def current_weather():
-    """
-    GET /api/weather/current?city=Delhi
-    GET /api/weather/current?lat=28.61&lon=77.20
-    """
     city = request.args.get('city', '').strip()
     lat = request.args.get('lat', '').strip()
     lon = request.args.get('lon', '').strip()
-    lang = request.args.get('lang', 'hi')  # Hindi default
+    lang = request.args.get('lang', 'hi')
     
     if not OPENWEATHER_API_KEY:
-        return jsonify({
-            "success": False,
-            "error": "OPENWEATHER_API_KEY not configured",
-            "data": None
-        }), 500
+        return jsonify({"success": False, "error": "OPENWEATHER_API_KEY not configured", "data": None}), 500
     
-    # Build API URL
     base_url = "https://api.openweathermap.org/data/2.5/weather"
     
     if lat and lon:
-        params = {
-            "lat": lat,
-            "lon": lon,
-            "appid": OPENWEATHER_API_KEY,
-            "units": "metric",
-            "lang": lang
-        }
+        params = {"lat": lat, "lon": lon, "appid": OPENWEATHER_API_KEY, "units": "metric", "lang": lang}
     elif city:
-        params = {
-            "q": city,
-            "appid": OPENWEATHER_API_KEY,
-            "units": "metric",
-            "lang": lang
-        }
+        params = {"q": city, "appid": OPENWEATHER_API_KEY, "units": "metric", "lang": lang}
     else:
-        return jsonify({
-            "success": False,
-            "error": "Provide ?city=Delhi OR ?lat=XX&lon=YY",
-            "data": None
-        }), 400
+        return jsonify({"success": False, "error": "Provide ?city=Delhi OR ?lat=XX&lon=YY", "data": None}), 400
     
     try:
         resp = requests.get(base_url, params=params, timeout=10)
         data = resp.json()
         
         if resp.status_code != 200:
-            return jsonify({
-                "success": False,
-                "error": data.get("message", "Weather API error"),
-                "data": None
-            }), resp.status_code
+            return jsonify({"success": False, "error": data.get("message", "Weather API error"), "data": None}), resp.status_code
         
-        # Format response for Singh Ji AI
         result = {
             "success": True,
             "city": data.get("name"),
@@ -73,11 +44,8 @@ def current_weather():
             },
             "humidity": data["main"]["humidity"],
             "pressure": data["main"]["pressure"],
-            "wind": {
-                "speed": data["wind"]["speed"],
-                "deg": data["wind"].get("deg", 0)
-            },
-            "visibility": data.get("visibility", 0) / 1000,  # km
+            "wind": {"speed": data["wind"]["speed"], "deg": data["wind"].get("deg", 0)},
+            "visibility": data.get("visibility", 0) / 1000,
             "weather": {
                 "main": data["weather"][0]["main"],
                 "description": data["weather"][0]["description"],
@@ -87,44 +55,20 @@ def current_weather():
             "sunset": data["sys"].get("sunset"),
             "timestamp": data.get("dt")
         }
+        return jsonify({"success": True, "error": None, "data": result})
         
-        return jsonify({
-            "success": True,
-            "error": None,
-            "data": result
-        })
-        
-    except requests.exceptions.Timeout:
-        return jsonify({
-            "success": False,
-            "error": "Weather API timeout",
-            "data": None
-        }), 504
     except Exception as e:
-        return jsonify({
-            "success": False,
-            "error": str(e),
-            "data": None
-        }), 500
-
+        return jsonify({"success": False, "error": str(e), "data": None}), 500
 
 @weather_bp.route('/forecast', methods=['GET'])
 def forecast():
-    """
-    GET /api/weather/forecast?city=Delhi&days=3
-    5-day / 3-hour forecast (free tier)
-    """
     city = request.args.get('city', '').strip()
     lat = request.args.get('lat', '').strip()
     lon = request.args.get('lon', '').strip()
     lang = request.args.get('lang', 'hi')
     
     if not OPENWEATHER_API_KEY:
-        return jsonify({
-            "success": False,
-            "error": "OPENWEATHER_API_KEY not configured",
-            "data": None
-        }), 500
+        return jsonify({"success": False, "error": "OPENWEATHER_API_KEY not configured", "data": None}), 500
     
     base_url = "https://api.openweathermap.org/data/2.5/forecast"
     
@@ -133,24 +77,15 @@ def forecast():
     elif city:
         params = {"q": city, "appid": OPENWEATHER_API_KEY, "units": "metric", "lang": lang}
     else:
-        return jsonify({
-            "success": False,
-            "error": "Provide ?city=Delhi OR ?lat=XX&lon=YY",
-            "data": None
-        }), 400
+        return jsonify({"success": False, "error": "Provide ?city=Delhi OR ?lat=XX&lon=YY", "data": None}), 400
     
     try:
         resp = requests.get(base_url, params=params, timeout=10)
         data = resp.json()
         
         if resp.status_code != 200:
-            return jsonify({
-                "success": False,
-                "error": data.get("message", "Forecast API error"),
-                "data": None
-            }), resp.status_code
+            return jsonify({"success": False, "error": data.get("message", "Forecast API error"), "data": None}), resp.status_code
         
-        # Group by day
         from collections import defaultdict
         daily = defaultdict(list)
         for item in data["list"]:
@@ -158,7 +93,7 @@ def forecast():
             daily[date].append(item)
         
         forecast_days = []
-        for date, items in list(daily.items())[:5]:  # Max 5 days
+        for date, items in list(daily.items())[:5]:
             temps = [i["main"]["temp"] for i in items]
             forecast_days.append({
                 "date": date,
@@ -174,52 +109,27 @@ def forecast():
         return jsonify({
             "success": True,
             "error": None,
-            "data": {
-                "city": data["city"]["name"],
-                "country": data["city"]["country"],
-                "forecast": forecast_days
-            }
+            "data": {"city": data["city"]["name"], "country": data["city"]["country"], "forecast": forecast_days}
         })
         
     except Exception as e:
-        return jsonify({
-            "success": False,
-            "error": str(e),
-            "data": None
-        }), 500
-
+        return jsonify({"success": False, "error": str(e), "data": None}), 500
 
 @weather_bp.route('/air', methods=['GET'])
 def air_quality():
-    """
-    GET /api/weather/air?lat=28.61&lon=77.20
-    Air Quality Index
-    """
     lat = request.args.get('lat', '').strip()
     lon = request.args.get('lon', '').strip()
     
     if not lat or not lon:
-        return jsonify({
-            "success": False,
-            "error": "Provide ?lat=XX&lon=YY",
-            "data": None
-        }), 400
+        return jsonify({"success": False, "error": "Provide ?lat=XX&lon=YY", "data": None}), 400
     
     if not OPENWEATHER_API_KEY:
-        return jsonify({
-            "success": False,
-            "error": "OPENWEATHER_API_KEY not configured",
-            "data": None
-        }), 500
+        return jsonify({"success": False, "error": "OPENWEATHER_API_KEY not configured", "data": None}), 500
     
     url = "http://api.openweathermap.org/data/2.5/air_pollution"
     
     try:
-        resp = requests.get(url, params={
-            "lat": lat,
-            "lon": lon,
-            "appid": OPENWEATHER_API_KEY
-        }, timeout=10)
+        resp = requests.get(url, params={"lat": lat, "lon": lon, "appid": OPENWEATHER_API_KEY}, timeout=10)
         data = resp.json()
         
         aqi_labels = {1: "Good", 2: "Fair", 3: "Moderate", 4: "Poor", 5: "Very Poor"}
@@ -228,16 +138,8 @@ def air_quality():
         return jsonify({
             "success": True,
             "error": None,
-            "data": {
-                "aqi": aqi,
-                "aqi_label": aqi_labels.get(aqi, "Unknown"),
-                "components": data["list"][0]["components"]
-            }
+            "data": {"aqi": aqi, "aqi_label": aqi_labels.get(aqi, "Unknown"), "components": data["list"][0]["components"]}
         })
         
     except Exception as e:
-        return jsonify({
-            "success": False,
-            "error": str(e),
-            "data": None
-        }), 500
+        return jsonify({"success": False, "error": str(e), "data": None}), 500
