@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import os
 import sys
+import json
 import importlib.util
 import asyncio
 from datetime import datetime
@@ -129,58 +130,46 @@ async def status():
         "status": "🦁 LIVE"
     }
 
-# 🦁 TELEGRAM WEBHOOK
-@app.post("/api/telegram/webhook")
-async def telegram_webhook(request: Request):
-    try:
-        data = await request.json()
-        logger.info(f"📩 Telegram webhook: {data}")
-        if "telegram_bot" in MODULES:
-            return await run_handler("telegram_bot", request)
-        return JSONResponse(status_code=200, content={"status": "ok", "message": "telegram_bot not loaded"})
-    except Exception as e:
-        logger.error(f"Telegram webhook error: {e}")
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
-
-# ✅ FIXED: Universal handler — supports BOTH sync & async
+# ✅ FIXED: Universal handler runner — NO AWAIT on sync functions!
 async def run_handler(module_name: str, request: Request):
-    """Run handler (sync or async) and return JSONResponse"""
+    """Run handler (sync or async) safely"""
     handler_func = MODULES[module_name]
     
     try:
         # Check if handler is async (coroutine function)
         if asyncio.iscoroutinefunction(handler_func):
+            # Async handler — can await directly
             result = await handler_func(request)
         else:
-            # Sync handler — run in thread pool to not block
-            result = await asyncio.to_thread(handler_func, request)
+            # Sync handler — DON'T await! Run in executor
+            loop = asyncio.get_event_loop()
+            result = await loop.run_in_executor(None, handler_func, request)
         
-        # If result is already a Response, return it
-        if hasattr(result, 'body'):
-            return result
-        
-        # If result is dict, wrap in JSONResponse
+        # Handle different return types
         if isinstance(result, dict):
-            status_code = result.pop("statusCode", 200) if "statusCode" in result else 200
-            headers = result.pop("headers", {}) if "headers" in result else {}
-            body = result.pop("body", None) if "body" in result else None
-            
-            if body and isinstance(body, str):
-                try:
-                    body = json.loads(body)
-                except:
-                    body = {"response": body}
-            
-            content = body if body else result
-            return JSONResponse(status_code=status_code, headers=headers, content=content)
+            # Check if it's a Flask-style response dict
+            if "statusCode" in result:
+                status_code = result.get("statusCode", 200)
+                headers = result.get("headers", {})
+                body = result.get("body", "{}")
+                if isinstance(body, str):
+                    try:
+                        body = json.loads(body)
+                    except:
+                        body = {"response": body}
+                return JSONResponse(status_code=status_code, headers=headers, content=body)
+            else:
+                # Plain dict
+                return JSONResponse(content=result)
         
-        return JSONResponse(content=result)
+        # If already a Response object
+        return result
         
     except Exception as e:
         logger.error(f"❌ Error in {module_name}: {e}")
         return JSONResponse(status_code=500, content={"status": "error", "module": module_name, "error": str(e)})
 
-# 🦁 DYNAMIC MODULE ROUTER — FIXED
+# 🦁 DYNAMIC MODULE ROUTER
 @app.api_route("/api/{module_name}", methods=["GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS"])
 async def router(request: Request, module_name: str):
     if module_name not in MODULES:
@@ -193,6 +182,19 @@ async def router(request: Request, module_name: str):
             }
         )
     return await run_handler(module_name, request)
+
+# 🦁 TELEGRAM WEBHOOK
+@app.post("/api/telegram/webhook")
+async def telegram_webhook(request: Request):
+    try:
+        data = await request.json()
+        logger.info(f"📩 Telegram webhook: {data}")
+        if "telegram_bot" in MODULES:
+            return await run_handler("telegram_bot", request)
+        return JSONResponse(status_code=200, content={"status": "ok", "message": "telegram_bot not loaded"})
+    except Exception as e:
+        logger.error(f"Telegram webhook error: {e}")
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 if __name__ == "__main__":
     import uvicorn
