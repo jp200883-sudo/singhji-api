@@ -1,6 +1,6 @@
 """
-🦁 SINGH JI AI ULTRA v7.0 - PHASE 1 (15 MODULES)
-Dynamic Module Loader
+🦁 SINGH JI AI ULTRA v7.0 - LIGHTWEIGHT (Render Free Tier Optimized)
+Lazy Loading + No Frontend
 """
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,39 +14,14 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# 🦁 SINGH JI AI ULTRA v7.0 - ALL 26 API KEYS
-CEREBRAS_API_KEY = os.getenv("CEREBRAS_API_KEY")
-CF_ACCOUNT_ID = os.getenv("CF_ACCOUNT_ID")
-CF_API_TOKEN = os.getenv("CF_API_TOKEN")
-CURRENTS_API_KEY = os.getenv("CURRENTS_API_KEY")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-HUGGINGFACE_TOKEN = os.getenv("HUGGINGFACE_TOKEN")
-MAGIC_HOUR_API_KEY = os.getenv("MAGIC_HOUR_API_KEY")
-MANDI_API_KEY = os.getenv("MANDI_API_KEY")
-MONGO_URI = os.getenv("MONGO_URI")
-NEWSDATA_API_KEY = os.getenv("NEWSDATA_API_KEY")
-OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
-PLANT_ID_API = os.getenv("PLANT_ID_API")
-PLANT_ID_URL = os.getenv("PLANT_ID_URL")
-PYTHON_VERSION = os.getenv("PYTHON_VERSION", "3.11")
-RAPIDAPI_KEY = os.getenv("RAPIDAPI_KEY")
-RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID")
-RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
-TAVILY_URL = os.getenv("TAVILY_URL")
+# API Keys (जब जरूरत हो तब use करो, startup पे नहीं)
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-TWILIO_SID = os.getenv("TWILIO_SID")
-TWILIO_TOKEN = os.getenv("TWILIO_TOKEN")
-TZ = os.getenv("TZ", "Asia/Kolkata")
 
-app = FastAPI(title="🦁 Singh Ji AI Ultra v7.0", version="7.0.0-phase1")
+app = FastAPI(title="🦁 Singh Ji AI Ultra v7.0", version="7.0.0-light")
 
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
-MODULES = {}
+MODULES = {}  # Lazy load — खाली शुरुआत
 MODULES_DIR = os.path.join(os.path.dirname(__file__), "..", "modules")
 
 def discover_modules():
@@ -79,24 +54,13 @@ def load_module(name, info):
         logger.error(f"Failed {name}: {e}")
         return None
 
-def load_all_modules():
-    global MODULES
-    for name, info in discover_modules().items():
-        handler = load_module(name, info)
-        if handler:
-            MODULES[name] = handler
-            logger.info(f"✅ {name}")
-        else:
-            logger.warning(f"⚠️ {name}")
-    return len(MODULES)
-
 @app.on_event("startup")
 async def startup():
-    logger.info(f"🦁 Phase 1 - {load_all_modules()} modules loaded!")
+    logger.info("🦁 Singh Ji AI v7.0 started (lazy loading enabled)")
 
 @app.api_route("/", methods=["GET", "HEAD"])
 async def root():
-    return {"name": "🦁 Singh Ji AI Ultra v7.0", "version": "7.0.0-phase1", "modules_loaded": len(MODULES), "status": "🦁 LIVE", "timestamp": datetime.now().isoformat()}
+    return {"name": "🦁 Singh Ji AI Ultra v7.0", "version": "7.0.0-light", "status": "🦁 LIVE", "timestamp": datetime.now().isoformat()}
 
 @app.api_route("/api/health", methods=["GET", "HEAD"])
 async def health():
@@ -104,35 +68,39 @@ async def health():
 
 @app.get("/api/status")
 async def status():
-    return {"name": "Singh Ji AI v7.0 Phase 1", "loaded": len(MODULES), "modules": list(MODULES.keys()), "status": "🦁 LIVE"}
+    return {"loaded": len(MODULES), "modules": list(MODULES.keys()), "status": "🦁 LIVE"}
 
-# ============================================================
-# 🦁 TELEGRAM WEBHOOK — /api/ हटा दिया, अब कोई टकराव नहीं
-# ============================================================
+# 🦁 TELEGRAM WEBHOOK
 @app.post("/telegram/webhook")
 async def telegram_webhook(request: Request):
-    """Telegram Bot Webhook Handler"""
     try:
         data = await request.json()
-        logger.info(f"📩 Telegram webhook received: {data}")
+        logger.info(f"📩 Telegram: {data.get('message', {}).get('text', 'no text')}")
         
-        # अगर telegram_bot मॉड्यूल लोड हुआ है तो उसे भेजो
         if "telegram_bot" in MODULES:
             return await MODULES["telegram_bot"](request)
         
-        # नहीं तो बेसिक जवाब दो
-        return JSONResponse(status_code=200, content={"status": "ok", "message": "Webhook received"})
+        return JSONResponse(status_code=200, content={"status": "ok"})
     except Exception as e:
-        logger.error(f"Telegram webhook error: {e}")
-        return JSONResponse(status_code=200, content={"status": "ok", "error": str(e)})
+        logger.error(f"Telegram error: {e}")
+        return JSONResponse(status_code=200, content={"status": "ok"})
 
-# ============================================================
-# 🦁 GENERIC ROUTER — /api/ वाले सब मॉड्यूल यहाँ से चलेंगे
-# ============================================================
+# 🦁 LAZY LOAD ROUTER — जब call हो तब load
 @app.api_route("/api/{module_name}", methods=["GET", "POST", "HEAD"])
 async def router(request: Request, module_name: str):
+    # Lazy load on first call
     if module_name not in MODULES:
-        return JSONResponse(status_code=404, content={"status": "error", "message": f"'{module_name}' not found", "available": list(MODULES.keys())})
+        all_modules = discover_modules()
+        if module_name in all_modules:
+            handler = load_module(module_name, all_modules[module_name])
+            if handler:
+                MODULES[module_name] = handler
+                logger.info(f"✅ Lazy loaded: {module_name}")
+            else:
+                return JSONResponse(status_code=404, content={"status": "error", "message": f"'{module_name}' failed to load"})
+        else:
+            return JSONResponse(status_code=404, content={"status": "error", "message": f"'{module_name}' not found"})
+    
     try:
         return await MODULES[module_name](request)
     except Exception as e:
