@@ -1,234 +1,148 @@
 """
-🦁 SINGH JI AI ULTRA v7.0 - LIGHTWEIGHT + SELF-PING
-Lazy Loading + Auto Ping (Har 10 min mein Render ko jagaye)
+🌤️ Singh Ji AI Ultra v7.0 — Weather Module
+Open-Meteo API (No API Key Required, Free Forever)
 """
-from fastapi import FastAPI, Request
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 import os
-import sys
-import asyncio
-import aiohttp
-import requests 
-import importlib.util
-import inspect  
-from datetime import datetime
+import requests
+from fastapi import Request
+from fastapi.responses import JSONResponse
 import logging
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+# Weather condition codes mapping (WMO)
+WMO_CODES = {
+    0: "Clear sky",
+    1: "Mainly clear", 2: "Partly cloudy", 3: "Overcast",
+    45: "Foggy", 48: "Depositing rime fog",
+    51: "Light drizzle", 53: "Moderate drizzle", 55: "Dense drizzle",
+    56: "Light freezing drizzle", 57: "Dense freezing drizzle",
+    61: "Slight rain", 63: "Moderate rain", 65: "Heavy rain",
+    66: "Light freezing rain", 67: "Heavy freezing rain",
+    71: "Slight snow", 73: "Moderate snow", 75: "Heavy snow",
+    77: "Snow grains",
+    80: "Slight rain showers", 81: "Moderate rain showers", 82: "Violent rain showers",
+    85: "Slight snow showers", 86: "Heavy snow showers",
+    95: "Thunderstorm", 96: "Thunderstorm with slight hail", 99: "Thunderstorm with heavy hail"
+}
 
-app = FastAPI(title="🦁 Singh Ji AI Ultra v7.0", version="7.0.0-light")
-
-app.add_middleware(
-    CORSMiddleware, 
-    allow_origins=["*"], 
-    allow_credentials=True, 
-    allow_methods=["*"], 
-    allow_headers=["*"]
-)
-
-MODULES = {}
-MODULES_DIR = os.path.join(os.path.dirname(__file__), "..", "modules")
-
-def discover_modules():
-    modules = {}
-    if not os.path.exists(MODULES_DIR): 
-        return modules
-    for item in os.listdir(MODULES_DIR):
-        item_path = os.path.join(MODULES_DIR, item)
-        if os.path.isdir(item_path) and not item.startswith("__"):
-            handler_path = os.path.join(item_path, "handler.py")
-            if os.path.exists(handler_path): 
-                modules[item] = {"type": "folder", "path": handler_path}
-        elif item.endswith(".py") and not item.startswith("__"):
-            modules[item[:-3]] = {"type": "file", "path": item_path}
-    return modules
-
-def load_module(name, info):
+async def handler(request: Request):
     try:
-        if info["type"] == "folder":
-            spec = importlib.util.spec_from_file_location(f"modules.{name}", info["path"])
-            module = importlib.util.module_from_spec(spec)
-            sys.modules[f"modules.{name}"] = module
-            spec.loader.exec_module(module)
-            return getattr(module, "handler", None)
-        else:
-            spec = importlib.util.spec_from_file_location(name, info["path"])
-            module = importlib.util.module_from_spec(spec)
-            sys.modules[name] = module
-            spec.loader.exec_module(module)
-            return getattr(module, "handler", None)
-    except Exception as e:
-        logger.error(f"Failed {name}: {e}")
-        return None
-
-# ============================================================
-# 🦁 SELF-PING SYSTEM — Render ko sone nahi dega!
-# ============================================================
-async def self_ping():
-    """Har 10 minute mein Render ko ping karega — server hamesha live"""
-    await asyncio.sleep(60)
-    
-    while True:
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(
-                    "https://singhji-api.onrender.com/api/health",
-                    timeout=aiohttp.ClientTimeout(total=10)
-                ) as resp:
-                    logger.info(f"🦁 Self-ping: {resp.status} | Render awake!")
-        except Exception as e:
-            logger.error(f"❌ Self-ping failed: {e}")
+        params = dict(request.query_params)
+        city = params.get("city", "Delhi").strip()
+        lang = params.get("lang", "hi").strip()
         
-        await asyncio.sleep(10 * 60)
-
-@app.on_event("startup")
-async def startup():
-    logger.info("🦁 Singh Ji AI v7.0 started")
-    logger.info("🦁 Self-ping enabled — Render will never sleep!")
-    asyncio.create_task(self_ping())
-
-@app.api_route("/", methods=["GET", "HEAD"])
-async def root():
-    return {
-        "name": "🦁 Singh Ji AI Ultra v7.0", 
-        "version": "7.0.0-light", 
-        "status": "🦁 LIVE", 
-        "timestamp": datetime.now().isoformat()
-    }
-
-@app.api_route("/api/health", methods=["GET", "HEAD"])
-async def health():
-    return {"status": "ok", "timestamp": datetime.now().isoformat()}
-
-@app.get("/api/status")
-async def status():
-    return {
-        "loaded": len(MODULES), 
-        "modules": list(MODULES.keys()), 
-        "status": "🦁 LIVE"
-    }
-
-# ============================================================
-# 🦁 TELEGRAM WEBHOOK
-# ============================================================
-@app.post("/telegram/webhook")
-async def telegram_webhook(request: Request):
-    try:
-        data = await request.json()
-        message = data.get('message', {})
-        text = message.get('text', '')
-        chat_id = message.get('chat', {}).get('id')
+        # Step 1: Geocoding — City to Lat/Lon
+        geo_url = f"https://geocoding-api.open-meteo.com/v1/search?name={city}&count=1&language={lang}"
+        geo_resp = requests.get(geo_url, timeout=10)
+        geo_data = geo_resp.json()
         
-        logger.info(f"📩 Telegram: {text} from chat {chat_id}")
+        if not geo_data.get("results"):
+            return JSONResponse(status_code=404, content={
+                "success": False,
+                "error": f"City '{city}' not found",
+                "tts": f"शहर {city} नहीं मिला। कृपया सही नाम डालें।"
+            })
         
-        # ✅ Reply decide karo
-        if text == '/start':
-            reply = "🦁 <b>Singh Ji AI Bot</b>\n\nShuruwat ho gayi!\n\nCommands:\n/start — Shuruwat\n/help — Madad\n/status — System check"
-        elif text == '/help':
-            reply = "🦁 <b>Madad</b>\n\n/start — Bot shuru\n/status — API status\nKuch bhi likho — Main jawab dunga!"
-        elif text == '/status':
-            reply = "🟢 <b>Singh Ji AI Status</b>\n\n✅ Bot Active\n✅ API Connected\n🦁 Singh Ji AI v7.0"
-        else:
-            reply = f"🦁 Aapne likha: <b>{text}</b>\n\nMain abhi sirf commands samajhta hoon:\n/start, /help, /status"
+        location = geo_data["results"][0]
+        lat = location["latitude"]
+        lon = location["longitude"]
+        country = location.get("country", "Unknown")
+        timezone = location.get("timezone", "auto")
         
-        # ✅ Telegram ko reply bhejo
-        if TELEGRAM_TOKEN and chat_id:
-            import requests
-            url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-            requests.post(url, json={
-                "chat_id": chat_id,
-                "text": reply,
-                "parse_mode": "HTML"
-            }, timeout=10)
-            logger.info(f"✅ Reply sent to {chat_id}")
-        
-        return JSONResponse(status_code=200, content={"status": "ok"})
-        
-    except Exception as e:
-        logger.error(f"Telegram error: {e}")
-        return JSONResponse(status_code=200, content={"status": "ok"})
-
-# ============================================================
-# 🦁 LAZY LOAD ROUTER — BASE ROUTE
-# ============================================================
-@app.api_route("/api/{module_name}", methods=["GET", "POST", "HEAD"])
-async def router(request: Request, module_name: str):
-    # Module load karo agar nahi hai
-    if module_name not in MODULES:
-        all_modules = discover_modules()
-        if module_name in all_modules:
-            handler = load_module(module_name, all_modules[module_name])
-            if handler:
-                MODULES[module_name] = handler
-                logger.info(f"✅ Lazy loaded: {module_name}")
-            else:
-                return JSONResponse(
-                    status_code=404, 
-                    content={"status": "error", "message": f"'{module_name}' failed to load"}
-                )
-        else:
-            return JSONResponse(
-                status_code=404, 
-                content={"status": "error", "message": f"'{module_name}' not found"}
-            )
-    
-    # ✅ SAHI — pehle check karo handler async hai ya normal
-    try:
-        handler = MODULES[module_name]
-        if inspect.iscoroutinefunction(handler):
-            return await handler(request)
-        else:
-            return handler(request)
-    except Exception as e:
-        logger.error(f"🔥 Error {module_name}: {e}")
-        return JSONResponse(
-            status_code=500, 
-            content={"status": "error", "module": module_name, "error": str(e)}
+        # Step 2: Weather Data
+        weather_url = (
+            f"https://api.open-meteo.com/v1/forecast?"
+            f"latitude={lat}&longitude={lon}"
+            f"&current=temperature_2m,relative_humidity_2m,apparent_temperature,"
+            f"is_day,precipitation,weather_code,wind_speed_10m,wind_direction_10m"
+            f"&daily=temperature_2m_max,temperature_2m_min,sunrise,sunset,"
+            f"precipitation_sum,weather_code"
+            f"&timezone={timezone}&forecast_days=3"
         )
-
-# ============================================================
-# 🦁 CATCH-ALL FOR MODULE SUB-ROUTES — /api/weather/current etc.
-# ============================================================
-@app.api_route("/api/{module_name}/{path:path}", methods=["GET", "POST", "HEAD"])
-async def router_subpath(request: Request, module_name: str, path: str):
-    """Same lazy router but handles /api/weather/current style URLs"""
-    # Module load karo agar nahi hai
-    if module_name not in MODULES:
-        all_modules = discover_modules()
-        if module_name in all_modules:
-            handler = load_module(module_name, all_modules[module_name])
-            if handler:
-                MODULES[module_name] = handler
-                logger.info(f"✅ Lazy loaded: {module_name} (subpath)")
-            else:
-                return JSONResponse(
-                    status_code=404, 
-                    content={"status": "error", "message": f"'{module_name}' failed to load"}
-                )
-        else:
-            return JSONResponse(
-                status_code=404, 
-                content={"status": "error", "message": f"'{module_name}' not found"}
-            )
-    
-    # ✅ Handler call karo
-    try:
-        handler = MODULES[module_name]
-        if inspect.iscoroutinefunction(handler):
-            return await handler(request)
-        else:
-            return handler(request)
+        
+        w_resp = requests.get(weather_url, timeout=10)
+        w_data = w_resp.json()
+        
+        current = w_data.get("current", {})
+        daily = w_data.get("daily", {})
+        
+        weather_code = current.get("weather_code", 0)
+        condition = WMO_CODES.get(weather_code, "Unknown")
+        
+        # Hindi condition mapping
+        HINDI_CONDITIONS = {
+            "Clear sky": "साफ आसमान",
+            "Mainly clear": "मुख्य रूप से साफ",
+            "Partly cloudy": "आंशिक रूप से बादल",
+            "Overcast": "बादल छाए हुए",
+            "Foggy": "धुंध",
+            "Light drizzle": "हल्की बूंदाबांदी",
+            "Moderate rain": "मध्यम बारिश",
+            "Heavy rain": "भारी बारिश",
+            "Slight snow": "हल्की बर्फबारी",
+            "Thunderstorm": "आंधी-तूफान"
+        }
+        hindi_condition = HINDI_CONDITIONS.get(condition, condition)
+        
+        # Build response
+        result = {
+            "success": True,
+            "city": city,
+            "country": country,
+            "latitude": lat,
+            "longitude": lon,
+            "current": {
+                "temperature_c": current.get("temperature_2m"),
+                "feels_like_c": current.get("apparent_temperature"),
+                "humidity_percent": current.get("relative_humidity_2m"),
+                "wind_speed_kmh": current.get("wind_speed_10m"),
+                "wind_direction": current.get("wind_direction_10m"),
+                "precipitation_mm": current.get("precipitation"),
+                "is_day": current.get("is_day") == 1,
+                "condition": condition,
+                "condition_hindi": hindi_condition,
+                "weather_code": weather_code
+            },
+            "forecast": [],
+            "source": "open-meteo.com (Free, No API Key)"
+        }
+        
+        # Build 3-day forecast
+        if daily:
+            for i in range(min(3, len(daily.get("time", [])))):
+                day_code = daily.get("weather_code", [0])[i]
+                result["forecast"].append({
+                    "date": daily["time"][i],
+                    "temp_max_c": daily.get("temperature_2m_max", [])[i],
+                    "temp_min_c": daily.get("temperature_2m_min", [])[i],
+                    "precipitation_mm": daily.get("precipitation_sum", [])[i],
+                    "condition": WMO_CODES.get(day_code, "Unknown"),
+                    "sunrise": daily.get("sunrise", [])[i] if daily.get("sunrise") else None,
+                    "sunset": daily.get("sunset", [])[i] if daily.get("sunset") else None
+                })
+        
+        # TTS Message
+        temp = result["current"]["temperature_c"]
+        tts = f"मौसम अपडेट {city}। तापमान {temp} डिग्री सेल्सियस। {hindi_condition}।"
+        if result["forecast"]:
+            tts += f" कल अधिकतम तापमान {result['forecast'][0]['temp_max_c']} डिग्री।"
+        
+        result["tts"] = tts
+        
+        return JSONResponse(content=result)
+        
+    except requests.exceptions.Timeout:
+        logger.error("Weather API timeout")
+        return JSONResponse(status_code=504, content={
+            "success": False,
+            "error": "Weather API timeout",
+            "tts": "मौसम सेवा में देरी हो रही है। कृपया बाद में प्रयास करें।"
+        })
     except Exception as e:
-        logger.error(f"🔥 Error {module_name}/{path}: {e}")
-        return JSONResponse(
-            status_code=500, 
-            content={"status": "error", "module": module_name, "path": path, "error": str(e)}
-        )
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", 8000)))
+        logger.error(f"Weather error: {e}")
+        return JSONResponse(status_code=500, content={
+            "success": False,
+            "error": str(e),
+            "tts": "मौसम जानकारी में त्रुटि हुई। कृपया पुनः प्रयास करें।"
+        })
