@@ -1,8 +1,67 @@
-import os, logging, aiohttp
+"""
+💼 Singh Ji AI Ultra v7.0 — Rozgar/Jobs Module
+"""
+import os
+import logging
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
 logger = logging.getLogger(__name__)
+
+# 🔑 KEYWORD MAPPING — Fix for 0 results
+KEYWORD_MAP = {
+    "software": "Software Development",
+    "developer": "Software Development",
+    "coding": "Software Development",
+    "programmer": "Software Development",
+    "it": "Software Development",
+    "data": "Data Science",
+    "ai": "AI/ML",
+    "machine learning": "AI/ML",
+    "ml": "AI/ML",
+    "security": "Cybersecurity",
+    "cloud": "Cloud Computing",
+    "devops": "DevOps",
+    "mobile": "Mobile Development",
+    "app": "Mobile Development",
+    "web": "Web Development",
+    "sarkari": "Government",
+    "government": "Government",
+    "govt": "Government",
+    "bank": "Banking/Finance",
+    "finance": "Banking/Finance",
+    "doctor": "Healthcare",
+    "nurse": "Healthcare",
+    "medical": "Healthcare",
+    "teacher": "Education",
+    "professor": "Education",
+    "engineer": "Engineering",
+    "sales": "Sales",
+    "marketing": "Marketing",
+    "hr": "HR/Recruiting",
+    "legal": "Legal",
+    "lawyer": "Legal",
+    "accounting": "Accounting",
+    "consulting": "Consulting",
+    "project": "Project Management",
+    "data entry": "Data Entry",
+    "customer": "Customer Service",
+    "driver": "Logistics",
+    "factory": "Manufacturing",
+    "farm": "Agriculture",
+    "construction": "Construction",
+    "hotel": "Hospitality",
+    "retail": "Retail",
+    "remote": "Remote/Work From Home",
+    "work from home": "Remote/Work From Home",
+    "wfh": "Remote/Work From Home",
+    "freelance": "Freelance",
+    "part time": "Part-time",
+    "part-time": "Part-time",
+    "intern": "Internship",
+    "internship": "Internship",
+    "trainee": "Internship"
+}
 
 async def handler(request: Request):
     try:
@@ -58,22 +117,36 @@ async def handler(request: Request):
         
         tips = {"resume": "Tailor resume for ATS", "linkedin": "Optimize LinkedIn profile", "networking": "80% jobs via networking", "remote": "Search 'remote' + skill", "visa": "Check visa sponsorship", "salary": "Research on Glassdoor/Payscale"}
         
-        # 🔍 FILTER
+        # 🔍 FILTER with KEYWORD MAPPING
         result = {"global": [], "regional": [], "govt": [], "categories": [], "tips": tips}
         
+        # Map keyword if exists
+        search_term = KEYWORD_MAP.get(keyword, keyword) if keyword else ""
+        
         if keyword:
+            # Search in global portals
             for k, v in portals["global"].items():
                 if keyword in v["name"].lower() or keyword in k or keyword in v["type"].lower():
                     result["global"].append({**v, "id": k})
+            
+            # Search in regional portals
             for reg, pts in portals["regional"].items():
                 for k, v in pts.items():
                     if keyword in v["name"].lower() or keyword in k:
                         result["regional"].append({**v, "id": k, "country": reg})
+            
+            # Search in govt schemes
             for reg, schemes in govt_schemes.items():
                 for k, v in schemes.items():
                     if keyword in v["name"].lower() or keyword in k:
                         result["govt"].append({**v, "id": k, "country": reg})
-            result["categories"] = [c for c in categories if keyword in c.lower()]
+            
+            # Search categories with mapped keyword
+            result["categories"] = [
+                c for c in categories 
+                if (search_term and search_term.lower() in c.lower()) 
+                or (keyword and keyword in c.lower())
+            ]
         
         if country:
             cu = country.upper()
@@ -83,17 +156,21 @@ async def handler(request: Request):
                 result["govt"] = [{**v, "id": k, "country": cu} for k, v in govt_schemes[cu].items()]
             result["global"] = [{**v, "id": k} for k, v in portals["global"].items() if cu in v["regions"] or "Worldwide" in v["regions"] or "Remote" in v["regions"]]
         
-        total = len(result["global"]) + len(result["regional"]) + len(result["govt"])
+        total = len(result["global"]) + len(result["regional"]) + len(result["govt"]) + len(result["categories"])
         
         # 🎙️ TTS MESSAGE
         tts_msg = f"रोज़गार मॉड्यूल। कुल {total} परिणाम मिले।"
         if country: tts_msg += f" देश: {country}।"
-        if keyword: tts_msg += f" कीवर्ड: {keyword}।"
+        if keyword: 
+            mapped = f" (मैप्ड: {search_term})" if search_term != keyword and search_term else ""
+            tts_msg += f" कीवर्ड: {keyword}{mapped}।"
+        if result["categories"]:
+            tts_msg += f" श्रेणियाँ: {', '.join(result['categories'][:3])}।"
         
         return JSONResponse({
             "success": True,
             "tts": tts_msg,
-            "filters": {"keyword": keyword or None, "country": country or None},
+            "filters": {"keyword": keyword or None, "country": country or None, "mapped_keyword": search_term if search_term != keyword else None},
             "results": result,
             "total": total,
             "countries_supported": list(portals["regional"].keys()),
