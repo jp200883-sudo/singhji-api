@@ -1,96 +1,44 @@
 import os
-import requests
+import logging
 from fastapi import Request
 from fastapi.responses import JSONResponse
-import logging
 
 logger = logging.getLogger(__name__)
 
 async def handler(request: Request):
     try:
-        method = request.method
-        if method == "GET":
-            params = dict(request.query_params)
-            lat = params.get('lat', '').strip()
-            lon = params.get('lon', '').strip()
-            city = params.get('city', '').strip()
-            emergency_type = params.get('type', '').strip()
-        else:
-            body = await request.json()
-            lat = str(body.get('lat', '')).strip()
-            lon = str(body.get('lon', '')).strip()
-            city = body.get('city', '').strip()
-            emergency_type = body.get('type', '').strip()
+        params = dict(request.query_params)
+        type_ = params.get("type", "").strip().lower()
         
-        # Emergency services data
         emergency_data = {
-            "police": "100",
-            "ambulance": "108",
-            "fire": "101",
-            "women_helpline": "1091",
-            "child_helpline": "1098",
-            "disaster_mgmt": "1078",
-            "blood_bank": "1910"
+            "police": {"number": "100", "alt": "112", "info": "Police helpline - 24x7"},
+            "ambulance": {"number": "108", "alt": "102", "info": "Ambulance - Free service"},
+            "fire": {"number": "101", "alt": "112", "info": "Fire brigade - 24x7"},
+            "women": {"number": "1091", "alt": "181", "info": "Women helpline"},
+            "child": {"number": "1098", "alt": "", "info": "Child helpline - Childline"},
+            "disaster": {"number": "1078", "alt": "011-26701728", "info": "NDMA disaster helpline"},
+            "cyber": {"number": "1930", "alt": "", "info": "Cyber crime helpline"},
+            "railway": {"number": "139", "alt": "", "info": "Railway helpline"},
+            "sos": {"number": "112", "alt": "", "info": "Universal emergency number"}
         }
         
-        # Nearby hospitals using OpenStreetMap (free)
-        hospitals = []
-        if lat and lon:
-            try:
-                overpass_url = "https://overpass-api.de/api/interpreter"
-                query = f"""
-                [out:json];
-                node["amenity"="hospital"](around:5000,{lat},{lon});
-                out body 5;
-                """
-                resp = requests.post(overpass_url, data={"data": query}, timeout=10)
-                data = resp.json()
-                for elem in data.get('elements', [])[:5]:
-                    hospitals.append({
-                        "name": elem.get('tags', {}).get('name', 'Unknown Hospital'),
-                        "lat": elem.get('lat'),
-                        "lon": elem.get('lon'),
-                        "phone": elem.get('tags', {}).get('phone', 'N/A')
-                    })
-            except Exception as e:
-                logger.error(f"Hospital fetch failed: {e}")
-        
-        # Nearby police stations
-        police_stations = []
-        if lat and lon:
-            try:
-                overpass_url = "https://overpass-api.de/api/interpreter"
-                query = f"""
-                [out:json];
-                node["amenity"="police"](around:5000,{lat},{lon});
-                out body 5;
-                """
-                resp = requests.post(overpass_url, data={"data": query}, timeout=10)
-                data = resp.json()
-                for elem in data.get('elements', [])[:5]:
-                    police_stations.append({
-                        "name": elem.get('tags', {}).get('name', 'Unknown Police Station'),
-                        "lat": elem.get('lat'),
-                        "lon": elem.get('lon'),
-                        "phone": elem.get('tags', {}).get('phone', 'N/A')
-                    })
-            except Exception as e:
-                logger.error(f"Police fetch failed: {e}")
+        if type_ and type_ in emergency_data:
+            return JSONResponse(content={
+                "success": True,
+                "type": type_,
+                "data": emergency_data[type_]
+            })
         
         return JSONResponse(content={
             "success": True,
-            "error": None,
-            "data": {
-                "emergency_numbers": emergency_data,
-                "location": {"city": city or "Unknown", "lat": lat, "lon": lon},
-                "nearby_hospitals": hospitals,
-                "nearby_police": police_stations,
-                "message": "Emergency services data fetched successfully"
-            }
+            "message": "🦁 Singh Ji AI - Emergency Numbers",
+            "universal": "112",
+            "all_numbers": emergency_data,
+            "usage": "/api/emergency?type=police"
         })
         
     except Exception as e:
-        logger.error(f"Emergency crash: {e}")
+        logger.error(f"Emergency error: {e}")
         return JSONResponse(status_code=500, content={
-            "success": False, "error": str(e), "data": None
+            "success": False, "error": str(e)
         })
