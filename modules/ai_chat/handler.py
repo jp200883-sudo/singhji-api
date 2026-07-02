@@ -1,9 +1,11 @@
-# ai_chat/handler.py
+# ai_chat/handler.py — FASTAPI VERSION
 import os
 import json
 import requests
 import time
-from typing import Optional, Dict, Any
+import asyncio
+from fastapi import Request
+from fastapi.responses import JSONResponse
 
 # ========== CONFIG ==========
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
@@ -21,14 +23,11 @@ class HybridAIChat:
             {"name": "HuggingFace", "func": self._call_huggingface, "key": HUGGINGFACE_TOKEN},
         ]
     
-    def chat(self, message: str, system_prompt: str = "You are Singh Ji AI, a helpful Indian AI assistant.") -> Dict[str, Any]:
-        """Try engines in order until one succeeds"""
+    def chat(self, message: str, system_prompt: str = "You are Singh Ji AI, a helpful Indian AI assistant.") -> dict:
         last_error = None
-        
         for engine in self.engines:
             if not engine["key"]:
-                continue  # Skip if no API key
-                
+                continue
             try:
                 print(f"🔄 Trying {engine['name']}...")
                 response = engine["func"](message, system_prompt)
@@ -41,9 +40,8 @@ class HybridAIChat:
             except Exception as e:
                 print(f"❌ {engine['name']} failed: {str(e)}")
                 last_error = e
-                continue  # Try next engine
+                continue
         
-        # All failed
         return {
             "success": False,
             "error": str(last_error),
@@ -52,7 +50,6 @@ class HybridAIChat:
         }
     
     def _call_groq(self, message: str, system_prompt: str) -> str:
-        """Groq - Primary (Fastest, Llama 3)"""
         url = "https://api.groq.com/openai/v1/chat/completions"
         headers = {
             "Authorization": f"Bearer {GROQ_API_KEY}",
@@ -72,7 +69,6 @@ class HybridAIChat:
         return resp.json()["choices"][0]["message"]["content"]
     
     def _call_gemini(self, message: str, system_prompt: str) -> str:
-        """Gemini - Secondary (Google, Multimodal)"""
         url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
         data = {
             "contents": [{
@@ -85,7 +81,6 @@ class HybridAIChat:
         return result["candidates"][0]["content"]["parts"][0]["text"]
     
     def _call_cerebras(self, message: str, system_prompt: str) -> str:
-        """Cerebras - Tertiary (Fast inference)"""
         url = "https://api.cerebras.ai/v1/chat/completions"
         headers = {
             "Authorization": f"Bearer {CEREBRAS_API_KEY}",
@@ -105,8 +100,6 @@ class HybridAIChat:
         return resp.json()["choices"][0]["message"]["content"]
     
     def _call_huggingface(self, message: str, system_prompt: str) -> str:
-        """HuggingFace - Fallback (Free open models)"""
-        # Using a free inference API model
         url = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2"
         headers = {"Authorization": f"Bearer {HUGGINGFACE_TOKEN}"}
         prompt = f"<s>[INST] {system_prompt}\n\n{message} [/INST]"
@@ -118,74 +111,49 @@ class HybridAIChat:
             return result[0].get("generated_text", "").replace(prompt, "").strip()
         return "HuggingFace response error"
     
-    def health_check(self) -> Dict[str, Any]:
-        """Check all engine statuses"""
+    def health_check(self) -> dict:
         status = {}
         for engine in self.engines:
             status[engine["name"]] = "✅ Ready" if engine["key"] else "❌ No Key"
         return status
 
 
-# ========== RENDER HANDLER ==========
-def handler(request):
+# ========== FASTAPI HANDLER ==========
+async def handler(request: Request):
     """
-    Render.com handler for ai_chat module
+    FastAPI handler for ai_chat module
     Supports: GET (health), POST (chat)
     """
     if request.method == "GET":
         ai = HybridAIChat()
-        return {
-            "statusCode": 200,
-            "headers": {"Content-Type": "application/json"},
-            "body": json.dumps({
-                "module": "ai_chat",
-                "version": "7.0",
-                "status": "LIVE",
-                "engines": ai.health_check()
-            })
-        }
+        return JSONResponse(content={
+            "module": "ai_chat",
+            "version": "7.0",
+            "status": "LIVE",
+            "engines": ai.health_check()
+        })
     
     elif request.method == "POST":
         try:
-            body = json.loads(request.body) if hasattr(request, 'body') else request.json()
+            body = await request.json()
             message = body.get("message", "")
             system_prompt = body.get("system_prompt", "You are Singh Ji AI, a helpful Indian AI assistant.")
             
             if not message:
-                return {
-                    "statusCode": 400,
-                    "body": json.dumps({"error": "Message required"})
-                }
+                return JSONResponse(status_code=400, content={"error": "Message required"})
             
             ai = HybridAIChat()
-            result = ai.chat(message, system_prompt)
             
-            return {
-                "statusCode": 200 if result["success"] else 503,
-                "headers": {
-                    "Content-Type": "application/json",
-                    "Access-Control-Allow-Origin": "*"
-                },
-                "body": json.dumps(result)
-            }
+            # Run sync chat in executor (non-blocking)
+            loop = asyncio.get_event_loop()
+            result = await loop.run_in_executor(None, ai.chat, message, system_prompt)
+            
+            return JSONResponse(
+                status_code=200 if result["success"] else 503,
+                content=result
+            )
             
         except Exception as e:
-            return {
-                "statusCode": 500,
-                "body": json.dumps({"error": str(e)})
-            }
+            return JSONResponse(status_code=500, content={"error": str(e)})
     
-    return {
-        "statusCode": 405,
-        "body": json.dumps({"error": "Method not allowed"})
-    }
-
-
-# ========== LOCAL TEST ==========
-if __name__ == "__main__":
-    ai = HybridAIChat()
-    print("🦁 SINGH JI AI ULTRA v7.0 — AI Chat Module")
-    print("Engine Status:", ai.health_check())
-    print("\nTesting...")
-    result = ai.chat("Namaste! Tum kaun ho?")
-    print(json.dumps(result, indent=2, ensure_ascii=False))
+    return JSONResponse(status_code=405, content={"error": "Method not allowed"})
