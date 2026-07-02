@@ -1,6 +1,6 @@
 """
 📰 Singh Ji AI Ultra v7.0 — News/Currents Module
-NewsAPI + GNews fallback (Free tiers)
+Uses: CurrentsAPI → NewsData → Fallback
 """
 import os
 import requests
@@ -14,64 +14,39 @@ async def handler(request: Request):
     try:
         params = dict(request.query_params)
         keywords = params.get("keywords", "India").strip()
-        num = min(int(params.get("num", 5)), 10)  # Max 10
+        num = min(int(params.get("num", 5)), 10)
         country = params.get("country", "in").strip().lower()
         lang = params.get("lang", "hi").strip().lower()
         
         articles = []
         source_used = None
         
-        # Try 1: NewsAPI (100 requests/day free)
-        newsapi_key = os.getenv("NEWS_API_KEY")
-        if newsapi_key and not articles:
+        # Try 1: CurrentsAPI (your key)
+        currents_key = os.getenv("CURRENTS_API_KEY")
+        if currents_key and not articles:
             try:
                 url = (
-                    f"https://newsapi.org/v2/everything?"
-                    f"q={keywords}&pageSize={num}&language={lang}&"
-                    f"sortBy=publishedAt&apiKey={newsapi_key}"
+                    f"https://api.currentsapi.services/v1/search?"
+                    f"keywords={keywords}&language={lang}&"
+                    f"apiKey={currents_key}"
                 )
                 resp = requests.get(url, timeout=10)
                 data = resp.json()
-                if data.get("status") == "ok" and data.get("articles"):
-                    for a in data["articles"]:
+                if data.get("status") == "ok" and data.get("news"):
+                    for a in data["news"][:num]:
                         articles.append({
                             "title": a.get("title", ""),
                             "description": a.get("description", ""),
                             "url": a.get("url", ""),
-                            "image": a.get("urlToImage", ""),
-                            "published": a.get("publishedAt", ""),
-                            "source": a.get("source", {}).get("name", "NewsAPI")
+                            "image": a.get("image", "") or a.get("image_url", ""),
+                            "published": a.get("published", ""),
+                            "source": a.get("author", "CurrentsAPI")
                         })
-                    source_used = "newsapi.org"
+                    source_used = "currentsapi.services"
             except Exception as e:
-                logger.error(f"NewsAPI failed: {e}")
+                logger.error(f"CurrentsAPI failed: {e}")
         
-        # Try 2: GNews (100 requests/day free)
-        gnews_key = os.getenv("GNEWS_API_KEY")
-        if gnews_key and not articles:
-            try:
-                url = (
-                    f"https://gnews.io/api/v4/search?"
-                    f"q={keywords}&max={num}&lang={lang}&country={country}&"
-                    f"apikey={gnews_key}"
-                )
-                resp = requests.get(url, timeout=10)
-                data = resp.json()
-                if data.get("articles"):
-                    for a in data["articles"]:
-                        articles.append({
-                            "title": a.get("title", ""),
-                            "description": a.get("description", ""),
-                            "url": a.get("url", ""),
-                            "image": a.get("image", ""),
-                            "published": a.get("publishedAt", ""),
-                            "source": a.get("source", {}).get("name", "GNews")
-                        })
-                    source_used = "gnews.io"
-            except Exception as e:
-                logger.error(f"GNews failed: {e}")
-        
-        # Try 3: NewsData.io (200 requests/day free)
+        # Try 2: NewsData.io (your key)
         newsdata_key = os.getenv("NEWSDATA_API_KEY")
         if newsdata_key and not articles:
             try:
@@ -96,23 +71,20 @@ async def handler(request: Request):
             except Exception as e:
                 logger.error(f"NewsData failed: {e}")
         
-        # Fallback: Mock data if all APIs fail
+        # Fallback
         if not articles:
-            articles = [
-                {
-                    "title": f"Latest news about {keywords}",
-                    "description": "News API temporarily unavailable. Please check your API keys in Render environment variables.",
-                    "url": "https://news.google.com",
-                    "image": "",
-                    "published": "",
-                    "source": "Fallback"
-                }
-            ]
-            source_used = "fallback (no API keys configured)"
+            articles = [{
+                "title": f"No news found for '{keywords}'",
+                "description": "Try different keywords or check API quotas.",
+                "url": "https://news.google.com",
+                "image": "",
+                "published": "",
+                "source": "Fallback"
+            }]
+            source_used = "fallback"
         
-        # TTS
         tts = f"समाचार अपडेट। {keywords} से जुड़ी {len(articles)} खबरें मिलीं।"
-        if articles:
+        if articles and articles[0].get("title"):
             tts += f" पहली खबर: {articles[0]['title'][:80]}..."
         
         return JSONResponse(content={
@@ -130,5 +102,5 @@ async def handler(request: Request):
         return JSONResponse(status_code=500, content={
             "success": False,
             "error": str(e),
-            "tts": "समाचार लाने में त्रुटि हुई। कृपया पुनः प्रयास करें।"
+            "tts": "समाचार लाने में त्रुटि हुई।"
         })
