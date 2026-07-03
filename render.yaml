@@ -1,4 +1,5 @@
 services:
+  # Python API (existing)
   - type: web
     name: singhji-api
     runtime: python
@@ -7,3 +8,15 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
+
+  # Go Voice Server (NEW)
+  - type: web
+    name: singhji-voice
+    runtime: go
+    buildCommand: go mod tidy && go build -o voice-server ./go-voice/cmd/main.go
+    startCommand: ./voice-server
+    envVars:
+      - key: PORT
+        value: 8080
+      - key: GROQ_API_KEY
+        sync: false
