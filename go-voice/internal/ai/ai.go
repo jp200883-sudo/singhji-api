@@ -1,243 +1,91 @@
 package ai
 
 import (
-	"context"
+	"bytes"
 	"encoding/json"
 	"fmt"
-	"time"
-
-	"singhji-voice-go/internal/config"
-
-	"github.com/go-resty/resty/v2"
-	"go.uber.org/zap"
+	"net/http"
+	"os"
 )
 
-type Brain struct {
-	cfg    *config.Config
-	logger *zap.Logger
-	client *resty.Client
+type AIRequest struct {
+	Message  string `json:"message"`
+	Language string `json:"language,omitempty"`
+	Model    string `json:"model,omitempty"`
 }
 
-type Message struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+type AIResponse struct {
+	Success  bool   `json:"success"`
+	Response string `json:"response,omitempty"`
+	Error    string `json:"error,omitempty"`
 }
 
-type ChatResult struct {
-	Response string `json:"response"`
-	Provider string `json:"provider"`
-	Tokens   int    `json:"tokens_used"`
-	Latency  int64  `json:"latency_ms"`
-}
-
-func NewBrain(cfg *config.Config, logger *zap.Logger) *Brain {
-	return &Brain{
-		cfg:    cfg,
-		logger: logger,
-		client: resty.New().SetTimeout(30 * time.Second),
+func HandleAIBrain(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	
+	if r.Method != http.MethodPost {
+		json.NewEncoder(w).Encode(AIResponse{Success: false, Error: "POST only"})
+		return
 	}
-}
-
-func (b *Brain) Chat(ctx context.Context, text string, history []Message, language string) (string, error) {
-	start := time.Now()
-
-	result, err := b.groqChat(ctx, text, history, language)
-	if err == nil {
-		b.logger.Info("AI: Groq success",
-			zap.Int("tokens", result.Tokens),
-			zap.Int64("latency_ms", result.Latency),
-			zap.Duration("duration", time.Since(start)))
-		return result.Response, nil
+	
+	var req AIRequest
+	json.NewDecoder(r.Body).Decode(&req)
+	
+	if req.Message == "" {
+		json.NewEncoder(w).Encode(AIResponse{Success: false, Error: "Message required"})
+		return
 	}
-	b.logger.Warn("AI: Groq failed", zap.Error(err))
-
-	result, err = b.geminiChat(ctx, text, history, language)
-	if err == nil {
-		b.logger.Info("AI: Gemini success", zap.Duration("duration", time.Since(start)))
-		return result.Response, nil
+	
+	model := req.Model
+	if model == "" {
+		model = "llama3-70b-8192"
 	}
-	b.logger.Warn("AI: Gemini failed", zap.Error(err))
-
-	result, err = b.localLLMChat(ctx, text, history, language)
-	if err == nil {
-		b.logger.Info("AI: Local LLM success", zap.Duration("duration", time.Since(start)))
-		return result.Response, nil
+	
+	groqKey := os.Getenv("GROQ_API_KEY")
+	if groqKey == "" {
+		json.NewEncoder(w).Encode(AIResponse{Success: false, Error: "GROQ key missing"})
+		return
 	}
-
-	return "", fmt.Errorf("all AI providers failed: %w", err)
-}
-
-func (b *Brain) groqChat(ctx context.Context, text string, history []Message, language string) (*ChatResult, error) {
-	if b.cfg.GroqAPIKey == "" {
-		return nil, fmt.Errorf("groq API key not configured")
-	}
-
-	messages := []map[string]string{
-		{
-			"role": "system",
-			"content": fmt.Sprintf("You are Singh Ji AI, a helpful Indian AI assistant. Respond in %s language. Be friendly, use Indian context when relevant.", language),
+	
+	groqReq := map[string]interface{}{
+		"model": model,
+		"messages": []map[string]string{
+			{"role": "system", "content": fmt.Sprintf("You are Singh Ji AI. Respond in %s.", req.Language)},
+			{"role": "user", "content": req.Message},
 		},
 	}
-
-	for _, msg := range history {
-		messages = append(messages, map[string]string{
-			"role":    msg.Role,
-			"content": msg.Content,
-		})
-	}
-
-	messages = append(messages, map[string]string{
-		"role":    "user",
-		"content": text,
-	})
-
-	resp, err := b.client.R().
-		SetContext(ctx).
-		SetHeader("Authorization", "Bearer "+b.cfg.GroqAPIKey).
-		SetHeader("Content-Type", "application/json").
-		SetBody(map[string]interface{}{
-			"model":       "llama3-70b-8192",
-			"messages":    messages,
-			"temperature": 0.7,
-			"max_tokens":  1024,
-		}).
-		Post("https://api.groq.com/openai/v1/chat/completions")
-
+	
+	jsonData, _ := json.Marshal(groqReq)
+	
+	req2, _ := http.NewRequest("POST", "https://api.groq.com/openai/v1/chat/completions", bytes.NewBuffer(jsonData))
+	req2.Header.Set("Authorization", "Bearer "+groqKey)
+	req2.Header.Set("Content-Type", "application/json")
+	
+	client := &http.Client{}
+	resp, err := client.Do(req2)
 	if err != nil {
-		return nil, err
+		json.NewEncoder(w).Encode(AIResponse{Success: false, Error: "Groq failed"})
+		return
 	}
-
+	defer resp.Body.Close()
+	
 	var result struct {
 		Choices []struct {
 			Message struct {
 				Content string `json:"content"`
 			} `json:"message"`
 		} `json:"choices"`
-		Usage struct {
-			TotalTokens int `json:"total_tokens"`
-		} `json:"usage"`
 	}
-
-	if err := json.Unmarshal(resp.Body(), &result); err != nil {
-		return nil, err
-	}
-
+	
+	json.NewDecoder(resp.Body).Decode(&result)
+	
 	if len(result.Choices) == 0 {
-		return nil, fmt.Errorf("no response from Groq")
+		json.NewEncoder(w).Encode(AIResponse{Success: false, Error: "No response"})
+		return
 	}
-
-	return &ChatResult{
+	
+	json.NewEncoder(w).Encode(AIResponse{
+		Success:  true,
 		Response: result.Choices[0].Message.Content,
-		Provider: "groq",
-		Tokens:   result.Usage.TotalTokens,
-		Latency:  0,
-	}, nil
-}
-
-func (b *Brain) geminiChat(ctx context.Context, text string, history []Message, language string) (*ChatResult, error) {
-	if b.cfg.GeminiAPIKey == "" {
-		return nil, fmt.Errorf("gemini API key not configured")
-	}
-
-	contents := []map[string]interface{}{
-		{
-			"role": "user",
-			"parts": []map[string]string{
-				{"text": fmt.Sprintf("You are Singh Ji AI. Respond in %s. User: %s", language, text)},
-			},
-		},
-	}
-
-	resp, err := b.client.R().
-		SetContext(ctx).
-		SetHeader("Content-Type", "application/json").
-		SetBody(map[string]interface{}{
-			"contents": contents,
-			"generationConfig": map[string]interface{}{
-				"temperature":     0.7,
-				"maxOutputTokens": 1024,
-			},
-		}).
-		Post(fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=%s", b.cfg.GeminiAPIKey))
-
-	if err != nil {
-		return nil, err
-	}
-
-	var result struct {
-		Candidates []struct {
-			Content struct {
-				Parts []struct {
-					Text string `json:"text"`
-				} `json:"parts"`
-			} `json:"content"`
-		} `json:"candidates"`
-	}
-
-	if err := json.Unmarshal(resp.Body(), &result); err != nil {
-		return nil, err
-	}
-
-	if len(result.Candidates) == 0 || len(result.Candidates[0].Content.Parts) == 0 {
-		return nil, fmt.Errorf("no response from Gemini")
-	}
-
-	return &ChatResult{
-		Response: result.Candidates[0].Content.Parts[0].Text,
-		Provider: "gemini",
-		Tokens:   0,
-		Latency:  0,
-	}, nil
-}
-
-func (b *Brain) localLLMChat(ctx context.Context, text string, history []Message, language string) (*ChatResult, error) {
-	messages := []map[string]string{
-		{
-			"role": "system",
-			"content": fmt.Sprintf("You are Singh Ji AI. Respond in %s language.", language),
-		},
-	}
-
-	for _, msg := range history {
-		messages = append(messages, map[string]string{
-			"role":    msg.Role,
-			"content": msg.Content,
-		})
-	}
-
-	messages = append(messages, map[string]string{
-		"role":    "user",
-		"content": text,
 	})
-
-	resp, err := b.client.R().
-		SetContext(ctx).
-		SetHeader("Content-Type", "application/json").
-		SetBody(map[string]interface{}{
-			"model":    "llama3",
-			"messages": messages,
-			"stream":   false,
-		}).
-		Post(b.cfg.LocalLLMURL + "/api/chat")
-
-	if err != nil {
-		return nil, err
-	}
-
-	var result struct {
-		Message struct {
-			Content string `json:"content"`
-		} `json:"message"`
-	}
-
-	if err := json.Unmarshal(resp.Body(), &result); err != nil {
-		return nil, err
-	}
-
-	return &ChatResult{
-		Response: result.Message.Content,
-		Provider: "local",
-		Tokens:   0,
-		Latency:  0,
-	}, nil
 }
