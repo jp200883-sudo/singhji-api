@@ -1,0 +1,55 @@
+services:
+  - type: web
+    name: singhji-voice
+    runtime: go
+    plan: free
+    buildCommand: go build -tags netgo -ldflags '-s -w' -o voice-server ./cmd/voice-server
+    startCommand: ./voice-server
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: ENV
+        value: production
+      - key: GIN_MODE
+        value: release
+      - key: SAMPLE_RATE
+        value: "16000"
+      - key: BIT_DEPTH
+        value: "16"
+      - key: CHANNELS
+        value: "1"
+      - key: BITRATE
+        value: "32"
+      - key: MAX_FILE_SIZE
+        value: "10485760"
+      - key: MAX_DURATION
+        value: "30s"
+      - key: QUEUE_WORKERS
+        value: "10"
+      - key: QUEUE_SIZE
+        value: "1000"
+      - key: WS_READ_BUFFER
+        value: "1024"
+      - key: WS_WRITE_BUFFER
+        value: "1024"
+      - key: WS_MAX_MESSAGE
+        value: "10485760"
+      # API KEYS - Add these in Render Dashboard
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: MINIMAX_API_KEY
+        sync: false
+      - key: FISH_AUDIO_KEY
+        sync: false
+      - key: GOOGLE_STT_KEY
+        sync: false
+      - key: GOOGLE_TRANSLATE_KEY
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: SUPABASE_BUCKET
+        value: voice-files

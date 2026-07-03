@@ -1,0 +1,39 @@
+# Binaries
+voice-server
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test binary
+*.test
+
+# Output
+dist/
+build/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+
+# Models (large files)
+models/
+*.onnx
+*.bin
+*.pt
+*.pth
+*.ckpt
+
+# Logs
+*.log
+logs/
