@@ -87,9 +87,19 @@ async def self_ping():
         
         await asyncio.sleep(10 * 60)
 
+# ============================================================
+# 🦁 STARTUP — FIXED: Ab sab modules preload honge
+# ============================================================
 @app.on_event("startup")
 async def startup():
-    logger.info("🦁 Singh Ji AI v7.0 started")
+    all_modules = discover_modules()
+    loaded_count = 0
+    for name, info in all_modules.items():
+        handler = load_module(name, info)
+        if handler:
+            MODULES[name] = handler
+            loaded_count += 1
+    logger.info(f"🦁 Singh Ji AI v7.0 started — {loaded_count}/{len(all_modules)} modules loaded")
     logger.info("🦁 Self-ping enabled — Render will never sleep!")
     asyncio.create_task(self_ping())
 
@@ -98,6 +108,7 @@ async def root():
     return {
         "name": "🦁 Singh Ji AI Ultra v7.0", 
         "version": "7.0.0-light", 
+        "modules_loaded": len(MODULES),
         "status": "🦁 LIVE", 
         "timestamp": datetime.now().isoformat()
     }
