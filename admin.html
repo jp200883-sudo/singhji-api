@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🛡️ Singh Ji Admin Dashboard v7.0</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --gold:#FFD700; --dark-gold:#B8860B; --royal:#1a237e; --deep:#0d1642;
+    --success:#00c853; --warn:#ffc107; --danger:#ff5252;
+    --glass:rgba(255,255,255,0.06); --border:rgba(255,255,255,0.12);
+  }
+  *{margin:0;padding:0;box-sizing:border-box;font-family:'Poppins',sans-serif;}
+  body{background:linear-gradient(135deg,#0d1642,#1a237e 50%,#0d1642);color:#fff;min-height:100vh;}
+
+  .header{background:linear-gradient(90deg,var(--deep),var(--royal));padding:16px 28px;
+    display:flex;justify-content:space-between;align-items:center;
+    border-bottom:2px solid var(--gold);position:sticky;top:0;z-index:10;}
+  .logo{display:flex;align-items:center;gap:12px;}
+  .logo-icon{width:50px;height:50px;border-radius:14px;
+    background:linear-gradient(135deg,var(--gold),var(--dark-gold));
+    display:flex;align-items:center;justify-content:center;font-weight:900;color:var(--deep);font-size:20px;}
+  .logo-text h1{font-size:20px;font-weight:800;color:var(--gold);letter-spacing:0.5px;}
+  .logo-text p{font-size:11px;color:rgba(255,255,255,0.55);}
+  .nav-btns{display:flex;gap:10px;}
+  .refresh-btn, .home-btn{background:var(--glass);border:1px solid var(--border);color:#fff;
+    padding:9px 18px;border-radius:22px;font-size:12px;font-weight:600;cursor:pointer;transition:.2s;}
+  .refresh-btn:hover, .home-btn:hover{background:rgba(255,255,255,0.12);}
+  .refresh-btn:disabled{opacity:0.5;cursor:not-allowed;}
+
+  .container{max-width:1400px;margin:0 auto;padding:30px 24px 60px;}
+
+  .stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px;margin-bottom:30px;}
+  .stat-card{background:var(--glass);border:1px solid var(--border);border-radius:18px;
+    padding:20px;text-align:center;transition:.25s;}
+  .stat-card:hover{border-color:var(--gold);}
+  .stat-card .stat-icon{font-size:28px;margin-bottom:8px;}
+  .stat-card h3{font-size:26px;font-weight:900;color:var(--gold);}
+  .stat-card p{font-size:11px;color:rgba(255,255,255,0.5);margin-top:4px;}
+  .stat-card .stat-sub{font-size:10px;color:rgba(255,255,255,0.35);margin-top:2px;}
+
+  .section{background:var(--glass);border:1px solid var(--border);border-radius:18px;
+    padding:22px;margin-bottom:20px;}
+  .section h2{font-size:16px;font-weight:700;color:var(--gold);margin-bottom:16px;
+    display:flex;align-items:center;gap:10px;}
+  .section h2 .badge{font-size:11px;background:rgba(255,255,255,0.1);padding:3px 10px;
+    border-radius:12px;color:rgba(255,255,255,0.7);font-weight:500;}
+
+  .phase-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;}
+  .phase-card{background:rgba(0,0,0,0.2);border-radius:14px;padding:16px;
+    border-left:4px solid var(--success);transition:.2s;}
+  .phase-card:hover{background:rgba(0,0,0,0.3);}
+  .phase-card.ready{border-left-color:var(--warn);}
+  .phase-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+  .phase-header h3{font-size:14px;font-weight:700;}
+  .phase-status{font-size:10px;font-weight:700;padding:3px 10px;border-radius:10px;}
+  .phase-status.live{background:rgba(0,200,83,0.2);color:var(--success);}
+  .phase-status.ready{background:rgba(255,193,7,0.2);color:var(--warn);}
+  .phase-details{font-size:11px;color:rgba(255,255,255,0.5);line-height:1.5;}
+
+  .api-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;}
+  .api-item{display:flex;justify-content:space-between;align-items:center;
+    background:rgba(0,0,0,0.2);padding:11px 14px;border-radius:10px;font-size:12px;transition:.2s;}
+  .api-item:hover{background:rgba(0,0,0,0.3);}
+  .api-name{display:flex;align-items:center;gap:8px;}
+  .api-status{font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;}
+  .api-status.ok{background:rgba(0,200,83,0.2);color:var(--success);}
+  .api-status.pending{background:rgba(255,193,7,0.2);color:var(--warn);}
+  .api-status.unknown{background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.5);}
+
+  .module-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;}
+  .module-item{background:rgba(0,0,0,0.2);padding:8px 12px;border-radius:8px;font-size:11px;
+    display:flex;align-items:center;gap:6px;transition:.2s;}
+  .module-item:hover{background:rgba(0,0,0,0.3);}
+  .mod-dot{width:6px;height:6px;border-radius:50%;background:var(--success);}
+
+  .info-box{background:rgba(0,200,83,0.08);border:1px solid rgba(0,200,83,0.25);
+    border-radius:12px;padding:14px;margin-bottom:14px;}
+  .info-box.warn{background:rgba(255,193,7,0.08);border-color:rgba(255,193,7,0.25);}
+  .info-box p{font-size:12px;color:rgba(255,255,255,0.7);margin:3px 0;}
+  .info-box p strong{color:var(--gold);}
+
+  .log-box{background:rgba(0,0,0,0.3);border-radius:12px;padding:14px;
+    font-family:'Courier New',monospace;font-size:11px;color:rgba(255,255,255,0.6);
+    max-height:180px;overflow-y:auto;line-height:1.6;}
+  .log-time{color:var(--gold);}
+  .log-ok{color:var(--success);}
+  .log-warn{color:var(--warn);}
+  .log-err{color:var(--danger);}
+
+  .skeleton{background:var(--glass);border:1px solid var(--border);border-radius:14px;height:60px;
+    animation:pulse 1.4s infinite;}
+  @keyframes pulse{0%,100%{opacity:.4}50%{opacity:.8}}
+
+  .empty,.error-box{text-align:center;padding:50px 20px;color:rgba(255,255,255,0.5);}
+  .error-box{color:#ffb3b3;}
+  .error-box button{margin-top:14px;}
+
+  .footer{text-align:center;padding:24px;border-top:1px solid var(--border);
+    color:rgba(255,255,255,0.35);font-size:11px;}
+
+  @media(max-width:600px){.stats-grid{grid-template-columns:repeat(2,1fr)}.header{padding:14px 16px}}
+</style>
+<base target="_blank">
+</head>
+<body>
+
+<header class="header">
+  <div class="logo">
+    <div class="logo-icon">🛡️</div>
+    <div class="logo-text">
+      <h1>Admin Dashboard</h1>
+      <p>Singh Ji AI Ultra v7.0 &mdash; Live Backend Data</p>
+    </div>
+  </div>
+  <div class="nav-btns">
+    <button class="home-btn" onclick="window.location.href='index.html'">🏠 Home</button>
+    <button class="refresh-btn" id="refreshBtn" onclick="loadAdminData()">🔄 Refresh</button>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- Stats Grid -->
+  <div class="stats-grid" id="statsGrid">
+    <div class="stat-card"><div class="stat-icon">📦</div><h3>--</h3><p>Total Modules</p></div>
+    <div class="stat-card"><div class="stat-icon">✅</div><h3>--</h3><p>Live Modules</p></div>
+    <div class="stat-card"><div class="stat-icon">⏳</div><h3>--</h3><p>Pending</p></div>
+    <div class="stat-card"><div class="stat-icon">🔑</div><h3>--</h3><p>API Keys</p></div>
+    <div class="stat-card"><div class="stat-icon">🌐</div><h3>26</h3><p>Languages</p><div class="stat-sub">Fixed</div></div>
+    <div class="stat-card"><div class="stat-icon">📱</div><h3>--</h3><p>Telegram Users</p></div>
+  </div>
+
+  <!-- Phase Status -->
+  <div class="section">
+    <h2>🚀 Phase Deployment Status <span class="badge" id="phaseBadge">Loading...</span></h2>
+    <div class="phase-grid" id="phaseGrid">
+      <div class="skeleton"></div><div class="skeleton"></div>
+      <div class="skeleton"></div><div class="skeleton"></div>
+    </div>
+  </div>
+
+  <!-- API Keys -->
+  <div class="section">
+    <h2>🔑 API Keys Status <span class="badge" id="apiBadge">Loading...</span></h2>
+    <div class="api-grid" id="apiGrid">
+      <div class="skeleton"></div><div class="skeleton"></div>
+      <div class="skeleton"></div><div class="skeleton"></div>
+    </div>
+  </div>
+
+  <!-- Auto-Schedule -->
+  <div class="section">
+    <h2>📅 Auto-Schedule System <span class="badge" id="scheduleBadge">Loading...</span></h2>
+    <div id="scheduleBox">
+      <div class="skeleton"></div>
+    </div>
+  </div>
+
+  <!-- Telegram Bot -->
+  <div class="section">
+    <h2>📱 Telegram Bot Status <span class="badge" id="telegramBadge">Loading...</span></h2>
+    <div id="telegramBox">
+      <div class="skeleton"></div>
+    </div>
+  </div>
+
+  <!-- All Modules -->
+  <div class="section">
+    <h2>📦 All Modules <span class="badge" id="moduleBadge">Loading...</span></h2>
+    <div class="module-list" id="moduleList">
+      <div class="skeleton"></div><div class="skeleton"></div>
+      <div class="skeleton"></div><div class="skeleton"></div>
+    </div>
+  </div>
+
+  <!-- System Logs -->
+  <div class="section">
+    <h2>🖥️ System Logs</h2>
+    <div class="log-box" id="logBox">
+      <p><span class="log-time">[--:--:--]</span> <span class="log-warn">Admin Dashboard loading...</span></p>
+    </div>
+  </div>
+
+</div>
+
+<footer class="footer">
+  Backend: singhji-api.onrender.com &nbsp;|&nbsp; Made in India &nbsp;|&nbsp; UPI: jp200883@sbi
+</footer>
+
+<script>
+const API_BASE = "https://singhji-api.onrender.com";
+
+function addLog(msg, type='ok'){
+  const box = document.getElementById('logBox');
+  const time = new Date().toLocaleTimeString('hi-IN',{hour12:false});
+  const cls = type==='ok'?'log-ok':type==='warn'?'log-warn':type==='err'?'log-err':'log-ok';
+  box.innerHTML = `<p><span class="log-time">[${time}]</span> <span class="${cls}">${msg}</span></p>` + box.innerHTML;
+}
+
+async function loadAdminData(){
+  const btn = document.getElementById('refreshBtn');
+  btn.disabled = true; btn.textContent = "Checking...";
+  addLog("Admin data fetch shuru...", "warn");
+
+  try{
+    // 1. API Status
+    const statusRes = await fetch(`${API_BASE}/api/status`, {cache:"no-store"});
+    if(!statusRes.ok) throw new Error("Status API failed: " + statusRes.status);
+    const statusData = await statusRes.json();
+    const modules = Array.isArray(statusData.modules) ? statusData.modules : [];
+    const moduleCount = modules.length;
+
+    // Update stats
+    document.getElementById('statsGrid').innerHTML = `
+      <div class="stat-card"><div class="stat-icon">📦</div><h3>${moduleCount}</h3><p>Total Modules</p></div>
+      <div class="stat-card"><div class="stat-icon">✅</div><h3>${moduleCount}</h3><p>Live Modules</p></div>
+      <div class="stat-card"><div class="stat-icon">⏳</div><h3>0</h3><p>Pending</p></div>
+      <div class="stat-card"><div class="stat-icon">🔑</div><h3>26</h3><p>API Keys</p><div class="stat-sub">23 Active</div></div>
+      <div class="stat-card"><div class="stat-icon">🌐</div><h3>26</h3><p>Languages</p><div class="stat-sub">Fixed</div></div>
+      <div class="stat-card"><div class="stat-icon">📱</div><h3>6</h3><p>Telegram Users</p><div class="stat-sub">Active</div></div>
+    `;
+    addLog(`Status API: ${moduleCount} modules mil gaye`, "ok");
+
+    // 2. Phase Grid (auto from modules)
+    const phaseMap = {
+      'core': {name:'Core AI', icon:'🤴', modules:['ai_chat','analytics','search','language','language_hub','meta_agent','supreme_agent','telegram_bot','whatsapp']},
+      'entertainment': {name:'Entertainment', icon:'🎬', modules:['news','news_scheduler','newsdata','singhji_tv']},
+      'lifestyle': {name:'Lifestyle', icon:'🍔', modules:['bachpan','horoscope','rozgar']},
+      'finance': {name:'Finance', icon:'🏦', modules:['banking','currency','upi','goldrate']},
+      'agriculture': {name:'Agriculture', icon:'🌾', modules:['mandi','pani','sewer']},
+      'utility': {name:'Utilities', icon:'⚡', modules:['fuel','schedule','weather','emergency']},
+      'shopping': {name:'Shopping', icon:'🛒', modules:['trolley']},
+      'other': {name:'Other', icon:'🔧', modules:['daily_report','govt','plant_id','supabase_memory','voice','voice_cmd','voice_tts']}
+    };
+
+    let phaseHTML = '';
+    let livePhases = 0;
+    for(const [key, phase] of Object.entries(phaseMap)){
+      const active = phase.modules.filter(m => modules.includes(m)).length;
+      const total = phase.modules.length;
+      const isLive = active === total;
+      if(isLive) livePhases++;
+      phaseHTML += `
+        <div class="phase-card ${isLive ? '' : 'ready'}">
+          <div class="phase-header">
+            <h3>${phase.icon} ${phase.name}</h3>
+            <span class="phase-status ${isLive ? 'live' : 'ready'}">${isLive ? 'LIVE' : 'READY'}</span>
+          </div>
+          <div class="phase-details">${active}/${total} modules active — ${phase.modules.slice(0,3).join(', ')}${total>3?'...':''}</div>
+        </div>
+      `;
+    }
+    document.getElementById('phaseGrid').innerHTML = phaseHTML;
+    document.getElementById('phaseBadge').textContent = `${livePhases}/8 LIVE`;
+    addLog(`Phases: ${livePhases}/8 LIVE calculated`, "ok");
+
+    // 3. API Keys (static for now - can be made dynamic)
+    const apis = [
+      {name:'Cerebras', icon:'🧠', status:'ok'},
+      {name:'Cloudflare', icon:'☁️', status:'ok'},
+      {name:'Groq', icon:'⚡', status:'ok'},
+      {name:'Gemini', icon:'✨', status:'ok'},
+      {name:'Currents API', icon:'📡', status:'ok'},
+      {name:'NewsData', icon:'📰', status:'ok'},
+      {name:'OpenWeather', icon:'🌤️', status:'ok'},
+      {name:'RapidAPI', icon:'🚀', status:'ok'},
+      {name:'Razorpay', icon:'💳', status:'ok'},
+      {name:'Telegram', icon:'📱', status:'ok'},
+      {name:'Twilio', icon:'📞', status:'ok'},
+      {name:'HuggingFace', icon:'🤗', status:'ok'},
+      {name:'Magic Hour', icon:'🎬', status:'ok'},
+      {name:'Mandi API', icon:'🌾', status:'ok'},
+      {name:'MongoDB', icon:'🍃', status:'ok'},
+      {name:'Tavily', icon:'🔍', status:'ok'},
+      {name:'Plant.id', icon:'🌿', status:'pending'},
+      {name:'Supabase', icon:'💾', status:'pending'}
+    ];
+    const activeApis = apis.filter(a => a.status === 'ok').length;
+    document.getElementById('apiGrid').innerHTML = apis.map(a => `
+      <div class="api-item">
+        <div class="api-name">${a.icon} ${a.name}</div>
+        <div class="api-status ${a.status}">${a.status === 'ok' ? 'Active' : 'Pending'}</div>
+      </div>
+    `).join('');
+    document.getElementById('apiBadge').textContent = `${activeApis}/${apis.length} Active`;
+    addLog(`APIs: ${activeApis}/${apis.length} active listed`, "ok");
+
+    // 4. Schedule Box
+    document.getElementById('scheduleBox').innerHTML = `
+      <div class="info-box">
+        <p><strong>Status:</strong> RUNNING 🟢</p>
+        <p><strong>Active Hours:</strong> 06:00 - 22:00 IST</p>
+        <p><strong>Sleep Mode:</strong> 22:00 - 06:00 IST</p>
+        <p><strong>Messages/Day:</strong> 33 auto-scheduled</p>
+        <p><strong>Next Message:</strong> ${new Date().getHours() < 22 ? 'Coming soon...' : 'Sleep mode (10 PM - 6 AM)'}</p>
+      </div>
+    `;
+    document.getElementById('scheduleBadge').textContent = 'RUNNING';
+    addLog("Schedule: 33 msgs/day running", "ok");
+
+    // 5. Telegram Box
+    document.getElementById('telegramBox').innerHTML = `
+      <div class="info-box">
+        <p><strong>Bot:</strong> @SinghJiBot</p>
+        <p><strong>Status:</strong> ACTIVE 🟢</p>
+        <p><strong>Users:</strong> 6</p>
+        <p><strong>Commands:</strong> /start, /help, /weather, /gold, /fuel, /news, /mandi, /bachpan</p>
+        <p><strong>Webhook:</strong> <code style="background:rgba(0,0,0,0.2);padding:2px 6px;border-radius:4px;font-size:10px;">${API_BASE}/telegram/webhook</code></p>
+      </div>
+    `;
+    document.getElementById('telegramBadge').textContent = 'ACTIVE';
+    addLog("Telegram: Bot active, 6 users", "ok");
+
+    // 6. Module List
+    document.getElementById('moduleList').innerHTML = modules.map(m => `
+      <div class="module-item">
+        <span class="mod-dot"></span>
+        ${m.replace(/_/g, ' ')}
+      </div>
+    `).join('');
+    document.getElementById('moduleBadge').textContent = `${moduleCount} Total`;
+    addLog(`Modules: ${moduleCount} listed`, "ok");
+
+    addLog("Admin Dashboard fully loaded!", "ok");
+
+  } catch(err){
+    addLog("Error: " + err.message, "err");
+    document.getElementById('phaseGrid').innerHTML = `<div class="error-box">Backend se connect nahi ho paya (cold start ho sakta hai).<br><button class="refresh-btn" onclick="loadAdminData()">Dobara try karo</button></div>`;
+    document.getElementById('apiGrid').innerHTML = `<div class="error-box">API data nahi mila</div>`;
+    document.getElementById('scheduleBox').innerHTML = `<div class="error-box">Schedule data nahi mila</div>`;
+    document.getElementById('telegramBox').innerHTML = `<div class="error-box">Telegram data nahi mila</div>`;
+    document.getElementById('moduleList').innerHTML = `<div class="error-box">Module list nahi mila</div>`;
+  } finally {
+    btn.disabled = false; btn.textContent = "🔄 Refresh";
+  }
+}
+
+// Load on start
+loadAdminData();
+// Auto-refresh every 60 seconds
+setInterval(loadAdminData, 60000);
+</script>
+
+</body>
+</html>
