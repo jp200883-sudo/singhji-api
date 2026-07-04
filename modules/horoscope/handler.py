@@ -590,3 +590,64 @@ if __name__ == "__main__":
     print(f"Prediction: {result['prediction'][:100]}...")
     print(f"\nTelegram Format:")
     print(format_telegram(result))
+    # FastAPI handler function for dynamic router
+async def handler(request):
+    """FastAPI handler for horoscope module"""
+    from fastapi import Request
+    import json
+    
+    try:
+        # Parse request
+        body = await request.json() if request.method == "POST" else {}
+        params = dict(request.query_params)
+        
+        # Get parameters
+        rashi = body.get("rashi") or params.get("rashi", "मेष")
+        period = body.get("period") or params.get("period", "daily")
+        language = body.get("language") or params.get("language", "hi")
+        date = body.get("date") or params.get("date", None)
+        action = body.get("action") or params.get("action", "get_horoscope")
+        
+        # Route to appropriate function
+        if action == "get_horoscope":
+            result = get_horoscope(rashi, period, language, date)
+        elif action == "all":
+            result = get_all_horoscopes(period, language)
+        elif action == "by_date":
+            day = int(body.get("day") or params.get("day", 1))
+            month = int(body.get("month") or params.get("month", 1))
+            result = {
+                "status": "success",
+                "day": day,
+                "month": month,
+                "rashi": get_rashi_by_date(day, month, language),
+                "language": language
+            }
+        elif action == "compatibility":
+            rashi1 = body.get("rashi1") or params.get("rashi1", "मेष")
+            rashi2 = body.get("rashi2") or params.get("rashi2", "तुला")
+            result = get_compatibility(rashi1, rashi2, language)
+        elif action == "telegram":
+            horoscope_data = get_horoscope(rashi, period, language, date)
+            result = {
+                "status": "success",
+                "message": format_telegram(horoscope_data),
+                "rashi": rashi,
+                "period": period,
+                "language": language
+            }
+        else:
+            result = get_horoscope(rashi, period, language, date)
+        
+        return {
+            "statusCode": 200,
+            "headers": {"Content-Type": "application/json"},
+            "body": json.dumps(result)
+        }
+        
+    except Exception as e:
+        return {
+            "statusCode": 500,
+            "headers": {"Content-Type": "application/json"},
+            "body": json.dumps({"status": "error", "message": str(e)})
+        }
