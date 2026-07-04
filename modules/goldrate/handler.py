@@ -275,44 +275,33 @@ class GoldRateHandler:
 
     def format_comparison_telegram(self, comp_data: Dict, language: str = "hi") -> str:
         """Format city comparison for Telegram"""
+        lines = []
         if language == "hi":
-            message = f"🏙️ *शहरों में तुलना* 🏙️
-📅 {comp_data.get('date')}
-
-"
+            lines.append("🏙️ *शहरों में तुलना* 🏙️")
+            lines.append(f"📅 {comp_data.get('date')}")
+            lines.append("")
             for item in comp_data.get("comparison", []):
-                message += f"📍 *{item['city']}*
-"
-                message += f"   24K: ₹{item['gold_24k']:,}
-"
-                message += f"   22K: ₹{item['gold_22k']:,}
-
-"
-            message += f"✅ सबसे सस्ता: {comp_data.get('cheapest')}
-"
-            message += f"❌ सबसे महंगा: {comp_data.get('costliest')}
-"
+                lines.append(f"📍 *{item['city']}*")
+                lines.append(f"   24K: ₹{item['gold_24k']:,}")
+                lines.append(f"   22K: ₹{item['gold_22k']:,}")
+                lines.append("")
+            lines.append(f"✅ सबसे सस्ता: {comp_data.get('cheapest')}")
+            lines.append(f"❌ सबसे महंगा: {comp_data.get('costliest')}")
         else:
-            message = f"🏙️ *City Comparison* 🏙️
-📅 {comp_data.get('date')}
-
-"
+            lines.append("🏙️ *City Comparison* 🏙️")
+            lines.append(f"📅 {comp_data.get('date')}")
+            lines.append("")
             for item in comp_data.get("comparison", []):
-                message += f"📍 *{item['city']}*
-"
-                message += f"   24K: ₹{item['gold_24k']:,}
-"
-                message += f"   22K: ₹{item['gold_22k']:,}
+                lines.append(f"📍 *{item['city']}*")
+                lines.append(f"   24K: ₹{item['gold_24k']:,}")
+                lines.append(f"   22K: ₹{item['gold_22k']:,}")
+                lines.append("")
+            lines.append(f"✅ Cheapest: {comp_data.get('cheapest')}")
+            lines.append(f"❌ Costliest: {comp_data.get('costliest')}")
 
-"
-            message += f"✅ Cheapest: {comp_data.get('cheapest')}
-"
-            message += f"❌ Costliest: {comp_data.get('costliest')}
-"
-
-        message += "
-⚡ *Singh Ji AI Ultra v7.0*"
-        return message
+        lines.append("")
+        lines.append("⚡ *Singh Ji AI Ultra v7.0*")
+        return "\n".join(lines)
 
 
 # Singleton
