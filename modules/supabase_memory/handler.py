@@ -1,67 +1,48 @@
+# modules/supabase_memory/handler.py — FULL UPGRADE
+
 import os
-from fastapi import Request
-from fastapi.responses import JSONResponse
-import logging
+from supabase import create_client
 
-logger = logging.getLogger(__name__)
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
-SUPABASE_URL = os.environ.get('SUPABASE_URL', '')
-SUPABASE_KEY = os.environ.get('SUPABASE_KEY', '')
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-async def handler(request: Request):
-    try:
-        method = request.method
-        if method == "GET":
-            params = dict(request.query_params)
-            action = params.get('action', 'status').strip()
-        else:
-            body = await request.json()
-            action = body.get('action', 'status').strip()
-        
-        if action == 'status':
-            return JSONResponse(content={
-                "success": True,
-                "error": None,
-                "data": {
-                    "supabase_url": SUPABASE_URL[:20] + "..." if SUPABASE_URL else "Not configured",
-                    "supabase_key": "✅ Configured" if SUPABASE_KEY else "❌ Not configured",
-                    "status": "Memory system ready" if SUPABASE_URL and SUPABASE_KEY else "Setup pending",
-                    "note": "Full Supabase integration coming in v7.1"
-                }
-            })
-        
-        elif action == 'store':
-            return JSONResponse(content={
-                "success": True,
-                "error": None,
-                "data": {
-                    "message": "Memory storage coming soon",
-                    "status": "Pending Supabase table setup",
-                    "action": "Contact admin for full memory activation"
-                }
-            })
-        
-        elif action == 'retrieve':
-            return JSONResponse(content={
-                "success": True,
-                "error": None,
-                "data": {
-                    "message": "Memory retrieval coming soon",
-                    "status": "Pending Supabase table setup"
-                }
-            })
-        
-        return JSONResponse(content={
-            "success": True,
-            "error": None,
-            "data": {
-                "actions": ["status", "store", "retrieve"],
-                "message": "Use ?action=status"
-            }
-        })
-        
-    except Exception as e:
-        logger.error(f"Supabase memory crash: {e}")
-        return JSONResponse(status_code=500, content={
-            "success": False, "error": str(e), "data": None
-        })
+async def handler(request):
+    body = await request.json()
+    action = body.get("action")
+    
+    if action == "save_user":
+        # User data save
+        data = supabase.table("users").insert(body["data"]).execute()
+        return {"success": True, "data": data}
+    
+    elif action == "get_user":
+        # User data fetch
+        data = supabase.table("users").select("*").eq("id", body["user_id"]).execute()
+        return {"success": True, "data": data}
+    
+    elif action == "save_chat":
+        # Chat history
+        data = supabase.table("chats").insert(body["data"]).execute()
+        return {"success": True}
+    
+    elif action == "get_chat_history":
+        # Chat history fetch
+        data = supabase.table("chats").select("*").eq("user_id", body["user_id"]).execute()
+        return {"success": True, "data": data}
+    
+    elif action == "save_schedule":
+        # Schedule preferences
+        data = supabase.table("schedules").insert(body["data"]).execute()
+        return {"success": True}
+    
+    elif action == "get_schedule":
+        # User schedule
+        data = supabase.table("schedules").select("*").eq("user_id", body["user_id"]).execute()
+        return {"success": True, "data": data}
+    
+    elif action == "analytics":
+        # Usage analytics
+        data = supabase.table("analytics").select("*").execute()
+        return {"success": True, "data": data}
