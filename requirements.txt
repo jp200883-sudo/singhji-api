@@ -13,3 +13,4 @@ fastapi
 uvicorn
 aiohttp
 python-multipart
+supabase
