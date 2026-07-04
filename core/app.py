@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import os
 import sys
+import json
 import asyncio
 import aiohttp
 import requests 
@@ -19,6 +20,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
 
 app = FastAPI(title="🦁 Singh Ji AI Ultra v7.0", version="7.0.0-light")
 
@@ -104,6 +106,10 @@ async def root():
 async def health():
     return {"status": "ok", "timestamp": datetime.now().isoformat()}
 
+@app.get("/health")
+async def health_simple():
+    return {"status": "ok", "version": "7.0", "service": "Singh Ji AI Ultra"}
+
 @app.get("/api/status")
 async def status():
     return {
@@ -111,6 +117,36 @@ async def status():
         "modules": list(MODULES.keys()), 
         "status": "🦁 LIVE"
     }
+
+# ============================================================
+# 🦁 RUN HANDLER — SYNC + ASYNC Support
+# ============================================================
+async def run_handler(module_name: str, request: Request):
+    handler_func = MODULES[module_name]
+    try:
+        if asyncio.iscoroutinefunction(handler_func):
+            result = await handler_func(request)
+        else:
+            loop = asyncio.get_event_loop()
+            result = await loop.run_in_executor(None, handler_func, request)
+        
+        if isinstance(result, dict):
+            if "statusCode" in result:
+                status_code = result.get("statusCode", 200)
+                headers = result.get("headers", {})
+                body = result.get("body", "{}")
+                if isinstance(body, str):
+                    try:
+                        body = json.loads(body)
+                    except:
+                        body = {"response": body}
+                return JSONResponse(status_code=status_code, headers=headers, content=body)
+            else:
+                return JSONResponse(content=result)
+        return result
+    except Exception as e:
+        logger.error(f"❌ Error in {module_name}: {e}")
+        return JSONResponse(status_code=500, content={"status": "error", "module": module_name, "error": str(e)})
 
 # ============================================================
 # 🦁 TELEGRAM WEBHOOK
@@ -125,7 +161,6 @@ async def telegram_webhook(request: Request):
         
         logger.info(f"📩 Telegram: {text} from chat {chat_id}")
         
-        # ✅ Reply decide karo
         if text == '/start':
             reply = "🦁 <b>Singh Ji AI Bot</b>\n\nShuruwat ho gayi!\n\nCommands:\n/start — Shuruwat\n/help — Madad\n/status — System check"
         elif text == '/help':
@@ -135,7 +170,6 @@ async def telegram_webhook(request: Request):
         else:
             reply = f"🦁 Aapne likha: <b>{text}</b>\n\nMain abhi sirf commands samajhta hoon:\n/start, /help, /status"
         
-        # ✅ Telegram ko reply bhejo
         if TELEGRAM_TOKEN and chat_id:
             import requests
             url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
@@ -151,12 +185,12 @@ async def telegram_webhook(request: Request):
     except Exception as e:
         logger.error(f"Telegram error: {e}")
         return JSONResponse(status_code=200, content={"status": "ok"})
+
 # ============================================================
 # 🦁 LAZY LOAD ROUTER — FIXED!
 # ============================================================
-@app.api_route("/api/{module_name}", methods=["GET", "POST", "HEAD"])
+@app.api_route("/api/{module_name}", methods=["GET", "POST", "HEAD", "PUT", "DELETE", "OPTIONS"])
 async def router(request: Request, module_name: str):
-    # Module load karo agar nahi hai
     if module_name not in MODULES:
         all_modules = discover_modules()
         if module_name in all_modules:
@@ -175,19 +209,7 @@ async def router(request: Request, module_name: str):
                 content={"status": "error", "message": f"'{module_name}' not found"}
             )
     
-    # ✅ SAHI — pehle check karo handler async hai ya normal
-    try:
-        handler = MODULES[module_name]
-        if inspect.iscoroutinefunction(handler):
-            return await handler(request)
-        else:
-            return handler(request)
-    except Exception as e:
-        logger.error(f"Error {module_name}: {e}")
-        return JSONResponse(
-            status_code=500, 
-            content={"status": "error", "module": module_name, "error": str(e)}
-        )
+    return await run_handler(module_name, request)
 
 if __name__ == "__main__":
     import uvicorn
