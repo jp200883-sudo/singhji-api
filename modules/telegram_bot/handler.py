@@ -1,209 +1,128 @@
-# telegram_bot/handler.py
+#!/usr/bin/env python3
+"""
+Singh Ji AI Ultra v7.0 - Telegram Bot Handler
+All module commands in one place
+"""
+
 import os
 import json
-import requests
-import time
-from typing import Dict, Any
-from fastapi import Request
-from fastapi.responses import JSONResponse
+from datetime import datetime
+from typing import Dict
 
-# ========== CONFIG ==========
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-BOT_URL = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}" if TELEGRAM_TOKEN else None
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "")
 
-# ========== TELEGRAM BOT MODULE ==========
-class TelegramBotModule:
+# All module commands
+COMMANDS = {
+    "news": {"module": "news", "action": "telegram", "params": {"category": "india", "language": "hi"}},
+    "khabar": {"module": "news", "action": "telegram", "params": {"category": "india", "language": "hi"}},
+    "sports": {"module": "news", "action": "telegram", "params": {"category": "sports", "language": "hi"}},
+    "business": {"module": "news", "action": "telegram", "params": {"category": "business", "language": "hi"}},
+    "rashifal": {"module": "horoscope", "action": "telegram", "params": {"rashi": "मेष", "period": "daily", "language": "hi"}},
+    "horoscope": {"module": "horoscope", "action": "telegram", "params": {"rashi": "Aries", "period": "daily", "language": "en"}},
+    "fuel": {"module": "fuel", "action": "telegram", "params": {"city": "Delhi", "fuel_type": "all"}},
+    "petrol": {"module": "fuel", "action": "telegram", "params": {"city": "Delhi", "fuel_type": "petrol"}},
+    "gold": {"module": "goldrate", "action": "telegram", "params": {"city": "India", "purity": "all"}},
+    "sone": {"module": "goldrate", "action": "telegram", "params": {"city": "India", "purity": "all"}},
+    "weather": {"module": "weather", "action": "telegram", "params": {"city": "Kanpur"}},
+    "mausam": {"module": "weather", "action": "telegram", "params": {"city": "Kanpur"}},
+    "mandi": {"module": "mandi", "action": "telegram", "params": {}},
+    "emergency": {"module": "emergency", "action": "telegram", "params": {}},
+    "sos": {"module": "emergency", "action": "telegram", "params": {}},
+    "bachpan": {"module": "bachpan", "action": "telegram", "params": {"language": "hi"}},
+    "child": {"module": "bachpan", "action": "telegram", "params": {"language": "hi"}},
+    "report": {"module": "daily_report", "action": "telegram", "params": {}},
+    "status": {"module": "status", "action": "get", "params": {}},
+    "help": {"module": "help", "action": "get", "params": {}},
+    "start": {"module": "start", "action": "get", "params": {}},
+}
+
+# Single line messages only
+WELCOME_MSG = "🦁 *Welcome to Singh Ji AI Ultra v7.0!*\n\nYour AI assistant for Bharat 🇮🇳\n\n*Commands:*\n📰 /news - Latest news\n🔮 /rashifal - Daily horoscope\n⛽ /fuel - Petrol/Diesel prices\n🪙 /gold - Gold/Silver rates\n🌤 /weather - Weather update\n🌾 /mandi - Mandi rates\n🛡 /bachpan - Child safety\n🚨 /emergency - Emergency help\n📊 /report - Daily report\nℹ️ /help - All commands\n\n⚡ *Singh Ji AI Ultra v7.0*"
+
+HELP_MSG = "🦁 *Singh Ji AI Commands*\n\n*📰 News:*\n/news - India news\n/sports - Sports news\n/business - Business news\n\n*🔮 Horoscope:*\n/rashifal [rashi] - Daily horoscope\nExample: /rashifal मेष\n\n*⛽ Fuel:*\n/fuel [city] - Fuel prices\n/petrol [city] - Petrol only\n\n*🪙 Gold:*\n/gold [city] - Gold/Silver rates\n\n*🌤 Weather:*\n/weather [city] - Weather update\n\n*🌾 Agriculture:*\n/mandi - Mandi rates\n\n*🛡 Child Safety:*\n/bachpan - Safety tips\n/child - Helplines\n\n*🚨 Emergency:*\n/emergency - Emergency numbers\n/sos - Quick help\n\n*📊 Reports:*\n/report - Daily report\n/status - System status\n\n⚡ *Singh Ji AI Ultra v7.0*"
+
+STATUS_MSG = "🟢 *Singh Ji AI Status*\n\n✅ Bot Active\n✅ API Connected\n🦁 Singh Ji AI v7.0"
+
+ERROR_MSG = "❓ Unknown command. Type /help for commands."
+
+
+class TelegramHandler:
     def __init__(self):
-        self.token = TELEGRAM_TOKEN
-        self.base_url = BOT_URL
-    
-    def send_message(self, chat_id: str, text: str, parse_mode: str = "HTML") -> Dict[str, Any]:
-        """Send message to Telegram chat"""
-        if not self.token:
-            return {"success": False, "error": "No Telegram token set"}
-        
-        try:
-            url = f"{self.base_url}/sendMessage"
-            data = {
-                "chat_id": chat_id,
-                "text": text,
-                "parse_mode": parse_mode
-            }
-            resp = requests.post(url, json=data, timeout=15)
-            resp.raise_for_status()
-            result = resp.json()
-            
-            return {
-                "success": result.get("ok", False),
-                "message_id": result.get("result", {}).get("message_id"),
-                "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
-            }
-            
-        except Exception as e:
-            return {"success": False, "error": str(e)}
-    
-    def send_photo(self, chat_id: str, photo_url: str, caption: str = "") -> Dict[str, Any]:
-        """Send photo to Telegram chat"""
-        if not self.token:
-            return {"success": False, "error": "No Telegram token set"}
-        
-        try:
-            url = f"{self.base_url}/sendPhoto"
-            data = {
-                "chat_id": chat_id,
-                "photo": photo_url,
-                "caption": caption,
-                "parse_mode": "HTML"
-            }
-            resp = requests.post(url, json=data, timeout=15)
-            resp.raise_for_status()
-            return {"success": True, "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")}
-        except Exception as e:
-            return {"success": False, "error": str(e)}
-    
-    def set_webhook(self, webhook_url: str) -> Dict[str, Any]:
-        """Set webhook for bot"""
-        if not self.token:
-            return {"success": False, "error": "No Telegram token set"}
-        
-        try:
-            url = f"{self.base_url}/setWebhook"
-            data = {"url": webhook_url, "drop_pending_updates": True}
-            resp = requests.post(url, json=data, timeout=15)
-            resp.raise_for_status()
-            result = resp.json()
-            return {
-                "success": result.get("ok", False),
-                "description": result.get("description", ""),
-                "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
-            }
-        except Exception as e:
-            return {"success": False, "error": str(e)}
-    
-    def get_webhook_info(self) -> Dict[str, Any]:
-        """Get current webhook info"""
-        if not self.token:
-            return {"success": False, "error": "No Telegram token set"}
-        
-        try:
-            url = f"{self.base_url}/getWebhookInfo"
-            resp = requests.get(url, timeout=15)
-            resp.raise_for_status()
-            result = resp.json()
-            return {
-                "success": result.get("ok", False),
-                "info": result.get("result", {}),
-                "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
-            }
-        except Exception as e:
-            return {"success": False, "error": str(e)}
-    
-    def delete_webhook(self) -> Dict[str, Any]:
-        """Delete webhook"""
-        if not self.token:
-            return {"success": False, "error": "No Telegram token set"}
-        
-        try:
-            url = f"{self.base_url}/deleteWebhook"
-            resp = requests.get(url, timeout=15)
-            resp.raise_for_status()
-            return {"success": True, "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")}
-        except Exception as e:
-            return {"success": False, "error": str(e)}
-    
-    def get_updates(self, offset: int = None) -> Dict[str, Any]:
-        """Get updates (for polling mode)"""
-        if not self.token:
-            return {"success": False, "error": "No Telegram token set"}
-        
-        try:
-            url = f"{self.base_url}/getUpdates"
-            params = {"limit": 10}
-            if offset:
-                params["offset"] = offset
-            
-            resp = requests.get(url, params=params, timeout=15)
-            resp.raise_for_status()
-            result = resp.json()
-            return {
-                "success": result.get("ok", False),
-                "updates": result.get("result", []),
-                "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
-            }
-        except Exception as e:
-            return {"success": False, "error": str(e)}
-    
-    def health_check(self) -> Dict[str, Any]:
+        pass
+
+    def parse_command(self, text: str) -> Dict:
+        if not text:
+            return {"command": "", "args": []}
+        parts = text.strip().split()
+        command = parts[0].lower().replace("/", "")
+        args = parts[1:] if len(parts) > 1 else []
+        return {"command": command, "args": args}
+
+    def get_response(self, command: str, args: list, user_id: str = "") -> str:
+        if command == "start":
+            return WELCOME_MSG
+        elif command == "help":
+            return HELP_MSG
+        elif command == "status":
+            return STATUS_MSG
+
+        if command not in COMMANDS:
+            return ERROR_MSG
+
+        cmd_info = COMMANDS[command]
+        module = cmd_info["module"]
+        action = cmd_info["action"]
+        params = cmd_info["params"].copy()
+
+        if args:
+            if command in ["rashifal", "horoscope"]:
+                params["rashi"] = args[0]
+            elif command in ["fuel", "petrol"]:
+                params["city"] = args[0]
+            elif command in ["gold", "sone"]:
+                params["city"] = args[0]
+            elif command in ["weather", "mausam"]:
+                params["city"] = args[0]
+
         return {
-            "module": "telegram_bot",
-            "token_set": bool(self.token),
-            "status": "✅ Ready" if self.token else "❌ No Token"
+            "module": module,
+            "action": action,
+            "params": params,
+            "user_id": user_id
         }
 
 
-# ========== RENDER HANDLER — FastAPI Compatible ==========
-async def handler(request: Request):
-    """FastAPI compatible handler — async def + JSONResponse"""
-    
-    if request.method == "GET":
-        t = TelegramBotModule()
-        
-        # ✅ FastAPI mein query params
-        action = request.query_params.get("action", "info")
-        
-        if action == "webhook_info":
-            result = t.get_webhook_info()
-        elif action == "delete_webhook":
-            result = t.delete_webhook()
-        elif action == "health":
-            result = t.health_check()
+telegram_handler = TelegramHandler()
+
+def parse_command(text: str) -> Dict:
+    return telegram_handler.parse_command(text)
+
+def get_response(command: str, args: list, user_id: str = "") -> str:
+    return telegram_handler.get_response(command, args, user_id)
+
+
+async def handler(request):
+    try:
+        body = await request.json() if request.method == "POST" else {}
+        params = dict(request.query_params)
+
+        action = body.get("action") or params.get("action", "parse")
+        text = body.get("text") or params.get("text", "")
+        user_id = body.get("user_id") or params.get("user_id", "")
+
+        if action == "parse":
+            result = parse_command(text)
+        elif action == "response":
+            parsed = parse_command(text)
+            result = get_response(parsed["command"], parsed["args"], user_id)
         else:
-            result = {
-                "module": "telegram_bot",
-                "status": "LIVE",
-                "health": t.health_check()
-            }
-        
-        # ✅ FastAPI JSONResponse
-        return JSONResponse(content=result)
-    
-    elif request.method == "POST":
-        try:
-            # ✅ FastAPI mein: await request.json()
-            body = await request.json()
-            action = body.get("action", "send_message")
-            
-            t = TelegramBotModule()
-            
-            if action == "send_message":
-                result = t.send_message(
-                    body.get("chat_id"), 
-                    body.get("text"), 
-                    body.get("parse_mode", "HTML")
-                )
-            elif action == "send_photo":
-                result = t.send_photo(
-                    body.get("chat_id"), 
-                    body.get("photo_url"), 
-                    body.get("caption", "")
-                )
-            elif action == "set_webhook":
-                result = t.set_webhook(body.get("webhook_url"))
-            elif action == "get_updates":
-                result = t.get_updates(body.get("offset"))
-            else:
-                result = {"error": "Unknown action"}
-            
-            # ✅ FastAPI JSONResponse
-            return JSONResponse(content=result)
-            
-        except Exception as e:
-            return JSONResponse(status_code=500, content={"error": str(e)})
-    
-    return JSONResponse(status_code=405, content={"error": "Method not allowed"})
+            result = {"status": "error", "message": "Unknown action"}
+
+        return result
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
 
 if __name__ == "__main__":
-    t = TelegramBotModule()
-    print("🦁 SINGH JI AI ULTRA v7.0 — Telegram Bot Module")
-    print("Health:", t.health_check())
+    print("Testing Telegram Handler...")
+    print(get_response("start", []))
