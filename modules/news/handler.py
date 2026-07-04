@@ -550,4 +550,52 @@ if __name__ == "__main__":
     print(f"Articles: {result['count']}")
     print(f"\nTelegram Format:")
     print(format_telegram(result, "hi"))
+    # FastAPI handler function for dynamic router
+async def handler(request):
+    """FastAPI handler for news module"""
+    from fastapi import Request
+    import json
+    
+    try:
+        # Parse request
+        body = await request.json() if request.method == "POST" else {}
+        params = dict(request.query_params)
+        
+        # Get parameters
+        category = body.get("category") or params.get("category", "india")
+        language = body.get("language") or params.get("language", "hi")
+        count = int(body.get("count") or params.get("count", 5))
+        action = body.get("action") or params.get("action", "get_news")
+        
+        # Route to appropriate function
+        if action == "get_news":
+            result = get_news(category, language, count)
+        elif action == "search":
+            keyword = body.get("keyword") or params.get("keyword", "")
+            result = search_news(keyword, language, count)
+        elif action == "trending":
+            result = get_trending_topics(language)
+        elif action == "telegram":
+            news_data = get_news(category, language, count)
+            result = {
+                "status": "success",
+                "message": format_telegram(news_data, language),
+                "category": category,
+                "language": language
+            }
+        else:
+            result = get_news(category, language, count)
+        
+        return {
+            "statusCode": 200,
+            "headers": {"Content-Type": "application/json"},
+            "body": json.dumps(result)
+        }
+        
+    except Exception as e:
+        return {
+            "statusCode": 500,
+            "headers": {"Content-Type": "application/json"},
+            "body": json.dumps({"status": "error", "message": str(e)})
+        }
 
