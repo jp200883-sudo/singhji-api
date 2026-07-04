@@ -180,27 +180,29 @@ class FuelHandler:
             "costliest": summary[-1]
         }
 
-    def format_for_telegram(self, fuel_data: Dict, language: str = "hi") -> str:
+       def format_for_telegram(self, fuel_data: Dict, language: str = "hi") -> str:
         """Format fuel rates for Telegram"""
         city = fuel_data.get("city", "Delhi")
         date = fuel_data.get("date", datetime.now().strftime("%Y-%m-%d"))
         rates = fuel_data.get("rates", {})
 
         if language == "hi":
-            message = f"⛽ *ईंधन के भाव* ⛽
-━━━━━━━━━━━━━━━
-📍 *{city}*
-📅 *{date}*
-
-"
+            message = "⛽ *ईंधन के भाव* ⛽\n━━━━━━━━━━━━━━━\n📍 *" + city + "*\n📅 *" + date + "*\n\n"
             for fuel, rate in rates.items():
                 name = FUEL_NAMES_HI.get(fuel, fuel.title())
                 unit = "₹/kg" if fuel == "lpg" else "₹/litre"
-                message += f"🔹 *{name}:* ₹{rate} {unit}
-"
-            message += f"
-📊 *स्रोत:* {fuel_data.get('source', 'IOC')}
-"
+                message += "🔹 *" + name + ":* ₹" + str(rate) + " " + unit + "\n"
+            message += "\n📊 *स्रोत:* " + fuel_data.get('source', 'IOC') + "\n"
+            message += "━━━━━━━━━━━━━━━\n⚡ *Singh Ji AI Ultra v7.0*"
+        else:
+            message = "⛽ *Fuel Prices* ⛽\n━━━━━━━━━━━━━━━\n📍 *" + city + "*\n📅 *" + date + "*\n\n"
+            for fuel, rate in rates.items():
+                unit = "₹/kg" if fuel == "lpg" else "₹/litre"
+                message += "🔹 *" + fuel.title() + ":* ₹" + str(rate) + " " + unit + "\n"
+            message += "\n📊 *Source:* " + fuel_data.get('source', 'IOC') + "\n"
+            message += "━━━━━━━━━━━━━━━\n⚡ *Singh Ji AI Ultra v7.0*"
+
+        return message
             message += "━━━━━━━━━━━━━━━
 ⚡ *Singh Ji AI Ultra v7.0*"
         else:
