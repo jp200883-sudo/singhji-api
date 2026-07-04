@@ -39,6 +39,7 @@ RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID")
 RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")  # ➕ ADDED
 TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
 TAVILY_URL = os.getenv("TAVILY_URL")
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
@@ -128,6 +129,10 @@ async def root():
 @app.api_route("/api/health", methods=["GET", "HEAD"])
 async def health():
     return {"status": "ok", "timestamp": datetime.now().isoformat()}
+
+@app.get("/health")  # ➕ ADDED
+async def health_simple():
+    return {"status": "ok", "version": "7.0", "service": "Singh Ji AI Ultra"}
 
 @app.get("/api/status")
 async def status():
