@@ -1,311 +1,354 @@
 {
-  "project": "Singh Ji AI Ultra v7.0",
-  "total_modules_target": 60,
-  "modules_done": 31,
-  "modules_remaining": 29,
-  "total_files_target": 210,
-  "files_remaining": 168,
-  "phase1_deadline": "10 July 2026",
-  "upi_id": "jp200883@sbi",
-  "modules_status": {
-    "COMPLETED (31)": [
-      "ai_chat",
-      "analytics",
-      "booking",
-      "currency",
-      "currency_api",
-      "daily_report",
-      "emergency",
-      "food",
-      "gold",
-      "guidebook",
-      "horoscope",
-      "hotel",
-      "language",
-      "news",
-      "payment",
-      "plant",
-      "radio",
-      "safety",
-      "scanner",
-      "shop",
-      "social",
-      "sports",
-      "stock",
-      "taxi",
-      "telegram",
-      "translate",
-      "travel",
-      "voice",
-      "weather",
-      "youtube",
-      "bachpan"
-    ],
-    "PENDING (29)": [
-      "admin",
-      "agriculture",
-      "astrology",
-      "banking",
-      "bill_payment",
-      "blood_bank",
-      "bus",
-      "calculator",
-      "calendar",
-      "career",
-      "courier",
-      "crime_report",
-      "dating",
-      "doctor",
-      "education",
-      "election",
-      "event",
-      "exam",
-      "festival",
-      "flight",
-      "gas",
-      "grocery",
-      "health",
-      "insurance",
-      "job",
-      "lawyer",
-      "loan",
-      "marriage",
-      "movie"
-    ]
-  },
-  "critical_pending": {
-    "HIGH PRIORITY": [
-      {
-        "task": "Bhashini API integration",
-        "status": "Registration submitted, approval pending",
-        "impact": "26 languages support"
-      },
-      {
-        "task": "Weather module fix",
-        "status": "Pending",
-        "impact": "Core feature broken"
-      },
-      {
-        "task": "Admin dashboard (admin.html)",
-        "status": "Pending",
-        "impact": "Management panel missing"
-      },
-      {
-        "task": "CORS configuration",
-        "status": "Pending",
-        "impact": "Frontend-Backend connection"
-      },
-      {
-        "task": "Telegram bot webhook",
-        "status": "Pending",
-        "impact": "Bot not receiving messages"
-      },
-      {
-        "task": "Plant.id integration",
-        "status": "Pending",
-        "impact": "Plant identification feature"
-      },
-      {
-        "task": "Supabase memory integration",
-        "status": "Pending",
-        "impact": "User data persistence"
-      }
-    ],
-    "MEDIUM PRIORITY": [
-      {
-        "task": "Payment Gateway activation",
-        "status": "ON HOLD (1000+ daily users needed)",
-        "impact": "Revenue model"
-      },
-      {
-        "task": "Voice system Go server deploy",
-        "status": "Ready, deploy to Render",
-        "impact": "Real-time voice features"
-      },
-      {
-        "task": "Cloudflare optimization",
-        "status": "DONE - DO NOT TOUCH",
-        "impact": "CDN/Security"
-      }
-    ]
-  },
-  "daily_schedule_10_july": {
-    "Phase 1 Complete Target": "10 July 2026",
-    "days_remaining": 6,
-    "daily_target_modules": 5,
-    "suggested_daily_plan": [
-      {
-        "day": "4 July (Today)",
-        "modules": [
-          "admin",
-          "agriculture",
-          "astrology"
-        ],
-        "tasks": [
-          "Fix weather module",
-          "Bhashini status check"
-        ]
-      },
-      {
-        "day": "5 July",
-        "modules": [
-          "banking",
-          "bill_payment",
-          "blood_bank",
-          "bus"
-        ],
-        "tasks": [
-          "CORS setup",
-          "Telegram webhook"
-        ]
-      },
-      {
-        "day": "6 July",
-        "modules": [
-          "calculator",
-          "calendar",
-          "career",
-          "courier"
-        ],
-        "tasks": [
-          "Plant.id integration"
-        ]
-      },
-      {
-        "day": "7 July",
-        "modules": [
-          "crime_report",
-          "dating",
-          "doctor",
-          "education"
-        ],
-        "tasks": [
-          "Supabase memory setup"
-        ]
-      },
-      {
-        "day": "8 July",
-        "modules": [
-          "election",
-          "event",
-          "exam",
-          "festival",
-          "flight"
-        ],
-        "tasks": [
-          "Admin dashboard UI"
-        ]
-      },
-      {
-        "day": "9 July",
-        "modules": [
-          "gas",
-          "grocery",
-          "health",
-          "insurance",
-          "job"
-        ],
-        "tasks": [
-          "Full integration testing"
-        ]
-      },
-      {
-        "day": "10 July",
-        "modules": [
-          "lawyer",
-          "loan",
-          "marriage",
-          "movie"
-        ],
-        "tasks": [
-          "Final deploy, Phase 1 complete!"
-        ]
-      }
-    ]
-  },
-  "voice_system_status": {
-    "version": "v7.0 Voice (3 July 2026)",
-    "services": [
-      {
-        "name": "STT",
-        "engines": [
-          "Whisper",
-          "Vosk",
-          "Google"
-        ],
-        "status": "Ready"
-      },
-      {
-        "name": "TTS",
-        "engines": [
-          "Minimax",
-          "Edge",
-          "Piper",
-          "Kokoro"
-        ],
-        "status": "Ready"
-      },
-      {
-        "name": "Translation",
-        "engines": [
-          "IndicTrans2",
-          "SeamlessM4T",
-          "Google"
-        ],
-        "status": "Ready"
-      },
-      {
-        "name": "AI Brain",
-        "engines": [
-          "Groq",
-          "Gemini",
-          "Local"
-        ],
-        "status": "Ready"
-      },
-      {
-        "name": "Voice Clone",
-        "engines": [
-          "Coqui XTTS",
-          "Fish",
-          "Orpheus"
-        ],
-        "status": "Ready"
-      },
-      {
-        "name": "WebSocket Streaming",
-        "status": "Real-time, Ready"
-      }
-    ],
-    "specs": "16kHz/32kbps Opus, 10MB max, Supabase storage, queue system",
-    "deploy_target": "Render"
-  },
-  "payment_gateway": {
-    "status": "READY BUT ON HOLD",
-    "activation_criteria": "1000+ daily users",
-    "files_created": [
-      "gateway.py",
-      "commission_tracker.py",
-      "payment.html",
-      "merchant.html",
-      "singhji_qr.png"
-    ],
-    "upi_id": "jp200883@sbi",
-    "business_model": {
-      "UPI": "0%",
-      "Card": "2%",
-      "Merchant Loans": "18-24% (future)",
-      "Insurance": "10-20% (future)"
+  "project": "Singh Ji AI Ultra v7.0 - Auto Message Scheduler",
+  "timezone": "Asia/Kolkata (IST)",
+  "sleep_hours": "22:00 - 06:00 (No messages)",
+  "total_modules_active": 12,
+  "daily_schedule": [
+    {
+      "time": "06:00",
+      "module": "aaj_ka_vichar",
+      "frequency": "daily",
+      "message_type": "motivational_quote",
+      "content": "Daily inspirational quote in Hindi",
+      "target": "all_users",
+      "status": "active"
     },
-    "current_phase": "FREE - All features free"
+    {
+      "time": "06:15",
+      "module": "suprabhat",
+      "frequency": "daily",
+      "message_type": "good_morning",
+      "content": "Good morning message with weather preview",
+      "target": "all_users",
+      "status": "active"
+    },
+    {
+      "time": "06:30",
+      "module": "mandi",
+      "frequency": "daily",
+      "message_type": "agriculture_rates",
+      "content": "Sabzi mandi rates - Aloo, Pyaz, Tamatar, etc.",
+      "target": "farmers",
+      "status": "active"
+    },
+    {
+      "time": "07:00",
+      "module": "weather",
+      "frequency": "daily",
+      "message_type": "weather_report",
+      "content": "Aaj ka mausam - temperature, rain, humidity",
+      "target": "all_users",
+      "status": "active"
+    },
+    {
+      "time": "07:30",
+      "module": "news_morning",
+      "frequency": "daily",
+      "message_type": "headlines",
+      "content": "Top 5 news headlines",
+      "target": "all_users",
+      "status": "active"
+    },
+    {
+      "time": "08:00",
+      "module": "goldrate",
+      "frequency": "daily",
+      "message_type": "gold_price",
+      "content": "Aaj ka sone ka bhav - 22k, 24k per 10g",
+      "target": "investors",
+      "status": "active"
+    },
+    {
+      "time": "08:30",
+      "module": "fuel",
+      "frequency": "daily",
+      "message_type": "petrol_diesel_price",
+      "content": "Petrol, Diesel, CNG rates by city",
+      "target": "vehicle_owners",
+      "status": "active"
+    },
+    {
+      "time": "09:00",
+      "module": "daily_report",
+      "frequency": "daily",
+      "message_type": "bot_stats",
+      "content": "Total users, messages, system status",
+      "target": "admin_only",
+      "status": "active"
+    },
+    {
+      "time": "09:30",
+      "module": "horoscope",
+      "frequency": "daily",
+      "message_type": "rashifal",
+      "content": "Aaj ka rashifal - 12 rashi",
+      "target": "all_users",
+      "status": "active"
+    },
+    {
+      "time": "10:00",
+      "module": "rozgar",
+      "frequency": "daily",
+      "message_type": "job_alerts",
+      "content": "Naukri updates - sarkari + private",
+      "target": "job_seekers",
+      "status": "active"
+    },
+    {
+      "time": "10:30",
+      "module": "schedule_utility",
+      "frequency": "daily",
+      "message_type": "daily_schedule",
+      "content": "Aaj ka schedule - water, power, bank",
+      "target": "all_users",
+      "status": "active"
+    },
+    {
+      "time": "11:00",
+      "module": "news_update",
+      "frequency": "every_30_min",
+      "message_type": "breaking_news",
+      "content": "Breaking news alerts",
+      "target": "news_subscribers",
+      "status": "active"
+    },
+    {
+      "time": "11:30",
+      "module": "pani",
+      "frequency": "daily",
+      "message_type": "water_supply_alert",
+      "content": "Water supply timing alert",
+      "target": "all_users",
+      "status": "active"
+    },
+    {
+      "time": "12:00",
+      "module": "news_midday",
+      "frequency": "daily",
+      "message_type": "headlines",
+      "content": "Midday news update",
+      "target": "all_users",
+      "status": "active"
+    },
+    {
+      "time": "12:30",
+      "module": "currency",
+      "frequency": "daily",
+      "message_type": "forex_rates",
+      "content": "USD, EUR, GBP, JPY rates",
+      "target": "traders",
+      "status": "active"
+    },
+    {
+      "time": "13:00",
+      "module": "sewer",
+      "frequency": "weekly_tue_thu_sat",
+      "message_type": "garbage_reminder",
+      "content": "Garbage collection reminder",
+      "target": "all_users",
+      "status": "active"
+    },
+    {
+      "time": "14:00",
+      "module": "power_cut_alert",
+      "frequency": "mon_wed_fri",
+      "message_type": "power_outage",
+      "content": "Evening power cut alert - 2-4 PM",
+      "target": "all_users",
+      "status": "active"
+    },
+    {
+      "time": "14:30",
+      "module": "govt",
+      "frequency": "daily",
+      "message_type": "sarkari_yojana",
+      "content": "Government scheme updates",
+      "target": "all_users",
+      "status": "active"
+    },
+    {
+      "time": "15:00",
+      "module": "news_afternoon",
+      "frequency": "daily",
+      "message_type": "headlines",
+      "content": "Afternoon news update",
+      "target": "all_users",
+      "status": "active"
+    },
+    {
+      "time": "15:30",
+      "module": "goldrate_evening",
+      "frequency": "daily",
+      "message_type": "gold_price_update",
+      "content": "Evening gold rate update",
+      "target": "investors",
+      "status": "active"
+    },
+    {
+      "time": "16:00",
+      "module": "fuel_evening",
+      "frequency": "daily",
+      "message_type": "fuel_price_update",
+      "content": "Evening fuel price update",
+      "target": "vehicle_owners",
+      "status": "active"
+    },
+    {
+      "time": "16:30",
+      "module": "weather_evening",
+      "frequency": "daily",
+      "message_type": "weather_forecast",
+      "content": "Kal ka mausam forecast",
+      "target": "all_users",
+      "status": "active"
+    },
+    {
+      "time": "17:00",
+      "module": "news_evening",
+      "frequency": "daily",
+      "message_type": "headlines",
+      "content": "Evening news digest",
+      "target": "all_users",
+      "status": "active"
+    },
+    {
+      "time": "17:30",
+      "module": "stock",
+      "frequency": "mon_fri",
+      "message_type": "market_closing",
+      "content": "Share market closing update - Nifty, Sensex",
+      "target": "investors",
+      "status": "active"
+    },
+    {
+      "time": "18:00",
+      "module": "bhajan",
+      "frequency": "daily",
+      "message_type": "devotional",
+      "content": "Daily bhajan / aarti / prayer",
+      "target": "all_users",
+      "status": "active"
+    },
+    {
+      "time": "18:30",
+      "module": "sports",
+      "frequency": "daily",
+      "message_type": "sports_update",
+      "content": "Cricket, football, kabaddi scores",
+      "target": "sports_fans",
+      "status": "active"
+    },
+    {
+      "time": "19:00",
+      "module": "entertainment",
+      "frequency": "daily",
+      "message_type": "movie_tv_update",
+      "content": "Aaj ka TV schedule, movie releases",
+      "target": "all_users",
+      "status": "active"
+    },
+    {
+      "time": "19:30",
+      "module": "joke",
+      "frequency": "daily",
+      "message_type": "funny",
+      "content": "Daily joke / meme / funny quote",
+      "target": "all_users",
+      "status": "active"
+    },
+    {
+      "time": "20:00",
+      "module": "health_tip",
+      "frequency": "daily",
+      "message_type": "health",
+      "content": "Daily health tip / yoga / desi nuskhe",
+      "target": "all_users",
+      "status": "active"
+    },
+    {
+      "time": "20:30",
+      "module": "recipe",
+      "frequency": "daily",
+      "message_type": "cooking",
+      "content": "Aaj ka special recipe",
+      "target": "all_users",
+      "status": "active"
+    },
+    {
+      "time": "21:00",
+      "module": "shubh_ratri",
+      "frequency": "daily",
+      "message_type": "good_night",
+      "content": "Good night message + kal ka preview",
+      "target": "all_users",
+      "status": "active"
+    },
+    {
+      "time": "21:30",
+      "module": "goldrate_night",
+      "frequency": "daily",
+      "message_type": "gold_price_final",
+      "content": "Final gold rate - closing",
+      "target": "investors",
+      "status": "active"
+    },
+    {
+      "time": "22:00",
+      "module": "system_sleep",
+      "frequency": "daily",
+      "message_type": "admin_only",
+      "content": "Bot going to sleep mode - no messages till 6 AM",
+      "target": "admin_only",
+      "status": "active"
+    }
+  ],
+  "special_schedules": {
+    "sunday_special": [
+      {
+        "time": "07:00",
+        "module": "sunday_special",
+        "content": "Sunday special - longer weather, special recipes"
+      },
+      {
+        "time": "10:00",
+        "module": "weekend_entertainment",
+        "content": "Weekend movie/TV recommendations"
+      },
+      {
+        "time": "19:00",
+        "module": "weekly_digest",
+        "content": "Week ka roundup - top news, gold rates, weather"
+      }
+    ],
+    "festival_special": [
+      {
+        "trigger": "festival_date",
+        "module": "festival_wishes",
+        "content": "Festival wishes + special info"
+      }
+    ]
   },
-  "tech_stack": {
-    "backend": "Python FastAPI (Render)",
-    "frontend": "HTML/JS (GitHub Pages)",
-    "database": "Supabase (pending)",
-    "voice_server": "Go (Render)",
-    "cdn": "Cloudflare (DONE)",
-    "payment": "Razorpay (ON HOLD)",
-    "languages": "Bhashini + gTTS/Whisper fallback"
+  "news_frequency": {
+    "morning": "07:30",
+    "midday": "12:00",
+    "afternoon": "15:00",
+    "evening": "17:00",
+    "breaking": "every_30_min (09:00-21:00)"
+  },
+  "gold_frequency": {
+    "morning": "08:00",
+    "afternoon": "15:30",
+    "evening": "21:30",
+    "total_per_day": 3
+  },
+  "fuel_frequency": {
+    "morning": "08:30",
+    "evening": "16:00",
+    "total_per_day": 2
+  },
+  "weather_frequency": {
+    "morning": "07:00",
+    "evening": "16:30",
+    "total_per_day": 2
   }
 }
