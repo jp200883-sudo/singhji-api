@@ -34,7 +34,7 @@ app.add_middleware(
 )
 
 MODULES = {}
-FASTAPI_ROUTERS = {}  # 🆕 Naya — FastAPI routers ke liye
+FASTAPI_ROUTERS = {}
 MODULES_DIR = os.path.join(os.path.dirname(__file__), "..", "modules")
 
 def discover_modules():
@@ -59,15 +59,12 @@ def load_module(name, info):
             sys.modules[f"modules.{name}"] = module
             spec.loader.exec_module(module)
             
-            # 🆕 Check karo — APIRouter hai ya function?
             router = getattr(module, "router", None)
             handler = getattr(module, "handler", None)
             
             if router and isinstance(router, APIRouter):
-                # FastAPI Router mila!
                 return {"type": "router", "router": router}
             elif handler:
-                # Purana function style
                 return {"type": "handler", "handler": handler}
             else:
                 return None
@@ -114,13 +111,11 @@ async def startup():
         result = load_module(name, info)
         if result:
             if result["type"] == "router":
-                # 🆕 FastAPI Router — app mein mount karo
                 FASTAPI_ROUTERS[name] = result["router"]
                 app.include_router(result["router"], prefix=f"/api/{name}", tags=[name])
                 loaded_routers += 1
                 logger.info(f"✅ Router loaded: {name} → /api/{name}")
             else:
-                # Purana handler
                 MODULES[name] = result["handler"]
                 loaded_handlers += 1
                 logger.info(f"✅ Handler loaded: {name}")
@@ -162,7 +157,7 @@ async def status():
     }
 
 # ============================================================
-# 🦁 TELEGRAM WEBHOOK (Pehle jaisa)
+# 🦁 TELEGRAM WEBHOOK
 # ============================================================
 @app.post("/telegram/webhook")
 async def telegram_webhook(request: Request):
@@ -224,38 +219,24 @@ async def run_handler(module_name: str, request: Request):
         logger.error(f"❌ Error in {module_name}: {e}")
         return JSONResponse(status_code=500, content={"status": "error", "module": module_name, "error": str(e)})
 
-# LAZY LOAD HANDLER — Purane modules ke liye
-# 🆕 EXCLUDE router modules from wildcard!
+# ============================================================
+# 🦁 WILDCARD ROUTER — Router modules ko skip karo
+# ============================================================
 @app.api_route("/api/{module_name}", methods=["GET", "POST", "HEAD", "PUT", "DELETE", "OPTIONS"])
 async def lazy_router(request: Request, module_name: str):
     
-    # 🆕 AGAR yeh FastAPI router hai, toh yahan mat aao!
+    # 🆕 AGAR yeh FastAPI router hai, toh hint do
     if module_name in FASTAPI_ROUTERS:
-        # Router already mounted at /api/{module_name}/...
-        # /api/guard_agent/ aise chalega, /api/guard_agent nahi
         return JSONResponse(
             status_code=404, 
             content={
                 "error": f"'{module_name}' is a FastAPI router",
-                "hint": f"Use /api/{module_name}/ or /api/{module_name}/endpoint/",
+                "hint": f"Use /api/{module_name}/ with trailing slash",
                 "example": f"/api/{module_name}/"
             }
         )
     
-    # Baaki purana code same...
-    if module_name not in MODULES:
-        all_modules = discover_modules()
-        if module_name in all_modules:
-            result = load_module(module_name, all_modules[module_name])
-            if result and result["type"] == "handler":
-                MODULES[module_name] = result["handler"]
-                logger.info(f"✅ Lazy loaded handler: {module_name}")
-            else:
-                return JSONResponse(status_code=404, content={"error": f"'{module_name}' not a handler"})
-        else:
-            return JSONResponse(status_code=404, content={"error": f"'{module_name}' not found"})
-    
-    return await run_handler(module_name, request)
+    # Purane handler modules ke liye
     if module_name not in MODULES:
         all_modules = discover_modules()
         if module_name in all_modules:
