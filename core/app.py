@@ -1,11 +1,10 @@
 """
 🦁 SINGH JI AI ULTRA v7.0 - LIGHTWEIGHT + SELF-PING + FASTAPI ROUTERS
-Lazy Loading + Auto Ping + Guard Agent Support
 """
 
 from fastapi import FastAPI, Request, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse  # 🆕 RedirectResponse add
 import os
 import sys
 import json
@@ -13,7 +12,6 @@ import asyncio
 import aiohttp
 import requests 
 import importlib.util
-import inspect  
 from datetime import datetime
 import logging
 
@@ -32,6 +30,17 @@ app.add_middleware(
     allow_methods=["*"], 
     allow_headers=["*"]
 )
+
+# 🆕 AUTO TRAILING SLASH MIDDLEWARE
+@app.middleware("http")
+async def auto_slash_redirect(request: Request, call_next):
+    path = request.url.path
+    if path.startswith("/api/") and not path.endswith("/"):
+        module_name = path.replace("/api/", "").split("/")[0]
+        if module_name in FASTAPI_ROUTERS:
+            return RedirectResponse(url=path + "/", status_code=307)
+    response = await call_next(request)
+    return response
 
 MODULES = {}
 FASTAPI_ROUTERS = {}
@@ -81,9 +90,6 @@ def load_module(name, info):
         logger.error(f"Failed {name}: {e}")
         return None
 
-# ============================================================
-# 🦁 SELF-PING SYSTEM
-# ============================================================
 async def self_ping():
     await asyncio.sleep(60)
     while True:
@@ -98,14 +104,12 @@ async def self_ping():
             logger.error(f"❌ Self-ping failed: {e}")
         await asyncio.sleep(10 * 60)
 
-# ============================================================
-# 🦁 STARTUP — Router + Handler dono load
-# ============================================================
 @app.on_event("startup")
 async def startup():
     all_modules = discover_modules()
     loaded_handlers = 0
     loaded_routers = 0
+    skipped = []  # 🆕
     
     for name, info in all_modules.items():
         result = load_module(name, info)
@@ -119,14 +123,16 @@ async def startup():
                 MODULES[name] = result["handler"]
                 loaded_handlers += 1
                 logger.info(f"✅ Handler loaded: {name}")
+        else:
+            skipped.append(name)  # 🆕
+            logger.warning(f"⚠️ Skipped {name}: no router or handler found")
     
     logger.info(f"🦁 Singh Ji AI v7.0 started — {loaded_handlers} handlers + {loaded_routers} routers loaded")
+    if skipped:
+        logger.warning(f"⚠️ Skipped modules: {', '.join(skipped)}")
     logger.info("🦁 Self-ping enabled — Render will never sleep!")
     asyncio.create_task(self_ping())
 
-# ============================================================
-# 🦁 HEALTH CHECKS
-# ============================================================
 @app.api_route("/", methods=["GET", "HEAD"])
 async def root():
     return {
@@ -156,9 +162,6 @@ async def status():
         "status": "🦁 LIVE"
     }
 
-# ============================================================
-# 🦁 TELEGRAM WEBHOOK
-# ============================================================
 @app.post("/telegram/webhook")
 async def telegram_webhook(request: Request):
     try:
@@ -189,9 +192,6 @@ async def telegram_webhook(request: Request):
         logger.error(f"Telegram error: {e}")
         return JSONResponse(status_code=200, content={"status": "ok"})
 
-# ============================================================
-# 🦁 LAZY LOAD HANDLER — Purane modules ke liye
-# ============================================================
 async def run_handler(module_name: str, request: Request):
     handler_func = MODULES[module_name]
     try:
@@ -219,13 +219,8 @@ async def run_handler(module_name: str, request: Request):
         logger.error(f"❌ Error in {module_name}: {e}")
         return JSONResponse(status_code=500, content={"status": "error", "module": module_name, "error": str(e)})
 
-# ============================================================
-# 🦁 WILDCARD ROUTER — Router modules ko skip karo
-# ============================================================
 @app.api_route("/api/{module_name}", methods=["GET", "POST", "HEAD", "PUT", "DELETE", "OPTIONS"])
 async def lazy_router(request: Request, module_name: str):
-    
-    # 🆕 AGAR yeh FastAPI router hai, toh hint do
     if module_name in FASTAPI_ROUTERS:
         return JSONResponse(
             status_code=404, 
@@ -236,7 +231,6 @@ async def lazy_router(request: Request, module_name: str):
             }
         )
     
-    # Purane handler modules ke liye
     if module_name not in MODULES:
         all_modules = discover_modules()
         if module_name in all_modules:
