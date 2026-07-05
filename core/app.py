@@ -1,8 +1,9 @@
 """
-🦁 SINGH JI AI ULTRA v7.0 - LIGHTWEIGHT + SELF-PING
-Lazy Loading + Auto Ping (Har 10 min mein Render ko jagaye)
+🦁 SINGH JI AI ULTRA v7.0 - LIGHTWEIGHT + SELF-PING + FASTAPI ROUTERS
+Lazy Loading + Auto Ping + Guard Agent Support
 """
-from fastapi import FastAPI, Request
+
+from fastapi import FastAPI, Request, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import os
@@ -33,6 +34,7 @@ app.add_middleware(
 )
 
 MODULES = {}
+FASTAPI_ROUTERS = {}  # 🆕 Naya — FastAPI routers ke liye
 MODULES_DIR = os.path.join(os.path.dirname(__file__), "..", "modules")
 
 def discover_modules():
@@ -56,24 +58,37 @@ def load_module(name, info):
             module = importlib.util.module_from_spec(spec)
             sys.modules[f"modules.{name}"] = module
             spec.loader.exec_module(module)
-            return getattr(module, "handler", None)
+            
+            # 🆕 Check karo — APIRouter hai ya function?
+            router = getattr(module, "router", None)
+            handler = getattr(module, "handler", None)
+            
+            if router and isinstance(router, APIRouter):
+                # FastAPI Router mila!
+                return {"type": "router", "router": router}
+            elif handler:
+                # Purana function style
+                return {"type": "handler", "handler": handler}
+            else:
+                return None
+                
         else:
             spec = importlib.util.spec_from_file_location(name, info["path"])
             module = importlib.util.module_from_spec(spec)
             sys.modules[name] = module
             spec.loader.exec_module(module)
-            return getattr(module, "handler", None)
+            handler = getattr(module, "handler", None)
+            return {"type": "handler", "handler": handler} if handler else None
+            
     except Exception as e:
         logger.error(f"Failed {name}: {e}")
         return None
 
 # ============================================================
-# 🦁 SELF-PING SYSTEM — Render ko sone nahi dega!
+# 🦁 SELF-PING SYSTEM
 # ============================================================
 async def self_ping():
-    """Har 10 minute mein Render ko ping karega — server hamesha live"""
     await asyncio.sleep(60)
-    
     while True:
         try:
             async with aiohttp.ClientSession() as session:
@@ -84,31 +99,46 @@ async def self_ping():
                     logger.info(f"🦁 Self-ping: {resp.status} | Render awake!")
         except Exception as e:
             logger.error(f"❌ Self-ping failed: {e}")
-        
         await asyncio.sleep(10 * 60)
 
 # ============================================================
-# 🦁 STARTUP — FIXED: Ab sab modules preload honge
+# 🦁 STARTUP — Router + Handler dono load
 # ============================================================
 @app.on_event("startup")
 async def startup():
     all_modules = discover_modules()
-    loaded_count = 0
+    loaded_handlers = 0
+    loaded_routers = 0
+    
     for name, info in all_modules.items():
-        handler = load_module(name, info)
-        if handler:
-            MODULES[name] = handler
-            loaded_count += 1
-    logger.info(f"🦁 Singh Ji AI v7.0 started — {loaded_count}/{len(all_modules)} modules loaded")
+        result = load_module(name, info)
+        if result:
+            if result["type"] == "router":
+                # 🆕 FastAPI Router — app mein mount karo
+                FASTAPI_ROUTERS[name] = result["router"]
+                app.include_router(result["router"], prefix=f"/api/{name}", tags=[name])
+                loaded_routers += 1
+                logger.info(f"✅ Router loaded: {name} → /api/{name}")
+            else:
+                # Purana handler
+                MODULES[name] = result["handler"]
+                loaded_handlers += 1
+                logger.info(f"✅ Handler loaded: {name}")
+    
+    logger.info(f"🦁 Singh Ji AI v7.0 started — {loaded_handlers} handlers + {loaded_routers} routers loaded")
     logger.info("🦁 Self-ping enabled — Render will never sleep!")
     asyncio.create_task(self_ping())
 
+# ============================================================
+# 🦁 HEALTH CHECKS
+# ============================================================
 @app.api_route("/", methods=["GET", "HEAD"])
 async def root():
     return {
         "name": "🦁 Singh Ji AI Ultra v7.0", 
         "version": "7.0.0-light", 
         "modules_loaded": len(MODULES),
+        "routers_loaded": len(FASTAPI_ROUTERS),
         "status": "🦁 LIVE", 
         "timestamp": datetime.now().isoformat()
     }
@@ -124,13 +154,48 @@ async def health_simple():
 @app.get("/api/status")
 async def status():
     return {
-        "loaded": len(MODULES), 
-        "modules": list(MODULES.keys()), 
+        "loaded_handlers": len(MODULES), 
+        "loaded_routers": len(FASTAPI_ROUTERS),
+        "handlers": list(MODULES.keys()),
+        "routers": list(FASTAPI_ROUTERS.keys()),
         "status": "🦁 LIVE"
     }
 
 # ============================================================
-# 🦁 RUN HANDLER — SYNC + ASYNC Support
+# 🦁 TELEGRAM WEBHOOK (Pehle jaisa)
+# ============================================================
+@app.post("/telegram/webhook")
+async def telegram_webhook(request: Request):
+    try:
+        data = await request.json()
+        message = data.get('message', {})
+        text = message.get('text', '')
+        chat_id = message.get('chat', {}).get('id')
+        
+        logger.info(f"📩 Telegram: {text} from chat {chat_id}")
+        
+        if text == '/start':
+            reply = "🦁 <b>Singh Ji AI Bot</b>\n\nShuruwat ho gayi!"
+        elif text == '/help':
+            reply = "🦁 <b>Madad</b>\n\n/start — Bot shuru\n/status — API status"
+        elif text == '/status':
+            reply = "🟢 <b>Singh Ji AI Status</b>\n\n✅ Bot Active\n✅ API Connected"
+        else:
+            reply = f"🦁 Aapne likha: <b>{text}</b>"
+        
+        if TELEGRAM_TOKEN and chat_id:
+            url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+            requests.post(url, json={"chat_id": chat_id, "text": reply, "parse_mode": "HTML"}, timeout=10)
+            logger.info(f"✅ Reply sent to {chat_id}")
+        
+        return JSONResponse(status_code=200, content={"status": "ok"})
+        
+    except Exception as e:
+        logger.error(f"Telegram error: {e}")
+        return JSONResponse(status_code=200, content={"status": "ok"})
+
+# ============================================================
+# 🦁 LAZY LOAD HANDLER — Purane modules ke liye
 # ============================================================
 async def run_handler(module_name: str, request: Request):
     handler_func = MODULES[module_name]
@@ -159,66 +224,24 @@ async def run_handler(module_name: str, request: Request):
         logger.error(f"❌ Error in {module_name}: {e}")
         return JSONResponse(status_code=500, content={"status": "error", "module": module_name, "error": str(e)})
 
-# ============================================================
-# 🦁 TELEGRAM WEBHOOK
-# ============================================================
-@app.post("/telegram/webhook")
-async def telegram_webhook(request: Request):
-    try:
-        data = await request.json()
-        message = data.get('message', {})
-        text = message.get('text', '')
-        chat_id = message.get('chat', {}).get('id')
-        
-        logger.info(f"📩 Telegram: {text} from chat {chat_id}")
-        
-        if text == '/start':
-            reply = "🦁 <b>Singh Ji AI Bot</b>\n\nShuruwat ho gayi!\n\nCommands:\n/start — Shuruwat\n/help — Madad\n/status — System check"
-        elif text == '/help':
-            reply = "🦁 <b>Madad</b>\n\n/start — Bot shuru\n/status — API status\nKuch bhi likho — Main jawab dunga!"
-        elif text == '/status':
-            reply = "🟢 <b>Singh Ji AI Status</b>\n\n✅ Bot Active\n✅ API Connected\n🦁 Singh Ji AI v7.0"
-        else:
-            reply = f"🦁 Aapne likha: <b>{text}</b>\n\nMain abhi sirf commands samajhta hoon:\n/start, /help, /status"
-        
-        if TELEGRAM_TOKEN and chat_id:
-            import requests
-            url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-            requests.post(url, json={
-                "chat_id": chat_id,
-                "text": reply,
-                "parse_mode": "HTML"
-            }, timeout=10)
-            logger.info(f"✅ Reply sent to {chat_id}")
-        
-        return JSONResponse(status_code=200, content={"status": "ok"})
-        
-    except Exception as e:
-        logger.error(f"Telegram error: {e}")
-        return JSONResponse(status_code=200, content={"status": "ok"})
-
-# ============================================================
-# 🦁 LAZY LOAD ROUTER — FIXED!
-# ============================================================
 @app.api_route("/api/{module_name}", methods=["GET", "POST", "HEAD", "PUT", "DELETE", "OPTIONS"])
 async def router(request: Request, module_name: str):
+    # 🆕 Pehle check karo — yeh FastAPI router hai kya?
+    if module_name in FASTAPI_ROUTERS:
+        # Router already mounted at /api/{module_name}, yahan nahi aayega normally
+        return JSONResponse(status_code=404, content={"error": "Use router endpoints directly"})
+    
     if module_name not in MODULES:
         all_modules = discover_modules()
         if module_name in all_modules:
-            handler = load_module(module_name, all_modules[module_name])
-            if handler:
-                MODULES[module_name] = handler
-                logger.info(f"✅ Lazy loaded: {module_name}")
+            result = load_module(module_name, all_modules[module_name])
+            if result and result["type"] == "handler":
+                MODULES[module_name] = result["handler"]
+                logger.info(f"✅ Lazy loaded handler: {module_name}")
             else:
-                return JSONResponse(
-                    status_code=404, 
-                    content={"status": "error", "message": f"'{module_name}' failed to load"}
-                )
+                return JSONResponse(status_code=404, content={"error": f"'{module_name}' not a handler"})
         else:
-            return JSONResponse(
-                status_code=404, 
-                content={"status": "error", "message": f"'{module_name}' not found"}
-            )
+            return JSONResponse(status_code=404, content={"error": f"'{module_name}' not found"})
     
     return await run_handler(module_name, request)
 
