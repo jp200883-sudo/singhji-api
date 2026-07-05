@@ -1,4 +1,4 @@
-# modules/supabase_memory/handler.py — FULL UPGRADE
+# modules/supabase_memory/handler.py — FULL UPGRADE (schema-matched)
 import os
 from typing import Optional
 from supabase import create_client, Client
@@ -14,7 +14,7 @@ if SUPABASE_URL and SUPABASE_KEY:
         print("आरंभ में Supabase जोड़ने में त्रुटि:", str(e))
         supabase = None
 else:
-    print("चेतावनी: SUPABASE_URL या SUPABASE_KEY व्यवस्था में मौजूद नहीं है")
+    print("चेतावनी: SUPABASE_URL या SUPABASE_SERVICE_KEY व्यवस्था में मौजूद नहीं है")
 
 
 def _ok(data=None):
@@ -57,7 +57,10 @@ async def handler(request):
             payload = body.get("data")
             if not payload:
                 return _fail("data क्षेत्र आवश्यक है", 400)
-            result = supabase.table("chats").insert(payload).execute()
+            # chat_history टेबल को message + response दोनों चाहिए
+            if "response" not in payload:
+                payload["response"] = ""
+            result = supabase.table("chat_history").insert(payload).execute()
             return _ok(result.data)
 
         elif action == "get_chat_history":
@@ -66,7 +69,7 @@ async def handler(request):
                 return _fail("user_id आवश्यक है", 400)
             limit = int(body.get("limit", 50))
             result = (
-                supabase.table("chats")
+                supabase.table("chat_history")
                 .select("*")
                 .eq("user_id", user_id)
                 .order("created_at", desc=True)
@@ -76,22 +79,43 @@ async def handler(request):
             return _ok(result.data)
 
         elif action == "save_schedule":
+            # असल में schedules टेबल नहीं है — user_memory में key="schedule" डालकर सेव कर रहे हैं
+            user_id = body.get("data", {}).get("user_id")
             payload = body.get("data")
-            if not payload:
-                return _fail("data क्षेत्र आवश्यक है", 400)
-            result = supabase.table("schedules").insert(payload).execute()
+            if not payload or not user_id:
+                return _fail("data.user_id आवश्यक है", 400)
+            record = {
+                "user_id": user_id,
+                "key": "schedule",
+                "value": payload
+            }
+            result = supabase.table("user_memory").upsert(record, on_conflict="user_id,key").execute()
             return _ok(result.data)
 
         elif action == "get_schedule":
             user_id = body.get("user_id")
             if not user_id:
                 return _fail("user_id आवश्यक है", 400)
-            result = supabase.table("schedules").select("*").eq("user_id", user_id).execute()
+            result = (
+                supabase.table("user_memory")
+                .select("*")
+                .eq("user_id", user_id)
+                .eq("key", "schedule")
+                .execute()
+            )
             return _ok(result.data)
 
         elif action == "analytics":
+            # असल टेबल का नाम events है
             limit = int(body.get("limit", 100))
-            result = supabase.table("analytics").select("*").limit(limit).execute()
+            result = supabase.table("events").select("*").order("created_at", desc=True).limit(limit).execute()
+            return _ok(result.data)
+
+        elif action == "log_event":
+            payload = body.get("data")
+            if not payload or "event_type" not in payload:
+                return _fail("data.event_type आवश्यक है", 400)
+            result = supabase.table("events").insert(payload).execute()
             return _ok(result.data)
 
         elif action == "delete_user":
