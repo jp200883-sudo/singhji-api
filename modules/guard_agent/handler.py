@@ -473,4 +473,72 @@ async def broadcast_whatsapp(numbers: List[str], message: str, location: Optiona
         results.append({"number": num, "status": result["status"]})
     
     return {
-        "broadcast_id": f
+        "broadcast_id": f"bc_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}",
+        "total": len(numbers),
+        "successful": sum(1 for r in results if r["status"] == "mock_sent"),
+        "results": results
+    }
+
+# ============================================
+# 📋 ALERT HISTORY
+# ============================================
+
+@router.get("/alerts")
+async def get_alerts(limit: int = 50, agent_type: Optional[str] = None):
+    filtered = alerts_db
+    if agent_type:
+        filtered = [a for a in alerts_db if a.get("type") == agent_type]
+    
+    return {
+        "total": len(filtered),
+        "alerts": filtered[-limit:][::-1]  # Latest first
+    }
+
+@router.delete("/alerts/clear")
+async def clear_alerts():
+    global alerts_db
+    count = len(alerts_db)
+    alerts_db = []
+    return {"status": "cleared", "deleted": count}
+
+# ============================================
+# 🤖 UNIFIED DETECTION (Sab ek saath)
+# ============================================
+
+@router.post("/detect")
+async def unified_detect(
+    camera_id: str,
+    location: str,
+    detect_types: List[str] = ["vehicle", "human", "sound"]
+):
+    """Ek camera se sab kuch detect karo"""
+    
+    results = {}
+    
+    for dtype in detect_types:
+        if dtype == "vehicle":
+            results["vehicle"] = {
+                "detected": random.random() > 0.5,
+                "count": random.randint(0, 5),
+                "types": random.sample(VEHICLE_TYPES, k=random.randint(1, 3))
+            }
+        elif dtype == "human":
+            results["human"] = {
+                "detected": random.random() > 0.3,
+                "count": random.randint(0, 10),
+                "behaviors": random.sample(BEHAVIOR_TYPES, k=random.randint(0, 2))
+            }
+        elif dtype == "sound":
+            sound = random.choice(SOUND_TYPES)
+            results["sound"] = {
+                "detected": sound != "normal",
+                "type": sound,
+                "priority": "CRITICAL" if sound in ["gunshot", "scream"] else "INFO"
+            }
+    
+    return {
+        "camera_id": camera_id,
+        "location": location,
+        "detections": results,
+        "processed_at": datetime.utcnow().isoformat()
+    }
