@@ -7,7 +7,7 @@ Petrol, Diesel, CNG, LPG rates for Indian cities
 import requests
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, List
 
 RAPIDAPI_KEY = os.getenv("RAPIDAPI_KEY", "")
@@ -138,7 +138,7 @@ class FuelHandler:
         base_rate = CITY_BASE_RATES.get(city.lower(), CITY_BASE_RATES["delhi"]).get(fuel_type, 0)
 
         for i in range(days):
-            date = (datetime.now() - __import__("datetime").timedelta(days=i)).strftime("%Y-%m-%d")
+            date = (datetime.now() - timedelta(days=i)).strftime("%Y-%m-%d")
             variation = (hash(date + city) % 40) - 20  # -20 to +20 paise
             rate = round(base_rate + variation * 0.01, 2)
             changes.append({
@@ -180,7 +180,7 @@ class FuelHandler:
             "costliest": summary[-1]
         }
 
-       def format_for_telegram(self, fuel_data: Dict, language: str = "hi") -> str:
+    def format_for_telegram(self, fuel_data: Dict, language: str = "hi") -> str:
         """Format fuel rates for Telegram"""
         city = fuel_data.get("city", "Delhi")
         date = fuel_data.get("date", datetime.now().strftime("%Y-%m-%d"))
@@ -203,26 +203,6 @@ class FuelHandler:
             message += "━━━━━━━━━━━━━━━\n⚡ *Singh Ji AI Ultra v7.0*"
 
         return message
-            message += "━━━━━━━━━━━━━━━
-⚡ *Singh Ji AI Ultra v7.0*"
-        else:
-            message = f"⛽ *Fuel Prices* ⛽
-━━━━━━━━━━━━━━━
-📍 *{city}*
-📅 *{date}*
-
-"
-            for fuel, rate in rates.items():
-                unit = "₹/kg" if fuel == "lpg" else "₹/litre"
-                message += f"🔹 *{fuel.title()}:* ₹{rate} {unit}
-"
-            message += f"
-📊 *Source:* {fuel_data.get('source', 'IOC')}
-"
-            message += "━━━━━━━━━━━━━━━
-⚡ *Singh Ji AI Ultra v7.0*"
-
-        return message
 
     def format_comparison_telegram(self, comp_data: Dict, language: str = "hi") -> str:
         """Format comparison for Telegram"""
@@ -230,40 +210,25 @@ class FuelHandler:
         fuel_name = FUEL_NAMES_HI.get(fuel_type, fuel_type.title())
 
         if language == "hi":
-            message = f"🏙️ *{fuel_name} — शहरों में तुलना* 🏙️
-📅 {comp_data.get('date')}
-
-"
+            message = "🏙️ *" + fuel_name + " — शहरों में तुलना* 🏙️\n📅 " + str(comp_data.get('date')) + "\n\n"
             for item in comp_data.get("comparison", []):
-                message += f"📍 *{item['city']}* — ₹{item['rate']}
-"
+                message += "📍 *" + item['city'] + "* — ₹" + str(item['rate']) + "\n"
             cheapest = comp_data.get("cheapest")
             costliest = comp_data.get("costliest")
             if cheapest and costliest:
-                message += f"
-✅ सबसे सस्ता: {cheapest['city']} (₹{cheapest['rate']})
-"
-                message += f"❌ सबसे महंगा: {costliest['city']} (₹{costliest['rate']})
-"
+                message += "\n✅ सबसे सस्ता: " + cheapest['city'] + " (₹" + str(cheapest['rate']) + ")\n"
+                message += "❌ सबसे महंगा: " + costliest['city'] + " (₹" + str(costliest['rate']) + ")\n"
         else:
-            message = f"🏙️ *{fuel_name} — City Comparison* 🏙️
-📅 {comp_data.get('date')}
-
-"
+            message = "🏙️ *" + fuel_name + " — City Comparison* 🏙️\n📅 " + str(comp_data.get('date')) + "\n\n"
             for item in comp_data.get("comparison", []):
-                message += f"📍 *{item['city']}* — ₹{item['rate']}
-"
+                message += "📍 *" + item['city'] + "* — ₹" + str(item['rate']) + "\n"
             cheapest = comp_data.get("cheapest")
             costliest = comp_data.get("costliest")
             if cheapest and costliest:
-                message += f"
-✅ Cheapest: {cheapest['city']} (₹{cheapest['rate']})
-"
-                message += f"❌ Costliest: {costliest['city']} (₹{costliest['rate']})
-"
+                message += "\n✅ Cheapest: " + cheapest['city'] + " (₹" + str(cheapest['rate']) + ")\n"
+                message += "❌ Costliest: " + costliest['city'] + " (₹" + str(costliest['rate']) + ")\n"
 
-        message += "
-⚡ *Singh Ji AI Ultra v7.0*"
+        message += "\n⚡ *Singh Ji AI Ultra v7.0*"
         return message
 
 
