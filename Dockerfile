@@ -9,4 +9,5 @@ COPY . .
 
 EXPOSE 8000
 
-CMD ["uvicorn", "agent_swarm_system:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
+# Railway uses $PORT env variable
+CMD uvicorn main:app --host 0.0.0.0 --port $PORT --workers 4
