@@ -7,7 +7,7 @@ ujson==5.9.0
 apscheduler==3.10.4
 requests==2.32.3
 transformers==4.41.2
-torch==2.3.1
+torch==2.5.1
 sentencepiece==0.2.0
 fastapi
 uvicorn
