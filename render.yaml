@@ -1,22 +1,28 @@
 services:
-  # Python API (existing)
   - type: web
-    name: singhji-api
-    runtime: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn core.app:app --host 0.0.0.0 --port $PORT
+    name: singhji-agent-swarm
+    runtime: docker
+    plan: standard
     envVars:
       - key: PYTHON_VERSION
-        value: 3.11.0
+        value: 3.11
+      - key: UVICORN_WORKERS
+        value: 4
+      - key: MAX_AGENTS
+        value: 300
+      - key: MAX_STEPS
+        value: 4000
+      - key: CLAW_GROUPS
+        value: 11
+      - key: REDIS_URL
+        fromService:
+          name: singhji-redis
+          type: redis
+          property: connectionString
+    healthCheckPath: /health
+    autoDeploy: true
 
-  # Go Voice Server (NEW)
-  - type: web
-    name: singhji-voice
-    runtime: go
-    buildCommand: go mod tidy && go build -o voice-server ./go-voice/cmd/main.go
-    startCommand: ./voice-server
-    envVars:
-      - key: PORT
-        value: 8080
-      - key: GROQ_API_KEY
-        sync: false
+  - type: redis
+    name: singhji-redis
+    plan: free
+    ipAllowList: []
