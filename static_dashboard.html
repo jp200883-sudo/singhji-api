@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🦁 Singh Ji AI — 300+ Agent Swarm Dashboard</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
+            color: #fff;
+            font-family: 'Segoe UI', sans-serif;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Animated background particles */
+        .particles {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 0;
+        }
+        .particle {
+            position: absolute;
+            width: 4px; height: 4px;
+            background: rgba(255, 165, 0, 0.6);
+            border-radius: 50%;
+            animation: float 15s infinite;
+        }
+        @keyframes float {
+            0%, 100% { transform: translateY(100vh) rotate(0deg); opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { transform: translateY(-100vh) rotate(720deg); opacity: 0; }
+        }
+
+        .header {
+            text-align: center;
+            padding: 30px 20px;
+            position: relative;
+            z-index: 1;
+        }
+        .header h1 {
+            font-size: 3em;
+            background: linear-gradient(90deg, #ff6b35, #f7c531, #ff6b35);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: glow 2s ease-in-out infinite alternate;
+        }
+        @keyframes glow {
+            from { text-shadow: 0 0 20px rgba(255,107,53,0.5); }
+            to { text-shadow: 0 0 40px rgba(247,197,49,0.8), 0 0 60px rgba(255,107,53,0.6); }
+        }
+        .header .subtitle {
+            color: #888;
+            font-size: 1.2em;
+            margin-top: 10px;
+        }
+
+        /* Stats Bar */
+        .stats-bar {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            padding: 20px;
+            flex-wrap: wrap;
+            position: relative;
+            z-index: 1;
+        }
+        .stat-card {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,165,0,0.3);
+            border-radius: 15px;
+            padding: 20px 30px;
+            text-align: center;
+            min-width: 150px;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s;
+        }
+        .stat-card:hover {
+            transform: translateY(-5px);
+            border-color: #ff6b35;
+            box-shadow: 0 10px 30px rgba(255,107,53,0.3);
+        }
+        .stat-number {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #f7c531;
+        }
+        .stat-label {
+            color: #aaa;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+
+        /* Step Progress */
+        .step-progress {
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 0 20px;
+            position: relative;
+            z-index: 1;
+        }
+        .step-bar {
+            background: rgba(255,255,255,0.1);
+            border-radius: 20px;
+            height: 30px;
+            overflow: hidden;
+            border: 1px solid rgba(255,165,0,0.3);
+        }
+        .step-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ff6b35, #f7c531);
+            border-radius: 20px;
+            transition: width 0.5s ease;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding-right: 10px;
+            font-weight: bold;
+            font-size: 0.9em;
+        }
+        .step-info {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 10px;
+            color: #888;
+            font-size: 0.9em;
+        }
+
+        /* Claw Groups Grid */
+        .claws-container {
+            max-width: 1400px;
+            margin: 40px auto;
+            padding: 0 20px;
+            position: relative;
+            z-index: 1;
+        }
+        .claws-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+            gap: 20px;
+        }
+
+        .claw-card {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 20px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+        .claw-card:hover {
+            transform: scale(1.02);
+            border-color: var(--claw-color);
+            box-shadow: 0 0 30px var(--claw-glow);
+        }
+
+        .claw-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .claw-icon {
+            font-size: 2.5em;
+        }
+        .claw-title {
+            flex: 1;
+        }
+        .claw-title h3 {
+            font-size: 1.3em;
+            color: #fff;
+        }
+        .claw-title .leader {
+            color: #888;
+            font-size: 0.85em;
+        }
+        .claw-count {
+            background: var(--claw-color);
+            color: #000;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 0.9em;
+        }
+
+        .agents-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 8px;
+            max-height: 300px;
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+        .agents-list::-webkit-scrollbar {
+            width: 5px;
+        }
+        .agents-list::-webkit-scrollbar-thumb {
+            background: var(--claw-color);
+            border-radius: 5px;
+        }
+
+        .agent-item {
+            background: rgba(255,255,255,0.05);
+            border-radius: 10px;
+            padding: 10px;
+            font-size: 0.85em;
+            border-left: 3px solid var(--claw-color);
+            transition: all 0.2s;
+        }
+        .agent-item:hover {
+            background: rgba(255,255,255,0.1);
+            transform: translateX(5px);
+        }
+        .agent-id {
+            color: var(--claw-color);
+            font-weight: bold;
+            font-size: 0.75em;
+        }
+        .agent-name {
+            color: #fff;
+            font-weight: 500;
+            margin: 3px 0;
+        }
+        .agent-role {
+            color: #888;
+            font-size: 0.8em;
+        }
+        .agent-status {
+            display: inline-block;
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            margin-left: 5px;
+        }
+        .status-active { background: #00ff88; box-shadow: 0 0 5px #00ff88; }
+        .status-idle { background: #888; }
+        .status-working { background: #f7c531; animation: pulse 1s infinite; }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* Ethics Overlay Banner */
+        .ethics-banner {
+            background: linear-gradient(90deg, rgba(0,255,136,0.1), rgba(0,255,136,0.05));
+            border: 1px solid rgba(0,255,136,0.3);
+            border-radius: 15px;
+            padding: 20px;
+            margin: 20px auto;
+            max-width: 800px;
+            text-align: center;
+            position: relative;
+            z-index: 1;
+        }
+        .ethics-banner h3 {
+            color: #00ff88;
+            margin-bottom: 10px;
+        }
+        .ethics-rules {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin-top: 10px;
+        }
+        .ethics-rule {
+            background: rgba(0,255,136,0.1);
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            color: #00ff88;
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 40px 20px;
+            color: #666;
+            position: relative;
+            z-index: 1;
+        }
+        .footer .tagline {
+            font-size: 1.5em;
+            background: linear-gradient(90deg, #ff6b35, #f7c531);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header h1 { font-size: 2em; }
+            .claws-grid { grid-template-columns: 1fr; }
+            .agents-list { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Particles -->
+    <div class="particles" id="particles"></div>
+
+    <!-- Header -->
+    <div class="header">
+        <h1>🦁 SINGH JI AI — 300+ AGENT SWARM</h1>
+        <div class="subtitle">11 Claw Groups | 4000 Steps | Claude Ethics Overlay | v8.0</div>
+    </div>
+
+    <!-- Stats Bar -->
+    <div class="stats-bar">
+        <div class="stat-card">
+            <div class="stat-number" id="totalAgents">300</div>
+            <div class="stat-label">Total Agents</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number">11</div>
+            <div class="stat-label">Claw Groups</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number">4000</div>
+            <div class="stat-label">Max Steps</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number" id="activeAgents">300</div>
+            <div class="stat-label">Active Now</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number" id="completedTasks">0</div>
+            <div class="stat-label">Tasks Done</div>
+        </div>
+    </div>
+
+    <!-- Step Progress -->
+    <div class="step-progress">
+        <div class="step-bar">
+            <div class="step-fill" id="stepFill" style="width: 0%">0%</div>
+        </div>
+        <div class="step-info">
+            <span>Steps Used: <span id="stepsUsed">0</span></span>
+            <span>Remaining: <span id="stepsRemaining">4000</span></span>
+        </div>
+    </div>
+
+    <!-- Claude Ethics Overlay -->
+    <div class="ethics-banner">
+        <h3>🛡️ Claude Ethics Overlay — ACTIVE</h3>
+        <div>Safety + Ethics + Honesty = सबसे तगड़ी "किमियत"</div>
+        <div class="ethics-rules">
+            <div class="ethics-rule">✅ Child Safety</div>
+            <div class="ethics-rule">✅ No Hate Speech</div>
+            <div class="ethics-rule">✅ Privacy First</div>
+            <div class="ethics-rule">✅ Honest AI</div>
+            <div class="ethics-rule">✅ No Illegal Content</div>
+        </div>
+    </div>
+
+    <!-- Claw Groups -->
+    <div class="claws-container">
+        <div class="claws-grid" id="clawsGrid"></div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+        <div class="tagline">"Owner देखतां रह जाए" — Claude को सीमेंट बेल्ट से बांध दिया! 🔥</div>
+        <div>Singh Ji AI Ultra v8.0 | Deploy: Render | Backend: singhji-api</div>
+    </div>
+
+    <script>
+        // Claw colors
+        const clawColors = {
+            "claw_1_agriculture": { color: "#4CAF50", glow: "rgba(76,175,80,0.3)" },
+            "claw_2_health": { color: "#f44336", glow: "rgba(244,67,54,0.3)" },
+            "claw_3_finance": { color: "#FFD700", glow: "rgba(255,215,0,0.3)" },
+            "claw_4_education": { color: "#2196F3", glow: "rgba(33,150,243,0.3)" },
+            "claw_5_governance": { color: "#9C27B0", glow: "rgba(156,39,176,0.3)" },
+            "claw_6_transport": { color: "#FF9800", glow: "rgba(255,152,0,0.3)" },
+            "claw_7_voice": { color: "#00BCD4", glow: "rgba(0,188,212,0.3)" },
+            "claw_8_media": { color: "#E91E63", glow: "rgba(233,30,99,0.3)" },
+            "claw_9_safety": { color: "#00ff88", glow: "rgba(0,255,136,0.3)" },
+            "claw_10_boss": { color: "#ff6b35", glow: "rgba(255,107,53,0.3)" },
+            "claw_11_core_ai": { color: "#f7c531", glow: "rgba(247,197,49,0.3)" }
+        };
+
+        // Swarm data
+        const swarmData = {"claw_1_agriculture": {"name": "🌾 Agriculture Claw", "agents": 30, "leader": "CropMaster Agent", "agents_list": [{"id": "AGR-001", "name": "Crop Advisor Agent", "role": "क्या बोएं, कब बोएं", "status": "active"}, {"id": "AGR-002", "name": "Price Tracker Agent", "role": "Mandi भाव real-time", "status": "active"}, {"id": "AGR-003", "name": "Weather Agent", "role": "IMD data, forecast", "status": "active"}, {"id": "AGR-004", "name": "Pest Alert Agent", "role": "Plantix scan, alert", "status": "active"}, {"id": "AGR-005", "name": "Soil Health Agent", "role": "Soil test, fertilizer", "status": "active"}, {"id": "AGR-006", "name": "Irrigation Agent", "role": "Water schedule, drip", "status": "active"}, {"id": "AGR-007", "name": "Seed Quality Agent", "role": "Seed certification", "status": "active"}, {"id": "AGR-008", "name": "Fertilizer Agent", "role": "NPK calculator", "status": "active"}, {"id": "AGR-009", "name": "Pesticide Agent", "role": "Safe spray guide", "status": "active"}, {"id": "AGR-010", "name": "Harvest Agent", "role": "Best harvest time", "status": "active"}, {"id": "AGR-011", "name": "Market Link Agent", "role": "Direct farmer buyer", "status": "active"}, {"id": "AGR-012", "name": "Subsidy Agent", "role": "Govt scheme tracker", "status": "active"}, {"id": "AGR-013", "name": "Crop Insurance Agent", "role": "PMFBY claims", "status": "active"}, {"id": "AGR-014", "name": "Organic Farming Agent", "role": "Organic certification", "status": "active"}, {"id": "AGR-015", "name": "Livestock Agent", "role": "Animal health, feed", "status": "active"}, {"id": "AGR-016", "name": "Dairy Agent", "role": "Milk production, price", "status": "active"}, {"id": "AGR-017", "name": "Poultry Agent", "role": "Chicken, egg market", "status": "active"}, {"id": "AGR-018", "name": "Fish Farming Agent", "role": "Aquaculture guide", "status": "active"}, {"id": "AGR-019", "name": "Beekeeping Agent", "role": "Honey production", "status": "active"}, {"id": "AGR-020", "name": "Greenhouse Agent", "role": "Polyhouse management", "status": "active"}, {"id": "AGR-021", "name": "Drone Spray Agent", "role": "Agri-drone booking", "status": "active"}, {"id": "AGR-022", "name": "Soil Testing Agent", "role": "Lab booking, report", "status": "active"}, {"id": "AGR-023", "name": "Weather Alert Agent", "role": "Extreme weather SOS", "status": "active"}, {"id": "AGR-024", "name": "Crop Disease Agent", "role": "Disease identification", "status": "active"}, {"id": "AGR-025", "name": "Farm Equipment Agent", "role": "Tractor, tools rent", "status": "active"}, {"id": "AGR-026", "name": "Cold Storage Agent", "role": "Storage booking", "status": "active"}, {"id": "AGR-027", "name": "Export Agent", "role": "International market", "status": "active"}, {"id": "AGR-028", "name": "Agri-Loan Agent", "role": "KCC, crop loan", "status": "active"}, {"id": "AGR-029", "name": "Smart Farm Agent", "role": "IoT sensor, automation", "status": "active"}, {"id": "AGR-030", "name": "Krishi Vigyan Agent", "role": "KVK connect, training", "status": "active"}]}, "claw_2_health": {"name": "🏥 Health Claw", "agents": 30, "leader": "Dr. Singh Agent", "agents_list": [{"id": "HLT-001", "name": "Symptom Checker Agent", "role": "बीमारी पहचान", "status": "active"}, {"id": "HLT-002", "name": "Doctor Finder Agent", "role": "नज़दीकी doctor", "status": "active"}, {"id": "HLT-003", "name": "Medicine Info Agent", "role": "दवाई की जानकारी", "status": "active"}, {"id": "HLT-004", "name": "Emergency SOS Agent", "role": "Ambulance, SOS", "status": "active"}, {"id": "HLT-005", "name": "Lab Test Agent", "role": "Blood test, report", "status": "active"}, {"id": "HLT-006", "name": "Appointment Agent", "role": "Hospital booking", "status": "active"}, {"id": "HLT-007", "name": "Ayurveda Agent", "role": "आयुर्वेदिक उपचार", "status": "active"}, {"id": "HLT-008", "name": "Yoga Agent", "role": "योग, प्राणायाम", "status": "active"}, {"id": "HLT-009", "name": "Diet Planner Agent", "role": "Nutrition, diet chart", "status": "active"}, {"id": "HLT-010", "name": "Mental Health Agent", "role": "Depression, anxiety", "status": "active"}, {"id": "HLT-011", "name": "Pregnancy Agent", "role": "Garv nirodh, care", "status": "active"}, {"id": "HLT-012", "name": "Child Health Agent", "role": "Baccha health, vaccine", "status": "active"}, {"id": "HLT-013", "name": "Senior Care Agent", "role": "Buzurg care, pension", "status": "active"}, {"id": "HLT-014", "name": "Dental Agent", "role": "Dant dard, dentist", "status": "active"}, {"id": "HLT-015", "name": "Eye Care Agent", "role": "Aankh check, specs", "status": "active"}, {"id": "HLT-016", "name": "Skin Care Agent", "role": "Skin disease, beauty", "status": "active"}, {"id": "HLT-017", "name": "Diabetes Agent", "role": "Sugar control, diet", "status": "active"}, {"id": "HLT-018", "name": "BP Heart Agent", "role": "Blood pressure, heart", "status": "active"}, {"id": "HLT-019", "name": "Cancer Support Agent", "role": "Cancer info, support", "status": "active"}, {"id": "HLT-020", "name": "TB Agent", "role": "Tuberculosis treatment", "status": "active"}, {"id": "HLT-021", "name": "HIV AIDS Agent", "role": "Awareness, testing", "status": "active"}, {"id": "HLT-022", "name": "Vaccination Agent", "role": "Vaccine schedule", "status": "active"}, {"id": "HLT-023", "name": "Blood Bank Agent", "role": "Blood donation, need", "status": "active"}, {"id": "HLT-024", "name": "Organ Donation Agent", "role": "Organ donor registry", "status": "active"}, {"id": "HLT-025", "name": "Telemedicine Agent", "role": "Online doctor consult", "status": "active"}, {"id": "HLT-026", "name": "Health Record Agent", "role": "Medical history store", "status": "active"}, {"id": "HLT-027", "name": "Fitness Agent", "role": "Exercise, gym plan", "status": "active"}, {"id": "HLT-028", "name": "Sleep Agent", "role": "Neend, sleep disorder", "status": "active"}, {"id": "HLT-029", "name": "First Aid Agent", "role": "Emergency first aid", "status": "active"}, {"id": "HLT-030", "name": "Health Insurance Agent", "role": "Ayushman, insurance", "status": "active"}]}, "claw_3_finance": {"name": "💰 Finance Claw", "agents": 30, "leader": "Banker Singh Agent", "agents_list": [{"id": "FIN-001", "name": "UPI Payment Agent", "role": "Payment, QR scan", "status": "active"}, {"id": "FIN-002", "name": "Gold Rate Agent", "role": "सोने की भाव", "status": "active"}, {"id": "FIN-003", "name": "Fuel Price Agent", "role": "Petrol/Diesel भाव", "status": "active"}, {"id": "FIN-004", "name": "Budget Tracker Agent", "role": "खर्चा track", "status": "active"}, {"id": "FIN-005", "name": "Bank Account Agent", "role": "Balance, statement", "status": "active"}, {"id": "FIN-006", "name": "Loan Agent", "role": "Personal, home loan", "status": "active"}, {"id": "FIN-007", "name": "Credit Score Agent", "role": "CIBIL check", "status": "active"}, {"id": "FIN-008", "name": "Stock Market Agent", "role": "Share, NSE, BSE", "status": "active"}, {"id": "FIN-009", "name": "Mutual Fund Agent", "role": "SIP, returns", "status": "active"}, {"id": "FIN-010", "name": "Crypto Agent", "role": "Bitcoin, crypto price", "status": "active"}, {"id": "FIN-011", "name": "Tax Filing Agent", "role": "ITR, GST filing", "status": "active"}, {"id": "FIN-012", "name": "Insurance Agent", "role": "Life, health, vehicle", "status": "active"}, {"id": "FIN-013", "name": "Pension Agent", "role": "EPF, NPS, pension", "status": "active"}, {"id": "FIN-014", "name": "FD RD Agent", "role": "Fixed deposit, RD", "status": "active"}, {"id": "FIN-015", "name": "Recurring Deposit Agent", "role": "RD calculator", "status": "active"}, {"id": "FIN-016", "name": "Currency Converter Agent", "role": "USD, EUR, GBP", "status": "active"}, {"id": "FIN-017", "name": "Expense Split Agent", "role": "Bill split, group", "status": "active"}, {"id": "FIN-018", "name": "Savings Goal Agent", "role": "Target savings", "status": "active"}, {"id": "FIN-019", "name": "Merchant Agent", "role": "Shop payment, QR", "status": "active"}, {"id": "FIN-020", "name": "Invoice Agent", "role": "Bill generate, GST", "status": "active"}, {"id": "FIN-021", "name": "Salary Agent", "role": "Payslip, PF, TDS", "status": "active"}, {"id": "FIN-022", "name": "Forex Agent", "role": "Currency exchange", "status": "active"}, {"id": "FIN-023", "name": "Commodity Agent", "role": "Gold, silver, oil", "status": "active"}, {"id": "FIN-024", "name": "Real Estate Agent", "role": "Property price, rent", "status": "active"}, {"id": "FIN-025", "name": "Microfinance Agent", "role": "SHG, micro loan", "status": "active"}, {"id": "FIN-026", "name": "Crowdfunding Agent", "role": "Donation, funding", "status": "active"}, {"id": "FIN-027", "name": "Wallet Agent", "role": "Paytm, PhonePe, GPay", "status": "active"}, {"id": "FIN-028", "name": "Bill Payment Agent", "role": "Electricity, water, gas", "status": "active"}, {"id": "FIN-029", "name": "Recharge Agent", "role": "Mobile, DTH recharge", "status": "active"}, {"id": "FIN-030", "name": "Financial Advisor Agent", "role": "Investment planning", "status": "active"}]}, "claw_4_education": {"name": "📚 Education Claw", "agents": 30, "leader": "Guru Ji Agent", "agents_list": [{"id": "EDU-001", "name": "Tutor Agent", "role": "226 भाषाओं में पढ़ाए", "status": "active"}, {"id": "EDU-002", "name": "Exam Prep Agent", "role": "Test prep, mock tests", "status": "active"}, {"id": "EDU-003", "name": "Coding Agent", "role": "Python, JS, C++ सिखाए", "status": "active"}, {"id": "EDU-004", "name": "Career Agent", "role": "Job, scholarship", "status": "active"}, {"id": "EDU-005", "name": "NCERT Agent", "role": "NCERT solutions, PDF", "status": "active"}, {"id": "EDU-006", "name": "Competitive Exam Agent", "role": "UPSC, SSC, JEE", "status": "active"}, {"id": "EDU-007", "name": "Language Agent", "role": "English, Hindi, regional", "status": "active"}, {"id": "EDU-008", "name": "Math Agent", "role": "Ganit, algebra, calculus", "status": "active"}, {"id": "EDU-009", "name": "Science Agent", "role": "Physics, Chem, Bio", "status": "active"}, {"id": "EDU-010", "name": "History Agent", "role": "Itihaas, ancient, modern", "status": "active"}, {"id": "EDU-011", "name": "Geography Agent", "role": "Bhugol, maps, climate", "status": "active"}, {"id": "EDU-012", "name": "Polity Agent", "role": "Samvidhan, politics", "status": "active"}, {"id": "EDU-013", "name": "Economics Agent", "role": "Arthshastra, budget", "status": "active"}, {"id": "EDU-014", "name": "GK Agent", "role": "General knowledge", "status": "active"}, {"id": "EDU-015", "name": "Reasoning Agent", "role": "Logical, analytical", "status": "active"}, {"id": "EDU-016", "name": "Essay Writing Agent", "role": "Essay, letter, report", "status": "active"}, {"id": "EDU-017", "name": "Vocabulary Agent", "role": "Shabd, synonyms", "status": "active"}, {"id": "EDU-018", "name": "Current Affairs Agent", "role": "Daily news, quiz", "status": "active"}, {"id": "EDU-019", "name": "Scholarship Agent", "role": "Govt, private scholarship", "status": "active"}, {"id": "EDU-020", "name": "Admission Agent", "role": "College, university", "status": "active"}, {"id": "EDU-021", "name": "Online Course Agent", "role": "Coursera, Udemy, free", "status": "active"}, {"id": "EDU-022", "name": "Skill Agent", "role": "Vocational training", "status": "active"}, {"id": "EDU-023", "name": "Research Agent", "role": "Paper, thesis, PhD", "status": "active"}, {"id": "EDU-024", "name": "Library Agent", "role": "Book search, e-library", "status": "active"}, {"id": "EDU-025", "name": "Quiz Master Agent", "role": "Interactive quiz", "status": "active"}, {"id": "EDU-026", "name": "Homework Agent", "role": "Assignment help", "status": "active"}, {"id": "EDU-027", "name": "Parent Connect Agent", "role": "Parent-teacher meet", "status": "active"}, {"id": "EDU-028", "name": "College Finder Agent", "role": "Best college ranking", "status": "active"}, {"id": "EDU-029", "name": "Study Planner Agent", "role": "Timetable, schedule", "status": "active"}, {"id": "EDU-030", "name": "Result Agent", "role": "Board, university result", "status": "active"}]}, "claw_5_governance": {"name": "🏛️ Governance Claw", "agents": 30, "leader": "Sarkar Agent", "agents_list": [{"id": "GOV-001", "name": "PAN Card Agent", "role": "PAN apply, update", "status": "active"}, {"id": "GOV-002", "name": "Aadhaar Agent", "role": "Aadhaar services", "status": "active"}, {"id": "GOV-003", "name": "Voter ID Agent", "role": "Voter card, election", "status": "active"}, {"id": "GOV-004", "name": "Pension Agent", "role": "Pension, senior citizen", "status": "active"}, {"id": "GOV-005", "name": "Ration Card Agent", "role": "Ration, PDS", "status": "active"}, {"id": "GOV-006", "name": "Passport Agent", "role": "Passport apply, status", "status": "active"}, {"id": "GOV-007", "name": "Driving License Agent", "role": "DL apply, RTO", "status": "active"}, {"id": "GOV-008", "name": "Vehicle RC Agent", "role": "RC transfer, fitness", "status": "active"}, {"id": "GOV-009", "name": "Property Registration Agent", "role": "Land registry, mutation", "status": "active"}, {"id": "GOV-010", "name": "Birth Certificate Agent", "role": "Birth, death cert", "status": "active"}, {"id": "GOV-011", "name": "Marriage Certificate Agent", "role": "Marriage registration", "status": "active"}, {"id": "GOV-012", "name": "Caste Certificate Agent", "role": "SC/ST/OBC cert", "status": "active"}, {"id": "GOV-013", "name": "Income Certificate Agent", "role": "Income, domicile", "status": "active"}, {"id": "GOV-014", "name": "GST Registration Agent", "role": "GST number, filing", "status": "active"}, {"id": "GOV-015", "name": "Company Registration Agent", "role": "MSME, startup", "status": "active"}, {"id": "GOV-016", "name": "RTI Agent", "role": "RTI filing, status", "status": "active"}, {"id": "GOV-017", "name": "Complaint Agent", "role": "Grievance, portal", "status": "active"}, {"id": "GOV-018", "name": "Election Agent", "role": "Voter list, booth", "status": "active"}, {"id": "GOV-019", "name": "Police Verification Agent", "role": "Character cert", "status": "active"}, {"id": "GOV-020", "name": "Court Case Agent", "role": "Case status, lawyer", "status": "active"}, {"id": "GOV-021", "name": "Land Record Agent", "role": "Bhulekh, khasra", "status": "active"}, {"id": "GOV-022", "name": "EWS Certificate Agent", "role": "Economically weak", "status": "active"}, {"id": "GOV-023", "name": "Arms License Agent", "role": "Gun license apply", "status": "active"}, {"id": "GOV-024", "name": "Trade License Agent", "role": "Shop license", "status": "active"}, {"id": "GOV-025", "name": "NOC Agent", "role": "No objection cert", "status": "active"}, {"id": "GOV-026", "name": "FIR Agent", "role": "FIR file, status", "status": "active"}, {"id": "GOV-027", "name": "Jail Visit Agent", "role": "Prisoner visit booking", "status": "active"}, {"id": "GOV-028", "name": "RTO Agent", "role": "Vehicle all services", "status": "active"}, {"id": "GOV-029", "name": "Municipal Agent", "role": "Property tax, water", "status": "active"}, {"id": "GOV-030", "name": "Digital India Agent", "role": "DigiLocker, e-sign", "status": "active"}]}, "claw_6_transport": {"name": "🚗 Transport Claw", "agents": 30, "leader": "Chalak Agent", "agents_list": [{"id": "TRP-001", "name": "Railway Agent", "role": "Ticket, PNR, status", "status": "active"}, {"id": "TRP-002", "name": "Bus Agent", "role": "Booking, schedule", "status": "active"}, {"id": "TRP-003", "name": "Cab Agent", "role": "Ola, Uber, auto", "status": "active"}, {"id": "TRP-004", "name": "Fuel Station Agent", "role": "Price, station finder", "status": "active"}, {"id": "TRP-005", "name": "Flight Agent", "role": "Air ticket, status", "status": "active"}, {"id": "TRP-006", "name": "Metro Agent", "role": "Metro route, card", "status": "active"}, {"id": "TRP-007", "name": "Auto Rickshaw Agent", "role": "Auto fare, booking", "status": "active"}, {"id": "TRP-008", "name": "Bike Taxi Agent", "role": "Rapido, bike ride", "status": "active"}, {"id": "TRP-009", "name": "EV Charging Agent", "role": "EV station finder", "status": "active"}, {"id": "TRP-010", "name": "Parking Agent", "role": "Parking spot, fee", "status": "active"}, {"id": "TRP-011", "name": "Toll Plaza Agent", "role": "FASTag, toll rate", "status": "active"}, {"id": "TRP-012", "name": "Route Planner Agent", "role": "Best route, traffic", "status": "active"}, {"id": "TRP-013", "name": "Vehicle Insurance Agent", "role": "Car, bike insurance", "status": "active"}, {"id": "TRP-014", "name": "Vehicle Service Agent", "role": "Service center, cost", "status": "active"}, {"id": "TRP-015", "name": "Driving School Agent", "role": "Learn driving", "status": "active"}, {"id": "TRP-016", "name": "Car Rental Agent", "role": "Self-drive rent", "status": "active"}, {"id": "TRP-017", "name": "Bike Rental Agent", "role": "Two-wheeler rent", "status": "active"}, {"id": "TRP-018", "name": "Ship/Cruise Agent", "role": "Ship ticket, cruise", "status": "active"}, {"id": "TRP-019", "name": "Helicopter Agent", "role": "Heli booking, tour", "status": "active"}, {"id": "TRP-020", "name": "Truck Booking Agent", "role": "Goods transport", "status": "active"}, {"id": "TRP-021", "name": "Tourist Bus Agent", "role": "Package tour bus", "status": "active"}, {"id": "TRP-022", "name": "Traffic Alert Agent", "role": "Jam, accident alert", "status": "active"}, {"id": "TRP-023", "name": "Road Safety Agent", "role": "Safety tips, rules", "status": "active"}, {"id": "TRP-024", "name": "Vehicle Valuation Agent", "role": "Car price, resale", "status": "active"}, {"id": "TRP-025", "name": "Number Plate Agent", "role": "Fancy number booking", "status": "active"}, {"id": "TRP-026", "name": "Pollution Check Agent", "role": "PUC certificate", "status": "active"}, {"id": "TRP-027", "name": "Breakdown Agent", "role": "Towing, roadside help", "status": "active"}, {"id": "TRP-028", "name": "Car Pool Agent", "role": "Share ride, save money", "status": "active"}, {"id": "TRP-029", "name": "Border Crossing Agent", "role": "Nepal, Bhutan, visa", "status": "active"}, {"id": "TRP-030", "name": "EV Subsidy Agent", "role": "Electric vehicle scheme", "status": "active"}]}, "claw_7_voice": {"name": "🎙️ Voice Claw", "agents": 30, "leader": "Bolti Agent", "agents_list": [{"id": "VCE-001", "name": "Bhashini Agent", "role": "22 भाषाएं, STT, TTS", "status": "active"}, {"id": "VCE-002", "name": "Translate Agent", "role": "Real-time translation", "status": "active"}, {"id": "VCE-003", "name": "Voice Clone Agent", "role": "आवाज़ clone", "status": "active"}, {"id": "VCE-004", "name": "Dialect Agent", "role": "गांव की बोली", "status": "active"}, {"id": "VCE-005", "name": "STT Whisper Agent", "role": "Speech to text", "status": "active"}, {"id": "VCE-006", "name": "TTS Piper Agent", "role": "Text to speech", "status": "active"}, {"id": "VCE-007", "name": "TTS Edge Agent", "role": "Microsoft Edge TTS", "status": "active"}, {"id": "VCE-008", "name": "TTS Minimax Agent", "role": "Minimax AI voice", "status": "active"}, {"id": "VCE-009", "name": "TTS Kokoro Agent", "role": "Kokoro fast TTS", "status": "active"}, {"id": "VCE-010", "name": "Voice Clone XTTS Agent", "role": "Coqui XTTS clone", "status": "active"}, {"id": "VCE-011", "name": "Voice Clone Fish Agent", "role": "Fish Speech clone", "status": "active"}, {"id": "VCE-012", "name": "Voice Clone Orpheus Agent", "role": "Orpheus emotion", "status": "active"}, {"id": "VCE-013", "name": "VoIP Call Agent", "role": "Internet calling", "status": "active"}, {"id": "VCE-014", "name": "Radio Broadcast Agent", "role": "FM, community radio", "status": "active"}, {"id": "VCE-015", "name": "Podcast Agent", "role": "Create, host podcast", "status": "active"}, {"id": "VCE-016", "name": "Audio Book Agent", "role": "Book to audio", "status": "active"}, {"id": "VCE-017", "name": "Voice Memo Agent", "role": "Record, transcribe", "status": "active"}, {"id": "VCE-018", "name": "Noise Cancel Agent", "role": "Background noise remove", "status": "active"}, {"id": "VCE-019", "name": "Audio Enhancement Agent", "role": "Quality improve", "status": "active"}, {"id": "VCE-020", "name": "Voice Analytics Agent", "role": "Tone, emotion detect", "status": "active"}, {"id": "VCE-021", "name": "Voice Command Agent", "role": "Voice control device", "status": "active"}, {"id": "VCE-022", "name": "Singing Agent", "role": "AI singing, karaoke", "status": "active"}, {"id": "VCE-023", "name": "Music Gen Agent", "role": "AI music create", "status": "active"}, {"id": "VCE-024", "name": "Sound Effect Agent", "role": "SFX generate", "status": "active"}, {"id": "VCE-025", "name": "Audio Transcription Agent", "role": "Meeting, lecture text", "status": "active"}, {"id": "VCE-026", "name": "Voice Dubbing Agent", "role": "Movie dub, lip sync", "status": "active"}, {"id": "VCE-027", "name": "Voice Chat Agent", "role": "Voice conversation AI", "status": "active"}, {"id": "VCE-028", "name": "Language Learn Agent", "role": "Speak practice", "status": "active"}, {"id": "VCE-029", "name": "Voice Biometric Agent", "role": "Voice password, auth", "status": "active"}, {"id": "VCE-030", "name": "Emergency Voice Agent", "role": "SOS voice alert", "status": "active"}]}, "claw_8_media": {"name": "📺 Media Claw", "agents": 30, "leader": "Chitra Agent", "agents_list": [{"id": "MED-001", "name": "Video Watch Agent", "role": "Watch, analyze video", "status": "active"}, {"id": "MED-002", "name": "Image Generate Agent", "role": "AI image create", "status": "active"}, {"id": "MED-003", "name": "News Aggregate Agent", "role": "News, summarize", "status": "active"}, {"id": "MED-004", "name": "Social Media Agent", "role": "Post, reply, engage", "status": "active"}, {"id": "MED-005", "name": "Video Edit Agent", "role": "Cut, merge, effect", "status": "active"}, {"id": "MED-006", "name": "Image Edit Agent", "role": "Crop, filter, enhance", "status": "active"}, {"id": "MED-007", "name": "Meme Generator Agent", "role": "Meme create, viral", "status": "active"}, {"id": "MED-008", "name": "Thumbnail Agent", "role": "YouTube thumbnail", "status": "active"}, {"id": "MED-009", "name": "Subtitle Agent", "role": "Auto subtitle, translate", "status": "active"}, {"id": "MED-010", "name": "Video Compress Agent", "role": "Reduce size, quality", "status": "active"}, {"id": "MED-011", "name": "GIF Maker Agent", "role": "GIF from video/image", "status": "active"}, {"id": "MED-012", "name": "Screen Recorder Agent", "role": "Record screen", "status": "active"}, {"id": "MED-013", "name": "Live Stream Agent", "role": "YouTube, Insta live", "status": "active"}, {"id": "MED-014", "name": "Photo Album Agent", "role": "Create digital album", "status": "active"}, {"id": "MED-015", "name": "Collage Maker Agent", "role": "Photo collage", "status": "active"}, {"id": "MED-016", "name": "Background Remove Agent", "role": "BG remove, replace", "status": "active"}, {"id": "MED-017", "name": "Face Swap Agent", "role": "Face change, deepfake", "status": "active"}, {"id": "MED-018", "name": "Watermark Agent", "role": "Add/remove watermark", "status": "active"}, {"id": "MED-019", "name": "PDF to Image Agent", "role": "Convert, extract", "status": "active"}, {"id": "MED-020", "name": "Image to PDF Agent", "role": "Scan, PDF create", "status": "active"}, {"id": "MED-021", "name": "QR Code Agent", "role": "Generate, scan QR", "status": "active"}, {"id": "MED-022", "name": "Barcode Agent", "role": "Scan, generate barcode", "status": "active"}, {"id": "MED-023", "name": "Document Scanner Agent", "role": "OCR, text extract", "status": "active"}, {"id": "MED-024", "name": "Color Palette Agent", "role": "Color scheme, hex", "status": "active"}, {"id": "MED-025", "name": "Logo Maker Agent", "role": "AI logo design", "status": "active"}, {"id": "MED-026", "name": "Banner Maker Agent", "role": "Social media banner", "status": "active"}, {"id": "MED-027", "name": "Infographic Agent", "role": "Data visualization", "status": "active"}, {"id": "MED-028", "name": "3D Model Agent", "role": "3D object create", "status": "active"}, {"id": "MED-029", "name": "Animation Agent", "role": "2D/3D animation", "status": "active"}, {"id": "MED-030", "name": "VR/AR Agent", "role": "Virtual reality content", "status": "active"}]}, "claw_9_safety": {"name": "🛡️ Safety Claw", "agents": 30, "leader": "Rakshak Agent", "agents_list": [{"id": "SFT-001", "name": "Content Filter Agent", "role": "Harmful block", "status": "active"}, {"id": "SFT-002", "name": "Age Gate Agent", "role": "Age check, restrict", "status": "active"}, {"id": "SFT-003", "name": "Privacy Shield Agent", "role": "Data protection", "status": "active"}, {"id": "SFT-004", "name": "Crisis Alert Agent", "role": "Emergency alert", "status": "active"}, {"id": "SFT-005", "name": "Cyber Bully Agent", "role": "Harassment detect, block", "status": "active"}, {"id": "SFT-006", "name": "Fake News Agent", "role": "Misinformation check", "status": "active"}, {"id": "SFT-007", "name": "Phishing Detector Agent", "role": "Scam link detect", "status": "active"}, {"id": "SFT-008", "name": "Malware Scanner Agent", "role": "Virus, malware check", "status": "active"}, {"id": "SFT-009", "name": "Password Manager Agent", "role": "Secure password", "status": "active"}, {"id": "SFT-010", "name": "2FA Agent", "role": "Two-factor auth", "status": "active"}, {"id": "SFT-011", "name": "Location Privacy Agent", "role": "GPS spoof, hide", "status": "active"}, {"id": "SFT-012", "name": "Camera/Mic Block Agent", "role": "Unauthorized access block", "status": "active"}, {"id": "SFT-013", "name": "Data Backup Agent", "role": "Auto backup, restore", "status": "active"}, {"id": "SFT-014", "name": "Encryption Agent", "role": "End-to-end encrypt", "status": "active"}, {"id": "SFT-015", "name": "Firewall Agent", "role": "Network protection", "status": "active"}, {"id": "SFT-016", "name": "VPN Agent", "role": "Secure tunnel", "status": "active"}, {"id": "SFT-017", "name": "Child Safety Agent", "role": "Parental control", "status": "active"}, {"id": "SFT-018", "name": "Women Safety Agent", "role": "SOS, safe route", "status": "active"}, {"id": "SFT-019", "name": "Elder Safety Agent", "role": "Fall detect, alert", "status": "active"}, {"id": "SFT-020", "name": "Disaster Alert Agent", "role": "Earthquake, flood", "status": "active"}, {"id": "SFT-021", "name": "Fire Safety Agent", "role": "Fire alert, escape", "status": "active"}, {"id": "SFT-022", "name": "Medical Emergency Agent", "role": "Health SOS, hospital", "status": "active"}, {"id": "SFT-023", "name": "Identity Theft Agent", "role": "Fraud detect, report", "status": "active"}, {"id": "SFT-024", "name": "Secure Chat Agent", "role": "Encrypted messaging", "status": "active"}, {"id": "SFT-025", "name": "App Permission Agent", "role": "Permission audit", "status": "active"}, {"id": "SFT-026", "name": "Dark Web Monitor Agent", "role": "Breach alert", "status": "active"}, {"id": "SFT-027", "name": "Biometric Lock Agent", "role": "Face, fingerprint lock", "status": "active"}, {"id": "SFT-028", "name": "Safe Browsing Agent", "role": "URL safe check", "status": "active"}, {"id": "SFT-029", "name": "Incident Report Agent", "role": "Crime, accident report", "status": "active"}, {"id": "SFT-030", "name": "AI Ethics Agent", "role": "Fairness, bias check", "status": "active"}]}, "claw_10_boss": {"name": "👑 Boss Claw", "agents": 10, "leader": "Master Singh Agent", "agents_list": [{"id": "BOS-001", "name": "Master Coordinator Agent", "role": "सब agents का boss", "status": "active"}, {"id": "BOS-002", "name": "User Preference Agent", "role": "User history, like", "status": "active"}, {"id": "BOS-003", "name": "Feedback Loop Agent", "role": "Learn, improve", "status": "active"}, {"id": "BOS-004", "name": "Report Generator Agent", "role": "Daily/weekly report", "status": "active"}, {"id": "BOS-005", "name": "Load Balancer Agent", "role": "Traffic distribute", "status": "active"}, {"id": "BOS-006", "name": "Error Handler Agent", "role": "Crash, bug fix", "status": "active"}, {"id": "BOS-007", "name": "Analytics Agent", "role": "Usage, performance", "status": "active"}, {"id": "BOS-008", "name": "A/B Test Agent", "role": "Feature test, optimize", "status": "active"}, {"id": "BOS-009", "name": "Notification Agent", "role": "Push, SMS, email", "status": "active"}, {"id": "BOS-010", "name": "Claude Ethics Agent", "role": "Safety + Ethics overlay", "status": "active"}]}, "claw_11_core_ai": {"name": "🧠 Core AI Claw", "agents": 20, "leader": "Singh Brain Agent", "agents_list": [{"id": "AI-001", "name": "GPT-4o Agent", "role": "Reasoning, coding master", "status": "active", "provider": "OpenAI"}, {"id": "AI-002", "name": "Claude 3.5 Sonnet Agent", "role": "Safety, ethics guardian", "status": "active", "provider": "Anthropic"}, {"id": "AI-003", "name": "Gemini 1.5 Pro Agent", "role": "Multimodal, search king", "status": "active", "provider": "Google"}, {"id": "AI-004", "name": "Kimi K2.6 Agent", "role": "Swarm, coordination boss", "status": "active", "provider": "Moonshot"}, {"id": "AI-005", "name": "Groq Llama Agent", "role": "Speed demon, 800 tok/s", "status": "active", "provider": "Groq"}, {"id": "AI-006", "name": "DeepSeek Agent", "role": "Math, logic expert", "status": "active", "provider": "DeepSeek"}, {"id": "AI-007", "name": "Mistral Agent", "role": "European AI, privacy", "status": "active", "provider": "Mistral"}, {"id": "AI-008", "name": "Cohere Agent", "role": "Enterprise, embed", "status": "active", "provider": "Cohere"}, {"id": "AI-009", "name": "Perplexity Agent", "role": "Real-time search AI", "status": "active", "provider": "Perplexity"}, {"id": "AI-010", "name": "Local LLM Agent", "role": "Offline, private AI", "status": "active", "provider": "Ollama"}, {"id": "AI-011", "name": "Code Interpreter Agent", "role": "Python, JS execution", "status": "active", "provider": "Singh Ji"}, {"id": "AI-012", "name": "Vision Agent", "role": "Image understand, OCR", "status": "active", "provider": "Singh Ji"}, {"id": "AI-013", "name": "Memory Agent", "role": "Long-term memory, recall", "status": "active", "provider": "Supabase"}, {"id": "AI-014", "name": "Context Agent", "role": "Conversation context", "status": "active", "provider": "Singh Ji"}, {"id": "AI-015", "name": "RAG Agent", "role": "Document retrieval", "status": "active", "provider": "Singh Ji"}, {"id": "AI-016", "name": "Planning Agent", "role": "Task breakdown, roadmap", "status": "active", "provider": "Singh Ji"}, {"id": "AI-017", "name": "Decision Agent", "role": "Choose best action", "status": "active", "provider": "Singh Ji"}, {"id": "AI-018", "name": "Self-Healing Agent", "role": "Auto fix errors", "status": "active", "provider": "Singh Ji"}, {"id": "AI-019", "name": "Multi-Modal Agent", "role": "Text+Image+Voice+Video", "status": "active", "provider": "Singh Ji"}, {"id": "AI-020", "name": "Singh Ji Supreme Agent", "role": "सबका बाप — Master of ALL", "status": "active", "provider": "Singh Ji AI"}]}};
+
+        // Render claws
+        function renderClaws() {
+            const grid = document.getElementById("clawsGrid");
+
+            for (const [clawId, claw] of Object.entries(swarmData)) {
+                const colors = clawColors[clawId] || { color: "#fff", glow: "rgba(255,255,255,0.3)" };
+
+                const card = document.createElement("div");
+                card.className = "claw-card";
+                card.style.setProperty("--claw-color", colors.color);
+                card.style.setProperty("--claw-glow", colors.glow);
+
+                let agentsHtml = "";
+                claw.agents_list.forEach(agent => {
+                    const statusClass = Math.random() > 0.7 ? "status-working" : "status-active";
+                    agentsHtml += `
+                        <div class="agent-item">
+                            <div class="agent-id">${agent.id}</div>
+                            <div class="agent-name">${agent.name} <span class="agent-status ${statusClass}"></span></div>
+                            <div class="agent-role">${agent.role}</div>
+                        </div>
+                    `;
+                });
+
+                card.innerHTML = `
+                    <div class="claw-header">
+                        <div class="claw-icon">${claw.name.split(" ")[0]}</div>
+                        <div class="claw-title">
+                            <h3>${claw.name}</h3>
+                            <div class="leader">👑 Leader: ${claw.leader}</div>
+                        </div>
+                        <div class="claw-count">${claw.agents_list.length}</div>
+                    </div>
+                    <div class="agents-list">${agentsHtml}</div>
+                `;
+
+                grid.appendChild(card);
+            }
+        }
+
+        // Create particles
+        function createParticles() {
+            const container = document.getElementById("particles");
+            for (let i = 0; i < 50; i++) {
+                const p = document.createElement("div");
+                p.className = "particle";
+                p.style.left = Math.random() * 100 + "%";
+                p.style.animationDelay = Math.random() * 15 + "s";
+                p.style.animationDuration = (10 + Math.random() * 10) + "s";
+                container.appendChild(p);
+            }
+        }
+
+        // Simulate live activity
+        let stepsUsed = 0;
+        let completedTasks = 0;
+
+        function simulateActivity() {
+            stepsUsed += Math.floor(Math.random() * 5);
+            if (stepsUsed > 4000) stepsUsed = 0;
+
+            completedTasks += Math.floor(Math.random() * 3);
+
+            const percentage = (stepsUsed / 4000) * 100;
+
+            document.getElementById("stepFill").style.width = percentage + "%";
+            document.getElementById("stepFill").textContent = Math.round(percentage) + "%";
+            document.getElementById("stepsUsed").textContent = stepsUsed;
+            document.getElementById("stepsRemaining").textContent = 4000 - stepsUsed;
+            document.getElementById("completedTasks").textContent = completedTasks;
+
+            // Random agent status updates
+            const statuses = document.querySelectorAll(".agent-status");
+            statuses.forEach(s => {
+                if (Math.random() > 0.95) {
+                    s.className = "agent-status status-working";
+                    setTimeout(() => {
+                        s.className = "agent-status status-active";
+                    }, 2000);
+                }
+            });
+        }
+
+        // Init
+        renderClaws();
+        createParticles();
+        setInterval(simulateActivity, 1000);
+    </script>
+</body>
+</html>
