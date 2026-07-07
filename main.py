@@ -2,7 +2,6 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Dict, List, Optional
-import json
 import os
 import random
 from datetime import datetime
@@ -21,7 +20,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Dummy data for testing
+# Dummy data — NO JSON FILE LOAD
 SWARM_DATA = {
     "claw_groups": {
         "claw_1_agriculture": {
