@@ -9,5 +9,5 @@ COPY . .
 
 EXPOSE 8000
 
-# Railway uses $PORT env variable
+# Shell form - Railway will substitute $PORT
 CMD uvicorn main:app --host 0.0.0.0 --port $PORT --workers 4
