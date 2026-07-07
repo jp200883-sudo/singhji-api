@@ -6,12 +6,13 @@ import os
 import random
 from datetime import datetime
 
+# SINGLE FastAPI app
 app = FastAPI(
     title="Singh Ji AI — 300 Agent Swarm",
     version="8.0.0"
 )
 
-# CORS
+# CORS — ONCE only
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -20,7 +21,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Dummy data — NO JSON FILE LOAD
+# Dummy data
 SWARM_DATA = {
     "claw_groups": {
         "claw_1_agriculture": {
@@ -85,33 +86,6 @@ async def list_claws():
             for claw_id, claw in SWARM_DATA["claw_groups"].items()
         ]
     }
-
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-import os
-
-app = FastAPI(title="Singh Ji AI Ultra")
-
-# CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# Health check (Railway needs this!)
-@app.get("/health")
-async def health():
-    return {"status": "ok", "app": "Singh Ji AI Ultra", "version": "7.0"}
-
-@app.get("/")
-async def root():
-    return {"message": "🦁 Singh Ji AI Ultra v7.0 is LIVE!", "status": "running"}
-
-# Your other routes here...
-# @app.get("/api/...")
 
 if __name__ == "__main__":
     import uvicorn
