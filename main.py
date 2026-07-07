@@ -1,15 +1,18 @@
 """
 🦁 SINGH JI AI — 300+ AGENT SWARM API 🦁
-FastAPI Server — Deploy to Render
+FastAPI Server — Deploy to Railway/Render
 """
+
+import os
+import json
+import asyncio
+import random
+from datetime import datetime
+from typing import Dict, List, Optional
 
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import Dict, List, Optional
-import json
-import asyncio
-from datetime import datetime
 
 app = FastAPI(
     title="Singh Ji AI — 300 Agent Swarm",
@@ -26,8 +29,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Load 300 Agents
-with open("singhji_310_agent_swarm.json", "r", encoding="utf-8") as f:
+# Load 300 Agents — Absolute Path for Railway
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+json_path = os.path.join(BASE_DIR, "singhji_310_agent_swarm.json")
+
+with open(json_path, "r", encoding="utf-8") as f:
     SWARM_DATA = json.load(f)
 
 # ============================================
@@ -144,17 +150,6 @@ async def get_agent(agent_id: str):
 async def run_mission(mission: MissionRequest, background_tasks: BackgroundTasks):
     """
     Execute a mission across multiple claws
-
-    Example:
-    {
-        "type": "farmer_help",
-        "claws": ["claw_1_agriculture", "claw_2_health"],
-        "tasks": [
-            {"type": "crop_advice", "crop": "wheat"},
-            {"type": "health_check", "symptom": "fever"}
-        ],
-        "user_id": "user123"
-    }
     """
     mission_id = f"mission_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{random.randint(1000,9999)}"
 
@@ -258,27 +253,6 @@ async def reset_swarm():
     step_tracker["current"] = 0
     active_missions.clear()
     return {"status": "reset", "message": "Swarm reset complete"}
-
-# ============================================
-# WEBSOCKET — Real-time Agent Updates
-# ============================================
-"""
-from fastapi import WebSocket
-
-@app.websocket("/ws/swarm")
-async def swarm_websocket(websocket: WebSocket):
-    await websocket.accept()
-    while True:
-        data = await websocket.receive_text()
-        # Handle real-time commands
-        await websocket.send_json({
-            "type": "swarm_update",
-            "agents_active": 300,
-            "steps": step_tracker["current"]
-        })
-"""
-
-import random
 
 if __name__ == "__main__":
     import uvicorn
