@@ -86,19 +86,32 @@ async def list_claws():
         ]
     }
 
-@app.get("/swarm/ethics")
-async def ethics_report():
-    return {
-        "overlay": "Claude Ethics + Safety",
-        "rules": [
-            "No harmful content for children",
-            "No hate speech or discrimination",
-            "No illegal activities",
-            "Protect user privacy",
-            "Be honest about limitations"
-        ],
-        "status": "✅ All systems safe"
-    }
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+import os
+
+app = FastAPI(title="Singh Ji AI Ultra")
+
+# CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Health check (Railway needs this!)
+@app.get("/health")
+async def health():
+    return {"status": "ok", "app": "Singh Ji AI Ultra", "version": "7.0"}
+
+@app.get("/")
+async def root():
+    return {"message": "🦁 Singh Ji AI Ultra v7.0 is LIVE!", "status": "running"}
+
+# Your other routes here...
+# @app.get("/api/...")
 
 if __name__ == "__main__":
     import uvicorn
