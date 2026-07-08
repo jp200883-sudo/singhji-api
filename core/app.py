@@ -1,11 +1,10 @@
 """
 🦁 SINGH JI AI — core/app.py
-Main FastAPI App
 """
 
 from fastapi import FastAPI, Request, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 import os
 import sys
 import json
@@ -15,6 +14,9 @@ import requests
 import importlib.util
 from datetime import datetime
 import logging
+
+# 🧠 TRISHUL MEMORY ROUTER — TOP पे IMPORT
+from modules.trishul.handler import router as trishul_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -83,11 +85,6 @@ async def self_ping():
             logger.error(f"❌ Self-ping failed: {e}")
         await asyncio.sleep(10 * 60)
 
-# ============================================================
-# 🧠 TRISHUL MEMORY ROUTER — EXPLICIT ADD
-# ============================================================
-from modules.trishul.handler import router as trishul_router
-
 def create_app():
     app = FastAPI(
         title="🦁 Singh Ji AI Ultra v7.0",
@@ -102,13 +99,11 @@ def create_app():
         allow_headers=["*"]
     )
     
-    # 🧠 TRISHUL MEMORY — Register Router
+    # 🧠 TRISHUL MEMORY — REGISTER HERE
     app.include_router(trishul_router, prefix="/api/memory", tags=["Trishul Memory"])
     logger.info("🧠 Trishul Memory Router Registered!")
     
-    # ============================================================
     # AUTO-DISCOVER OTHER MODULES
-    # ============================================================
     all_modules = discover_modules()
     loaded_handlers = 0
     loaded_routers = 0
@@ -138,10 +133,7 @@ def create_app():
     if skipped:
         logger.warning(f"⚠️ Skipped: {', '.join(skipped)}")
     
-    # ============================================================
     # ROOT ENDPOINTS
-    # ============================================================
-    
     @app.api_route("/", methods=["GET", "HEAD"])
     async def root():
         return {
