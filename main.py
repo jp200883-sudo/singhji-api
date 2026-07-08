@@ -1,7 +1,7 @@
 """
 🦁 SINGH JI AI ULTRA v7.0 — SARWAN 330 AGENT SWARM
-Phased deployment | Zero overload | Railway compatible
-max_agents: 100 | Load threshold: 90%
+Hybrid API: Railway (Primary) + Render (Fallback)
+API Key Check: Missing key = graceful error, not crash
 """
 from fastapi import FastAPI, Request, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
@@ -19,7 +19,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # ═══════════════════════════════════════════════════════
-# 🦁 ALL 26 API KEYS
+# 🦁 ALL 26 API KEYS — Check which are available
 # ═══════════════════════════════════════════════════════
 CEREBRAS_API_KEY = os.getenv("CEREBRAS_API_KEY")
 CF_ACCOUNT_ID = os.getenv("CF_ACCOUNT_ID")
@@ -48,13 +48,27 @@ TWILIO_SID = os.getenv("TWILIO_SID")
 TWILIO_TOKEN = os.getenv("TWILIO_TOKEN")
 TZ = os.getenv("TZ", "Asia/Kolkata")
 
+# Check available keys
+AVAILABLE_KEYS = {
+    "OPENWEATHER": bool(OPENWEATHER_API_KEY),
+    "CURRENTS": bool(CURRENTS_API_KEY),
+    "GROQ": bool(GROQ_API_KEY),
+    "GEMINI": bool(GEMINI_API_KEY),
+    "TELEGRAM": bool(TELEGRAM_TOKEN),
+}
+
+# ═══════════════════════════════════════════════════════
+# 🦁 FALLBACK URLS — Render as backup
+# ═══════════════════════════════════════════════════════
+RENDER_URL = "https://singhji-api.onrender.com"
+
 # ═══════════════════════════════════════════════════════
 # 🦁 FASTAPI APP
 # ═══════════════════════════════════════════════════════
 app = FastAPI(
     title="🦁 Singh Ji AI Ultra v7.0",
-    version="7.0.0-sarwan",
-    description="330 Agent Swarm | Sarwan Edition"
+    version="7.0.0-sarwan-hybrid",
+    description="330 Agent Swarm | Hybrid API | Railway Primary + Render Fallback"
 )
 
 app.add_middleware(
@@ -74,7 +88,7 @@ AGENT_SWARM = {}
 AGENT_QUEUE = []
 AGENT_SCHEDULE = {}
 USER_SESSIONS = {}
-SYSTEM_LOAD = {"active_agents": 0, "max_agents": 100, "phase": 0}  # FIX: 50 → 100
+SYSTEM_LOAD = {"active_agents": 0, "max_agents": 100, "phase": 0}
 
 MODULES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "modules")
 
@@ -83,34 +97,22 @@ MODULES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "modules"
 # ═══════════════════════════════════════════════════════
 AGENT_DEFINITIONS = {}
 
-# Phase 1: Core Agents (1-100) — Immediate
 for i in range(1, 101):
     AGENT_DEFINITIONS[f"agent_{i:03d}"] = {
-        "phase": 1,
-        "type": "core",
-        "delay_minutes": 0,
-        "priority": "critical",
-        "role": "system"
+        "phase": 1, "type": "core", "delay_minutes": 0,
+        "priority": "critical", "role": "system"
     }
 
-# Phase 2: Service Agents (101-200) — 5 min delay
 for i in range(101, 201):
     AGENT_DEFINITIONS[f"agent_{i:03d}"] = {
-        "phase": 2,
-        "type": "service",
-        "delay_minutes": 5,
-        "priority": "high",
-        "role": "api"
+        "phase": 2, "type": "service", "delay_minutes": 5,
+        "priority": "high", "role": "api"
     }
 
-# Phase 3: Specialized Agents (201-330) — 10 min delay
 for i in range(201, 331):
     AGENT_DEFINITIONS[f"agent_{i:03d}"] = {
-        "phase": 3,
-        "type": "specialized",
-        "delay_minutes": 10,
-        "priority": "medium",
-        "role": "ai"
+        "phase": 3, "type": "specialized", "delay_minutes": 10,
+        "priority": "medium", "role": "ai"
     }
 
 # ═══════════════════════════════════════════════════════
@@ -160,7 +162,7 @@ def load_module(name, info):
         return None
 
 # ═══════════════════════════════════════════════════════
-# 🦁 SYSTEM LOAD CHECK — FIX: 80% → 90%
+# 🦁 SYSTEM LOAD CHECK
 # ═══════════════════════════════════════════════════════
 async def check_system_load():
     active = SYSTEM_LOAD["active_agents"]
@@ -168,13 +170,39 @@ async def check_system_load():
     if active >= max_allowed:
         return False
     load_percent = (active / max_allowed) * 100
-    return load_percent < 90  # FIX: 80 → 90
+    return load_percent < 90
+
+# ═══════════════════════════════════════════════════════
+# 🦁 FALLBACK FETCH — Try Railway first, then Render
+# ═══════════════════════════════════════════════════════
+async def fallback_fetch(endpoint: str, method="GET", data=None, headers=None):
+    """Try Railway first, fallback to Render if key missing or fails"""
+    urls = [
+        f"{RENDER_URL}{endpoint}",  # Render has keys
+    ]
+    
+    # Try Render first (it has all keys)
+    for url in urls:
+        try:
+            async with aiohttp.ClientSession() as session:
+                if method == "GET":
+                    async with session.get(url, timeout=aiohttp.ClientTimeout(total=15), headers=headers or {}) as resp:
+                        if resp.status == 200:
+                            return await resp.json()
+                elif method == "POST":
+                    async with session.post(url, json=data, timeout=aiohttp.ClientTimeout(total=15), headers=headers or {}) as resp:
+                        if resp.status == 200:
+                            return await resp.json()
+        except Exception as e:
+            logger.warning(f"Fallback fetch failed for {url}: {e}")
+            continue
+    
+    return None
 
 # ═══════════════════════════════════════════════════════
 # 🦁 SARWAN AGENT SCHEDULER
 # ═══════════════════════════════════════════════════════
 async def sarwan_scheduler():
-    """Sarwan 330 Agent Swarm — Phased deployment"""
     await asyncio.sleep(30)
     
     phases = [1, 2, 3]
@@ -213,11 +241,10 @@ async def sarwan_scheduler():
             if int(agent_id.split("_")[1]) % 10 == 0:
                 logger.info(f"✅ {agent_id} activated (Phase {phase})")
             
-            await asyncio.sleep(0.2)  # FIX: 0.5 → 0.2 (faster)
+            await asyncio.sleep(0.2)
         
         logger.info(f"🦁 Phase {phase} complete: {len([a for a in AGENT_SWARM.values() if a.get('phase')==phase])} agents")
     
-    # Process queue
     while AGENT_QUEUE:
         can_add = await check_system_load()
         if can_add:
@@ -255,7 +282,7 @@ async def self_ping():
         await asyncio.sleep(10 * 60)
 
 # ═══════════════════════════════════════════════════════
-# 🦁 LIGHTWEIGHT STARTUP
+# 🦁 STARTUP
 # ═══════════════════════════════════════════════════════
 @app.on_event("startup")
 async def startup():
@@ -267,6 +294,7 @@ async def startup():
                 MODULES[name] = result
         
         logger.info(f"🦁 {len(MODULES)} modules ready")
+        logger.info(f"🦁 Available API Keys: {AVAILABLE_KEYS}")
         
         asyncio.create_task(sarwan_scheduler())
         asyncio.create_task(self_ping())
@@ -276,18 +304,19 @@ async def startup():
         logger.error(f"Startup error: {e}")
 
 # ═══════════════════════════════════════════════════════
-# 🦁 HEALTH — IMMEDIATE RESPONSE
+# 🦁 HEALTH
 # ═══════════════════════════════════════════════════════
 @app.get("/")
 @app.head("/")
 async def root():
     return {
         "name": "🦁 Singh Ji AI Ultra v7.0",
-        "version": "7.0.0-sarwan",
+        "version": "7.0.0-sarwan-hybrid",
         "modules": len(MODULES),
         "agents_active": SYSTEM_LOAD["active_agents"],
         "agents_queued": len(AGENT_QUEUE),
         "phase": SYSTEM_LOAD["phase"],
+        "available_keys": AVAILABLE_KEYS,
         "status": "🦁 LIVE",
         "timestamp": datetime.now().isoformat()
     }
@@ -295,7 +324,12 @@ async def root():
 @app.get("/health")
 @app.head("/health")
 def health():
-    return {"status": "ok", "service": "Singh Ji AI", "agents": SYSTEM_LOAD["active_agents"]}
+    return {
+        "status": "ok",
+        "service": "Singh Ji AI",
+        "agents": SYSTEM_LOAD["active_agents"],
+        "available_keys": {k: v for k, v in AVAILABLE_KEYS.items()}
+    }
 
 @app.get("/api/health")
 @app.head("/api/health")
@@ -305,7 +339,7 @@ def api_health():
 @app.get("/api/status")
 async def status():
     return {
-        "name": "Singh Ji AI v7.0 Sarwan",
+        "name": "Singh Ji AI v7.0 Sarwan Hybrid",
         "modules": len(MODULES),
         "agents": {
             "total": 330,
@@ -318,6 +352,7 @@ async def status():
                 "phase_3": len([a for a in AGENT_SWARM.values() if a.get("phase") == 3])
             }
         },
+        "available_keys": AVAILABLE_KEYS,
         "timestamp": datetime.now().isoformat()
     }
 
@@ -380,29 +415,53 @@ async def memory_delete(key: str):
     return {"deleted": False, "error": "Key not found"}
 
 # ═══════════════════════════════════════════════════════
-# 🦁 WEATHER MODULE
+# 🦁 WEATHER MODULE — WITH FALLBACK TO RENDER
 # ═══════════════════════════════════════════════════════
 @app.get("/api/weather/")
 async def weather_root():
-    return {"module": "Weather", "status": "active"}
+    return {"module": "Weather", "status": "active", "source": "Railway Primary"}
 
 @app.get("/api/weather/{city}")
 async def weather_city(city: str):
-    if not OPENWEATHER_API_KEY:
-        return {"error": "API key not set"}
+    # Try Railway first (if key available)
+    if OPENWEATHER_API_KEY:
+        try:
+            import requests
+            url = f"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={OPENWEATHER_API_KEY}&units=metric"
+            resp = requests.get(url, timeout=10)
+            data = resp.json()
+            if resp.status_code == 200:
+                return {
+                    "city": city,
+                    "temp": data["main"]["temp"],
+                    "humidity": data["main"]["humidity"],
+                    "desc": data["weather"][0]["description"],
+                    "source": "Railway"
+                }
+        except Exception as e:
+            logger.warning(f"Railway weather failed: {e}")
+    
+    # Fallback to Render
     try:
-        import requests
-        url = f"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={OPENWEATHER_API_KEY}&units=metric"
-        resp = requests.get(url, timeout=10)
-        data = resp.json()
-        if resp.status_code == 200:
-            return {"city": city, "temp": data["main"]["temp"], "humidity": data["main"]["humidity"], "desc": data["weather"][0]["description"]}
-        return {"error": data.get("message")}
+        fallback_data = await fallback_fetch(f"/api/weather/{city}")
+        if fallback_data:
+            fallback_data["source"] = "Render (Fallback)"
+            return fallback_data
     except Exception as e:
-        return {"error": str(e)}
+        logger.warning(f"Render weather fallback failed: {e}")
+    
+    # No keys available — return demo data
+    return {
+        "city": city,
+        "temp": 32.0,
+        "humidity": 65,
+        "desc": "haze (demo — add OPENWEATHER_API_KEY to Railway)",
+        "source": "DEMO",
+        "note": "Add OPENWEATHER_API_KEY to Railway Variables or use Render API"
+    }
 
 # ═══════════════════════════════════════════════════════
-# 🦁 NEWS MODULE
+# 🦁 NEWS MODULE — WITH FALLBACK
 # ═══════════════════════════════════════════════════════
 @app.get("/api/news/")
 async def news_root():
@@ -410,14 +469,27 @@ async def news_root():
 
 @app.get("/api/news/latest")
 async def news_latest():
-    if not CURRENTS_API_KEY:
-        return {"error": "API key not set"}
-    try:
-        import requests
-        resp = requests.get(f"https://api.currentsapi.services/v1/latest-news?apiKey={CURRENTS_API_KEY}", timeout=10)
-        return resp.json()
-    except Exception as e:
-        return {"error": str(e)}
+    if CURRENTS_API_KEY:
+        try:
+            import requests
+            resp = requests.get(f"https://api.currentsapi.services/v1/latest-news?apiKey={CURRENTS_API_KEY}", timeout=10)
+            return resp.json()
+        except Exception as e:
+            logger.warning(f"Railway news failed: {e}")
+    
+    # Fallback to Render
+    fallback_data = await fallback_fetch("/api/news/latest")
+    if fallback_data:
+        fallback_data["source"] = "Render (Fallback)"
+        return fallback_data
+    
+    return {
+        "status": "demo",
+        "news": [
+            {"title": "🦁 Singh Ji AI News", "description": "Add CURRENTS_API_KEY to Railway", "url": "#"}
+        ],
+        "source": "DEMO"
+    }
 
 # ═══════════════════════════════════════════════════════
 # 🦁 MANDI MODULE
@@ -440,7 +512,7 @@ async def plant_root():
 @app.post("/api/plant/identify")
 async def plant_identify(request: Request):
     if not PLANT_ID_API:
-        return {"error": "API key not set"}
+        return {"error": "API key not set", "note": "Add PLANT_ID_API to Railway Variables"}
     data = await request.json()
     return {"status": "pending", "image": data.get("image_url", "none")}
 
@@ -470,7 +542,8 @@ async def admin_root():
             "active": SYSTEM_LOAD["active_agents"],
             "queued": len(AGENT_QUEUE),
             "phase": SYSTEM_LOAD["phase"]
-        }
+        },
+        "available_keys": AVAILABLE_KEYS
     }
 
 @app.get("/api/admin/stats")
@@ -482,6 +555,7 @@ async def admin_stats():
         "agents_queued": len(AGENT_QUEUE),
         "phase": SYSTEM_LOAD["phase"],
         "load": f"{(SYSTEM_LOAD['active_agents']/SYSTEM_LOAD['max_agents']*100):.1f}%",
+        "available_keys": AVAILABLE_KEYS,
         "timestamp": datetime.now().isoformat()
     }
 
