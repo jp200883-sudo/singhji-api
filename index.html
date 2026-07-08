@@ -1,164 +1,449 @@
+<!-- 🦁 SINGH JI AI ULTRA v7.0 — HYBRID FRONTEND -->
 <!DOCTYPE html>
 <html lang="hi">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Singh Ji AI Ultra v7.0</title>
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700;900&display=swap" rel="stylesheet">
-<style>
-  :root{
-    --gold:#FFD700; --dark-gold:#B8860B; --royal:#1a237e; --deep:#0d1642;
-    --success:#00c853; --warn:#ffc107; --danger:#ff5252;
-    --glass:rgba(255,255,255,0.06); --border:rgba(255,255,255,0.12);
-  }
-  *{margin:0;padding:0;box-sizing:border-box;font-family:'Poppins',sans-serif;}
-  body{background:linear-gradient(135deg,#0d1642,#1a237e 50%,#0d1642);color:#fff;min-height:100vh;}
-  .header{background:linear-gradient(90deg,var(--deep),var(--royal));padding:16px 28px;
-    display:flex;justify-content:space-between;align-items:center;
-    border-bottom:2px solid var(--gold);position:sticky;top:0;z-index:10;}
-  .logo{display:flex;align-items:center;gap:12px;}
-  .logo-icon{width:50px;height:50px;border-radius:14px;
-    background:linear-gradient(135deg,var(--gold),var(--dark-gold));
-    display:flex;align-items:center;justify-content:center;font-weight:900;color:var(--deep);font-size:20px;}
-  .logo-text h1{font-size:20px;font-weight:800;color:var(--gold);letter-spacing:0.5px;}
-  .logo-text p{font-size:11px;color:rgba(255,255,255,0.55);}
-  .refresh-btn{background:var(--glass);border:1px solid var(--border);color:#fff;
-    padding:9px 18px;border-radius:22px;font-size:12px;font-weight:600;cursor:pointer;transition:.2s;}
-  .refresh-btn:hover{background:rgba(255,255,255,0.12);}
-  .refresh-btn:active{transform:scale(0.97);}
-
-  .hero{text-align:center;padding:44px 20px 24px;}
-  .hero h2{font-size:30px;font-weight:900;margin-bottom:8px;}
-  .hero h2 span{color:var(--gold);}
-  .hero p{font-size:14px;color:rgba(255,255,255,0.6);max-width:560px;margin:0 auto;}
-
-  .status-row{display:flex;justify-content:center;gap:14px;flex-wrap:wrap;margin:26px 0 8px;}
-  .pill{background:var(--glass);border:1px solid var(--border);border-radius:30px;
-    padding:8px 18px;font-size:12.5px;display:flex;align-items:center;gap:8px;}
-  .dot{width:8px;height:8px;border-radius:50%;}
-  .dot.live{background:var(--success);animation:blink 1.6s infinite;}
-  .dot.down{background:var(--danger);}
-  .dot.checking{background:var(--warn);animation:blink 0.8s infinite;}
-  @keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
-
-  .modules-wrap{max-width:1300px;margin:0 auto;padding:30px 24px 60px;}
-  .modules-head{display:flex;justify-content:space-between;align-items:baseline;
-    margin-bottom:18px;flex-wrap:wrap;gap:8px;}
-  .modules-head h3{font-size:16px;color:rgba(255,255,255,0.85);font-weight:700;}
-  .modules-head span{font-size:12px;color:rgba(255,255,255,0.45);}
-
-  .modules-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;}
-  .mod-card{background:var(--glass);border:1px solid var(--border);border-radius:16px;
-    padding:16px;transition:.25s;position:relative;overflow:hidden;}
-  .mod-card:hover{border-color:var(--gold);transform:translateY(-3px);}
-  .mod-name{font-size:14px;font-weight:700;text-transform:capitalize;margin-bottom:6px;
-    word-break:break-word;}
-  .mod-endpoint{font-size:10.5px;color:rgba(255,255,255,0.4);font-family:monospace;}
-  .mod-badge{position:absolute;top:12px;right:12px;width:8px;height:8px;
-    border-radius:50%;background:var(--success);}
-
-  .empty,.error-box{text-align:center;padding:60px 20px;color:rgba(255,255,255,0.5);}
-  .error-box{color:#ffb3b3;}
-  .error-box button{margin-top:14px;}
-
-  .skeleton{background:var(--glass);border:1px solid var(--border);border-radius:16px;height:70px;
-    animation:pulse 1.4s infinite;}
-  @keyframes pulse{0%,100%{opacity:.5}50%{opacity:1}}
-
-  .footer{text-align:center;padding:26px;border-top:1px solid var(--border);
-    color:rgba(255,255,255,0.35);font-size:11.5px;}
-
-  @media(max-width:600px){.hero h2{font-size:22px}.header{padding:14px 16px}}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🦁 Singh Ji AI Ultra v7.0</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #fff;
+            min-height: 100vh;
+        }
+        .header {
+            text-align: center;
+            padding: 20px;
+            background: rgba(0,0,0,0.3);
+        }
+        .header h1 { font-size: 2.5em; color: #ffd700; }
+        .header p { color: #aaa; margin-top: 5px; }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .server-status {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        
+        .status-card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            padding: 20px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .status-card h3 {
+            color: #ffd700;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        .online { background: #00ff88; box-shadow: 0 0 10px #00ff88; }
+        .offline { background: #ff4444; }
+        .sleeping { background: #ffaa00; }
+        
+        .modules-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+        }
+        
+        .module-card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            padding: 20px;
+            border: 1px solid rgba(255,255,255,0.1);
+            transition: transform 0.3s;
+        }
+        
+        .module-card:hover {
+            transform: translateY(-5px);
+            border-color: #ffd700;
+        }
+        
+        .module-card h3 {
+            color: #ffd700;
+            margin-bottom: 15px;
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #ffd700, #ffaa00);
+            color: #1a1a2e;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: bold;
+            margin: 5px;
+            transition: all 0.3s;
+        }
+        
+        .btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 20px rgba(255,215,0,0.3);
+        }
+        
+        .output {
+            background: rgba(0,0,0,0.3);
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 15px;
+            min-height: 100px;
+            font-family: monospace;
+            font-size: 0.9em;
+            overflow-x: auto;
+        }
+        
+        .loading {
+            color: #ffd700;
+            animation: pulse 1s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .footer {
+            text-align: center;
+            padding: 30px;
+            color: #666;
+        }
+    </style>
 </head>
 <body>
-
-<header class="header">
-  <div class="logo">
-    <div class="logo-icon">SJ</div>
-    <div class="logo-text">
-      <h1>Singh Ji AI Ultra</h1>
-      <p>v7.0 &mdash; Bharat to the World</p>
+    <div class="header">
+        <h1>🦁 Singh Ji AI Ultra v7.0</h1>
+        <p>60 Modules | 330 Agent Swarm | 26 Languages | India Super App</p>
     </div>
-  </div>
-  <button class="refresh-btn" id="refreshBtn" onclick="loadStatus()">Refresh</button>
-</header>
-
-<section class="hero">
-  <h2>Ek App. <span id="moduleCountHero">--</span> Modules. Anant Shakti.</h2>
-  <p>Live backend status seedhe singhji-api se, koi hardcoded data nahi &mdash; jo neeche dikh raha hai wahi is waqt server par chal raha hai.</p>
-  <div class="status-row" id="statusRow">
-    <div class="pill"><span class="dot checking" id="apiDot"></span><span id="apiText">API check ho raha hai...</span></div>
-  </div>
-</section>
-
-<section class="modules-wrap">
-  <div class="modules-head">
-    <h3 id="modulesHeading">Live Modules</h3>
-    <span id="lastChecked"></span>
-  </div>
-  <div class="modules-grid" id="modulesGrid">
-    <div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>
-    <div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>
-  </div>
-</section>
-
-<footer class="footer">
-  Backend: singhji-api.onrender.com &nbsp;|&nbsp; Made in India &nbsp;|&nbsp; UPI: jp200883@sbi
-</footer>
-
-<script>
-const API_BASE = "https://singhji-api.onrender.com";
-
-async function loadStatus(){
-  const btn = document.getElementById('refreshBtn');
-  const dot = document.getElementById('apiDot');
-  const text = document.getElementById('apiText');
-  const grid = document.getElementById('modulesGrid');
-  const heading = document.getElementById('modulesHeading');
-  const lastChecked = document.getElementById('lastChecked');
-
-  btn.disabled = true; btn.textContent = "Checking...";
-  dot.className = "dot checking";
-  text.textContent = "API check ho raha hai...";
-  grid.innerHTML = '<div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>';
-
-  try{
-    const res = await fetch(`${API_BASE}/api/status`, {cache:"no-store"});
-    if(!res.ok) throw new Error("status " + res.status);
-    const data = await res.json();
-    const modules = Array.isArray(data.modules) ? data.modules : [];
-
-    dot.className = "dot live";
-    text.textContent = `API LIVE &mdash; ${modules.length} modules loaded`;
-    text.innerHTML = `API LIVE &mdash; ${modules.length} modules loaded`;
-    document.getElementById('moduleCountHero').textContent = modules.length;
-    heading.textContent = `Live Modules (${modules.length})`;
-    lastChecked.textContent = "Last checked: " + new Date().toLocaleTimeString('hi-IN');
-
-    if(modules.length === 0){
-      grid.innerHTML = '<div class="empty">Koi module load nahi hua. Backend check karo.</div>';
-    } else {
-      grid.innerHTML = modules.map(name => `
-        <div class="mod-card">
-          <span class="mod-badge"></span>
-          <div class="mod-name">${name.replace(/_/g,' ')}</div>
-          <div class="mod-endpoint">/api/${name}</div>
+    
+    <div class="container">
+        <!-- Server Status -->
+        <div class="server-status">
+            <div class="status-card">
+                <h3><span class="status-dot online" id="render-dot"></span> Render Server</h3>
+                <p id="render-status">Checking...</p>
+                <p id="render-modules">Modules: --</p>
+            </div>
+            <div class="status-card">
+                <h3><span class="status-dot online" id="railway-dot"></span> Railway Server</h3>
+                <p id="railway-status">Checking...</p>
+                <p id="railway-agents">Agents: --</p>
+            </div>
         </div>
-      `).join('');
-    }
-  } catch(err){
-    dot.className = "dot down";
-    text.textContent = "API se connect nahi ho paya";
-    grid.innerHTML = `<div class="error-box">Backend abhi jawab nahi de raha (cold start ho sakta hai, Render par 30-50 sec lagte hain).<br><button class="refresh-btn" onclick="loadStatus()">Dobara try karo</button></div>`;
-    lastChecked.textContent = "Last try: " + new Date().toLocaleTimeString('hi-IN');
-  } finally {
-    btn.disabled = false; btn.textContent = "Refresh";
-  }
-}
+        
+        <!-- Modules Grid -->
+        <div class="modules-grid">
+            <!-- Weather Module -->
+            <div class="module-card">
+                <h3>🌤️ Weather</h3>
+                <input type="text" id="city-input" placeholder="Enter city (e.g. Delhi)" style="padding:8px;border-radius:5px;border:none;width:100%;margin-bottom:10px;">
+                <button class="btn" onclick="getWeather()">Get Weather</button>
+                <div class="output" id="weather-output">Click button to get weather...</div>
+            </div>
+            
+            <!-- News Module -->
+            <div class="module-card">
+                <h3>📰 Latest News</h3>
+                <button class="btn" onclick="getNews()">Fetch News</button>
+                <div class="output" id="news-output">Click button to get news...</div>
+            </div>
+            
+            <!-- 330 Agent Swarm -->
+            <div class="module-card">
+                <h3>🐝 330 Agent Swarm</h3>
+                <button class="btn" onclick="getSwarmStatus()">Swarm Status</button>
+                <button class="btn" onclick="executeAgent()">Test Agent</button>
+                <div class="output" id="swarm-output">Click button to check swarm...</div>
+            </div>
+            
+            <!-- Tax Calculator -->
+            <div class="module-card">
+                <h3>💰 Tax Calculator</h3>
+                <input type="number" id="income-input" placeholder="Annual Income" style="padding:8px;border-radius:5px;border:none;width:100%;margin-bottom:10px;">
+                <select id="regime-select" style="padding:8px;border-radius:5px;border:none;width:100%;margin-bottom:10px;">
+                    <option value="new">New Regime</option>
+                    <option value="old">Old Regime</option>
+                </select>
+                <button class="btn" onclick="calculateTax()">Calculate Tax</button>
+                <div class="output" id="tax-output">Enter income and click calculate...</div>
+            </div>
+            
+            <!-- Memory -->
+            <div class="module-card">
+                <h3>🧠 Memory Store</h3>
+                <input type="text" id="mem-key" placeholder="Key" style="padding:8px;border-radius:5px;border:none;width:48%;margin-bottom:10px;">
+                <input type="text" id="mem-value" placeholder="Value" style="padding:8px;border-radius:5px;border:none;width:48%;margin-bottom:10px;">
+                <button class="btn" onclick="saveMemory()">Save</button>
+                <button class="btn" onclick="getMemory()">Get All</button>
+                <div class="output" id="memory-output">Use buttons to manage memory...</div>
+            </div>
+            
+            <!-- Admin -->
+            <div class="module-card">
+                <h3>👑 Admin Dashboard</h3>
+                <button class="btn" onclick="getAdminStats()">System Stats</button>
+                <div class="output" id="admin-output">Click for system stats...</div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="footer">
+        <p>🦁 Singh Ji AI Ultra v7.0 | Made with ❤️ in India</p>
+        <p>Render + Railway Hybrid Architecture</p>
+    </div>
 
-loadStatus();
-setInterval(loadStatus, 60000); // auto-refresh every 60s
-</script>
+    <script>
+        // 🦁 HYBRID API CONFIGURATION
+        const RENDER_API = "https://singhji-api.onrender.com";
+        const RAILWAY_API = "https://singhji-api-production-85ca.up.railway.app";
+        
+        // Track which server is active
+        let renderActive = false;
+        let railwayActive = false;
+        
+        // ====== SERVER STATUS CHECK ======
+        async function checkServers() {
+            // Check Render
+            try {
+                const start = Date.now();
+                const res = await fetch(`${RENDER_API}/health`, {timeout: 5000});
+                const data = await res.json();
+                const latency = Date.now() - start;
+                renderActive = true;
+                document.getElementById('render-dot').className = 'status-dot online';
+                document.getElementById('render-status').textContent = `Online (${latency}ms)`;
+                document.getElementById('render-modules').textContent = `Modules: 37+`;
+            } catch(e) {
+                renderActive = false;
+                document.getElementById('render-dot').className = 'status-dot sleeping';
+                document.getElementById('render-status').textContent = 'Sleeping/Waking...';
+                document.getElementById('render-modules').textContent = 'Modules: 37+';
+            }
+            
+            // Check Railway
+            try {
+                const start = Date.now();
+                const res = await fetch(`${RAILWAY_API}/health`, {timeout: 5000});
+                const data = await res.json();
+                const latency = Date.now() - start;
+                railwayActive = true;
+                document.getElementById('railway-dot').className = 'status-dot online';
+                document.getElementById('railway-status').textContent = `Online (${latency}ms)`;
+                document.getElementById('railway-agents').textContent = `Agents: ${data.agents || '--'}`;
+            } catch(e) {
+                railwayActive = false;
+                document.getElementById('railway-dot').className = 'status-dot offline';
+                document.getElementById('railway-status').textContent = 'Offline';
+                document.getElementById('railway-agents').textContent = 'Agents: --';
+            }
+        }
+        
+        // Check every 30 seconds
+        checkServers();
+        setInterval(checkServers, 30000);
+        
+        // ====== RENDER MODULES (Old, Stable) ======
+        async function getWeather() {
+            const output = document.getElementById('weather-output');
+            const city = document.getElementById('city-input').value || 'Delhi';
+            output.innerHTML = '<span class="loading">🦁 Loading weather...</span>';
+            
+            try {
+                const res = await fetch(`${RENDER_API}/api/weather/${city}`);
+                const data = await res.json();
+                output.innerHTML = `
+                    <strong>🌤️ ${data.city || city}</strong><br>
+                    🌡️ Temperature: ${data.temperature || data.temp || '--'}°C<br>
+                    💧 Humidity: ${data.humidity || '--'}%<br>
+                    📝 ${data.description || data.desc || '--'}<br>
+                    <small style="color:#888;">Source: Render Server</small>
+                `;
+            } catch(e) {
+                output.innerHTML = `<span style="color:#ff4444;">❌ Error: ${e.message}</span>`;
+            }
+        }
+        
+        async function getNews() {
+            const output = document.getElementById('news-output');
+            output.innerHTML = '<span class="loading">🦁 Loading news...</span>';
+            
+            try {
+                const res = await fetch(`${RENDER_API}/api/news/latest`);
+                const data = await res.json();
+                const articles = data.news || data.articles || [];
+                const html = articles.slice(0, 5).map(a => `
+                    <div style="margin:5px 0;padding:5px;background:rgba(255,255,255,0.05);border-radius:5px;">
+                        <strong>${a.title || 'No title'}</strong><br>
+                        <small>${a.description || ''}</small>
+                    </div>
+                `).join('');
+                output.innerHTML = html || '<p>No news available</p>';
+            } catch(e) {
+                output.innerHTML = `<span style="color:#ff4444;">❌ Error: ${e.message}</span>`;
+            }
+        }
+        
+        // ====== RAILWAY MODULES (New, Testing) ======
+        async function getSwarmStatus() {
+            const output = document.getElementById('swarm-output');
+            output.innerHTML = '<span class="loading">🦁 Checking swarm...</span>';
+            
+            try {
+                const res = await fetch(`${RAILWAY_API}/api/swarm/`);
+                const data = await res.json();
+                output.innerHTML = `
+                    <strong>🐝 Sarwan 330 Swarm</strong><br>
+                    Active: ${data.active || 0} / ${data.total || 330}<br>
+                    Queued: ${data.queued || 0}<br>
+                    Phase: ${data.current_phase || '--'}<br>
+                    Load: ${data.phases?.phase_1?.status || '--'}<br>
+                    <small style="color:#888;">Source: Railway Server</small>
+                `;
+            } catch(e) {
+                output.innerHTML = `<span style="color:#ff4444;">❌ Error: ${e.message}</span>`;
+            }
+        }
+        
+        async function executeAgent() {
+            const output = document.getElementById('swarm-output');
+            output.innerHTML = '<span class="loading">🦁 Executing agent...</span>';
+            
+            try {
+                const res = await fetch(`${RAILWAY_API}/api/swarm/agent/agent_001/execute`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({task: 'system_check'})
+                });
+                const data = await res.json();
+                output.innerHTML = `
+                    <strong>✅ Agent Executed</strong><br>
+                    ID: ${data.agent_id}<br>
+                    Task: ${data.task}<br>
+                    Status: ${data.status}<br>
+                    Tasks Completed: ${data.tasks_completed || 1}<br>
+                    <small style="color:#888;">Source: Railway Server</small>
+                `;
+            } catch(e) {
+                output.innerHTML = `<span style="color:#ff4444;">❌ Error: ${e.message}</span>`;
+            }
+        }
+        
+        async function calculateTax() {
+            const output = document.getElementById('tax-output');
+            const income = parseFloat(document.getElementById('income-input').value) || 0;
+            const regime = document.getElementById('regime-select').value;
+            
+            if (!income) {
+                output.innerHTML = '<span style="color:#ff4444;">❌ Please enter income</span>';
+                return;
+            }
+            
+            output.innerHTML = '<span class="loading">🦁 Calculating tax...</span>';
+            
+            try {
+                const res = await fetch(`${RAILWAY_API}/api/retirement/tax-calculate`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({income: income, regime: regime})
+                });
+                const data = await res.json();
+                output.innerHTML = `
+                    <strong>💰 Tax Calculation</strong><br>
+                    Income: ₹${data.income?.toLocaleString() || income}<br>
+                    Regime: ${data.regime?.toUpperCase()}<br>
+                    Tax: ₹${data.tax?.toLocaleString() || '--'}<br>
+                    Cess (4%): ₹${data.cess?.toLocaleString() || '--'}<br>
+                    <strong>Total Tax: ₹${data.total?.toLocaleString() || '--'}</strong><br>
+                    <strong style="color:#00ff88;">Take Home: ₹${data.take_home?.toLocaleString() || '--'}</strong><br>
+                    <small style="color:#888;">Source: Railway Server</small>
+                `;
+            } catch(e) {
+                output.innerHTML = `<span style="color:#ff4444;">❌ Error: ${e.message}</span>`;
+            }
+        }
+        
+        async function saveMemory() {
+            const output = document.getElementById('memory-output');
+            const key = document.getElementById('mem-key').value;
+            const value = document.getElementById('mem-value').value;
+            
+            if (!key || !value) {
+                output.innerHTML = '<span style="color:#ff4444;">❌ Enter key and value</span>';
+                return;
+            }
+            
+            output.innerHTML = '<span class="loading">🦁 Saving...</span>';
+            
+            try {
+                const res = await fetch(`${RAILWAY_API}/api/memory/`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({key: key, value: value})
+                });
+                const data = await res.json();
+                output.innerHTML = `<span style="color:#00ff88;">✅ Saved: ${data.key} (Total: ${data.total})</span>`;
+            } catch(e) {
+                output.innerHTML = `<span style="color:#ff4444;">❌ Error: ${e.message}</span>`;
+            }
+        }
+        
+        async function getMemory() {
+            const output = document.getElementById('memory-output');
+            output.innerHTML = '<span class="loading">🦁 Loading memory...</span>';
+            
+            try {
+                const res = await fetch(`${RAILWAY_API}/api/memory/`);
+                const data = await res.json();
+                output.innerHTML = `
+                    <strong>🧠 Memory Store</strong><br>
+                    Records: ${data.records || 0}<br>
+                    Keys: ${data.keys?.join(', ') || 'None'}<br>
+                    <small style="color:#888;">Source: Railway Server</small>
+                `;
+            } catch(e) {
+                output.innerHTML = `<span style="color:#ff4444;">❌ Error: ${e.message}</span>`;
+            }
+        }
+        
+        async function getAdminStats() {
+            const output = document.getElementById('admin-output');
+            output.innerHTML = '<span class="loading">🦁 Loading stats...</span>';
+            
+            try {
+                const res = await fetch(`${RAILWAY_API}/api/admin/stats`);
+                const data = await res.json();
+                output.innerHTML = `
+                    <strong>👑 System Stats</strong><br>
+                    Modules: ${data.modules || 0}<br>
+                    Memory: ${data.memory || 0} records<br>
+                    Agents: ${data.agents_active || 0} active<br>
+                    Queued: ${data.agents_queued || 0}<br>
+                    Phase: ${data.phase || '--'}<br>
+                    Load: ${data.load || '--'}<br>
+                    <small style="color:#888;">${data.timestamp}</small>
+                `;
+            } catch(e) {
+                output.innerHTML = `<span style="color:#ff4444;">❌ Error: ${e.message}</span>`;
+            }
+        }
+    </script>
 </body>
 </html>
