@@ -5,9 +5,6 @@ from typing import Dict, List, Optional
 import os
 import random
 from datetime import datetime
-from mem0 import Memory
-
-memory = Memory()
 
 # SINGLE FastAPI app
 app = FastAPI(
@@ -23,22 +20,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# ============================================================
-# 🧠 TRISHUL MEMORY SYSTEM
-# ============================================================
-
-@app.post("/api/memory/store")
-async def store_memory(request: Request):
-    data = await request.json()
-    memory.add(data.get("message"), user_id=data.get("user_id"))
-    return {"status": "stored"}
-
-@app.post("/api/memory/get")
-async def get_memory(request: Request):
-    data = await request.json()
-    memories = memory.get_all(user_id=data.get("user_id"))
-    return {"memories": memories}
 
 # ... (बाकी endpoints same)
 # ============================================================
