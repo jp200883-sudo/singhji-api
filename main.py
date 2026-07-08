@@ -1,6 +1,7 @@
 """
 🦁 SINGH JI AI ULTRA v7.0 — SARWAN 330 AGENT SWARM
 Phased deployment | Zero overload | Railway compatible
+max_agents: 100 | Load threshold: 90%
 """
 from fastapi import FastAPI, Request, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
@@ -73,7 +74,7 @@ AGENT_SWARM = {}
 AGENT_QUEUE = []
 AGENT_SCHEDULE = {}
 USER_SESSIONS = {}
-SYSTEM_LOAD = {"active_agents": 0, "max_agents": 50, "phase": 0}
+SYSTEM_LOAD = {"active_agents": 0, "max_agents": 100, "phase": 0}  # FIX: 50 → 100
 
 MODULES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "modules")
 
@@ -159,7 +160,7 @@ def load_module(name, info):
         return None
 
 # ═══════════════════════════════════════════════════════
-# 🦁 SYSTEM LOAD CHECK
+# 🦁 SYSTEM LOAD CHECK — FIX: 80% → 90%
 # ═══════════════════════════════════════════════════════
 async def check_system_load():
     active = SYSTEM_LOAD["active_agents"]
@@ -167,7 +168,7 @@ async def check_system_load():
     if active >= max_allowed:
         return False
     load_percent = (active / max_allowed) * 100
-    return load_percent < 80
+    return load_percent < 90  # FIX: 80 → 90
 
 # ═══════════════════════════════════════════════════════
 # 🦁 SARWAN AGENT SCHEDULER
@@ -212,10 +213,11 @@ async def sarwan_scheduler():
             if int(agent_id.split("_")[1]) % 10 == 0:
                 logger.info(f"✅ {agent_id} activated (Phase {phase})")
             
-            await asyncio.sleep(0.5)
+            await asyncio.sleep(0.2)  # FIX: 0.5 → 0.2 (faster)
         
         logger.info(f"🦁 Phase {phase} complete: {len([a for a in AGENT_SWARM.values() if a.get('phase')==phase])} agents")
     
+    # Process queue
     while AGENT_QUEUE:
         can_add = await check_system_load()
         if can_add:
@@ -253,7 +255,7 @@ async def self_ping():
         await asyncio.sleep(10 * 60)
 
 # ═══════════════════════════════════════════════════════
-# 🦁 LIGHTWEIGHT STARTUP — NO BLOCKING
+# 🦁 LIGHTWEIGHT STARTUP
 # ═══════════════════════════════════════════════════════
 @app.on_event("startup")
 async def startup():
@@ -266,7 +268,6 @@ async def startup():
         
         logger.info(f"🦁 {len(MODULES)} modules ready")
         
-        # Background tasks — non-blocking
         asyncio.create_task(sarwan_scheduler())
         asyncio.create_task(self_ping())
         
@@ -275,7 +276,7 @@ async def startup():
         logger.error(f"Startup error: {e}")
 
 # ═══════════════════════════════════════════════════════
-# 🦁 HEALTH — IMMEDIATE RESPONSE (Railway compatible)
+# 🦁 HEALTH — IMMEDIATE RESPONSE
 # ═══════════════════════════════════════════════════════
 @app.get("/")
 @app.head("/")
@@ -294,7 +295,6 @@ async def root():
 @app.get("/health")
 @app.head("/health")
 def health():
-    """Sync function — Railway healthcheck needs fast response"""
     return {"status": "ok", "service": "Singh Ji AI", "agents": SYSTEM_LOAD["active_agents"]}
 
 @app.get("/api/health")
