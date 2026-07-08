@@ -1,8 +1,8 @@
 """
-🦁 SINGH JI AI ULTRA v7.0 — COMPLETE MASTER
-All routes in one file | Modules lazy-load ready | 330 Agent Swarm Ready
+🦁 SINGH JI AI ULTRA v7.0 — SARWAN 330 AGENT SWARM
+Phased deployment | Zero overload | Railway compatible
 """
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import os
@@ -52,8 +52,8 @@ TZ = os.getenv("TZ", "Asia/Kolkata")
 # ═══════════════════════════════════════════════════════
 app = FastAPI(
     title="🦁 Singh Ji AI Ultra v7.0",
-    version="7.0.0-complete",
-    description="60 Modules | 330 Agent Swarm | 26 Languages | India Super App"
+    version="7.0.0-sarwan",
+    description="330 Agent Swarm | Sarwan Edition"
 )
 
 app.add_middleware(
@@ -69,27 +69,67 @@ app.add_middleware(
 # ═══════════════════════════════════════════════════════
 MODULES = {}
 MEMORY_STORE = {}
-AGENT_SWARM = {}  # 330 Agent Swarm Registry
+AGENT_SWARM = {}
+AGENT_QUEUE = []
+AGENT_SCHEDULE = {}
 USER_SESSIONS = {}
+SYSTEM_LOAD = {"active_agents": 0, "max_agents": 50, "phase": 0}
 
 MODULES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "modules")
 
 # ═══════════════════════════════════════════════════════
-# 🦁 MODULE DISCOVERY & LOADING
+# 🦁 SARWAN 330 AGENT DEFINITIONS
+# ═══════════════════════════════════════════════════════
+AGENT_DEFINITIONS = {}
+
+# Phase 1: Core Agents (1-100) — Immediate
+for i in range(1, 101):
+    AGENT_DEFINITIONS[f"agent_{i:03d}"] = {
+        "phase": 1,
+        "type": "core",
+        "delay_minutes": 0,
+        "priority": "critical",
+        "role": "system"
+    }
+
+# Phase 2: Service Agents (101-200) — 5 min delay
+for i in range(101, 201):
+    AGENT_DEFINITIONS[f"agent_{i:03d}"] = {
+        "phase": 2,
+        "type": "service",
+        "delay_minutes": 5,
+        "priority": "high",
+        "role": "api"
+    }
+
+# Phase 3: Specialized Agents (201-330) — 10 min delay
+for i in range(201, 331):
+    AGENT_DEFINITIONS[f"agent_{i:03d}"] = {
+        "phase": 3,
+        "type": "specialized",
+        "delay_minutes": 10,
+        "priority": "medium",
+        "role": "ai"
+    }
+
+# ═══════════════════════════════════════════════════════
+# 🦁 MODULE DISCOVERY
 # ═══════════════════════════════════════════════════════
 def discover_modules():
     modules = {}
     if not os.path.exists(MODULES_DIR):
-        logger.warning(f"⚠️ modules/ not found at {MODULES_DIR}")
         return modules
-    for item in os.listdir(MODULES_DIR):
-        item_path = os.path.join(MODULES_DIR, item)
-        if os.path.isdir(item_path) and not item.startswith("__"):
-            handler_path = os.path.join(item_path, "handler.py")
-            if os.path.exists(handler_path):
-                modules[item] = {"type": "folder", "path": handler_path}
-        elif item.endswith(".py") and not item.startswith("__"):
-            modules[item[:-3]] = {"type": "file", "path": item_path}
+    try:
+        for item in os.listdir(MODULES_DIR):
+            item_path = os.path.join(MODULES_DIR, item)
+            if os.path.isdir(item_path) and not item.startswith("__"):
+                handler_path = os.path.join(item_path, "handler.py")
+                if os.path.exists(handler_path):
+                    modules[item] = {"type": "folder", "path": handler_path}
+            elif item.endswith(".py") and not item.startswith("__"):
+                modules[item[:-3]] = {"type": "file", "path": item_path}
+    except Exception as e:
+        logger.error(f"Module discovery error: {e}")
     return modules
 
 def load_module(name, info):
@@ -99,33 +139,104 @@ def load_module(name, info):
             module = importlib.util.module_from_spec(spec)
             sys.modules[f"modules.{name}"] = module
             spec.loader.exec_module(module)
-            
-            # Check for router first (FastAPI), then handler (function)
             router = getattr(module, "router", None)
             if router:
                 app.include_router(router)
                 return "router_mounted"
-            
-            handler = getattr(module, "handler", None)
-            return handler
+            return getattr(module, "handler", None)
         else:
             spec = importlib.util.spec_from_file_location(name, info["path"])
             module = importlib.util.module_from_spec(spec)
             sys.modules[name] = module
             spec.loader.exec_module(module)
-            
             router = getattr(module, "router", None)
             if router:
                 app.include_router(router)
                 return "router_mounted"
-            
             return getattr(module, "handler", None)
     except Exception as e:
-        logger.error(f"❌ Failed {name}: {e}")
+        logger.error(f"Failed {name}: {e}")
         return None
 
 # ═══════════════════════════════════════════════════════
-# 🦁 SELF-PING SYSTEM
+# 🦁 SYSTEM LOAD CHECK
+# ═══════════════════════════════════════════════════════
+async def check_system_load():
+    active = SYSTEM_LOAD["active_agents"]
+    max_allowed = SYSTEM_LOAD["max_agents"]
+    if active >= max_allowed:
+        return False
+    load_percent = (active / max_allowed) * 100
+    return load_percent < 80
+
+# ═══════════════════════════════════════════════════════
+# 🦁 SARWAN AGENT SCHEDULER
+# ═══════════════════════════════════════════════════════
+async def sarwan_scheduler():
+    """Sarwan 330 Agent Swarm — Phased deployment"""
+    await asyncio.sleep(30)
+    
+    phases = [1, 2, 3]
+    phase_delays = {1: 0, 2: 300, 3: 600}
+    
+    for phase in phases:
+        SYSTEM_LOAD["phase"] = phase
+        logger.info(f"🦁 Sarwan Phase {phase} starting...")
+        await asyncio.sleep(phase_delays[phase])
+        
+        phase_agents = [k for k, v in AGENT_DEFINITIONS.items() if v["phase"] == phase]
+        
+        for agent_id in phase_agents:
+            can_add = await check_system_load()
+            if not can_add:
+                AGENT_QUEUE.append(agent_id)
+                await asyncio.sleep(5)
+                continue
+            
+            AGENT_SWARM[agent_id] = {
+                "id": agent_id,
+                "type": AGENT_DEFINITIONS[agent_id]["type"],
+                "phase": phase,
+                "status": "active",
+                "registered_at": datetime.now().isoformat(),
+                "last_active": datetime.now().isoformat(),
+                "tasks_completed": 0,
+                "config": {
+                    "auto_execute": False,
+                    "max_tasks_per_minute": 10,
+                    "cooldown_seconds": 6
+                }
+            }
+            SYSTEM_LOAD["active_agents"] += 1
+            
+            if int(agent_id.split("_")[1]) % 10 == 0:
+                logger.info(f"✅ {agent_id} activated (Phase {phase})")
+            
+            await asyncio.sleep(0.5)
+        
+        logger.info(f"🦁 Phase {phase} complete: {len([a for a in AGENT_SWARM.values() if a.get('phase')==phase])} agents")
+    
+    while AGENT_QUEUE:
+        can_add = await check_system_load()
+        if can_add:
+            agent_id = AGENT_QUEUE.pop(0)
+            AGENT_SWARM[agent_id] = {
+                "id": agent_id,
+                "type": AGENT_DEFINITIONS[agent_id]["type"],
+                "phase": AGENT_DEFINITIONS[agent_id]["phase"],
+                "status": "active",
+                "registered_at": datetime.now().isoformat(),
+                "last_active": datetime.now().isoformat(),
+                "tasks_completed": 0,
+                "config": {"auto_execute": False, "max_tasks_per_minute": 10, "cooldown_seconds": 6}
+            }
+            SYSTEM_LOAD["active_agents"] += 1
+        await asyncio.sleep(10)
+    
+    logger.info("🦁 SARWAN 330 ALL ACTIVE!")
+
+# ═══════════════════════════════════════════════════════
+# 🦁 SELF-PING
 # ═══════════════════════════════════════════════════════
 async def self_ping():
     await asyncio.sleep(60)
@@ -133,63 +244,80 @@ async def self_ping():
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.get(
-                    "https://singhji-api.onrender.com/api/health",
+                    "https://singhji-api-production-85ca.up.railway.app/health",
                     timeout=aiohttp.ClientTimeout(total=10)
                 ) as resp:
-                    logger.info(f"🦁 Self-ping: {resp.status} | Render awake!")
+                    logger.info(f"🦁 Self-ping: {resp.status}")
         except Exception as e:
-            logger.error(f"❌ Self-ping failed: {e}")
+            logger.error(f"Self-ping: {e}")
         await asyncio.sleep(10 * 60)
 
 # ═══════════════════════════════════════════════════════
-# 🦁 STARTUP
+# 🦁 LIGHTWEIGHT STARTUP — NO BLOCKING
 # ═══════════════════════════════════════════════════════
 @app.on_event("startup")
 async def startup():
-    all_modules = discover_modules()
-    
-    for name, info in all_modules.items():
-        result = load_module(name, info)
-        if result:
-            MODULES[name] = result
-            logger.info(f"✅ Loaded: {name} ({'router' if result == 'router_mounted' else 'handler'})")
-    
-    logger.info(f"🦁 {len(MODULES)} modules ready!")
-    logger.info(f"🦁 Modules: {list(MODULES.keys())}")
-    logger.info("🦁 Self-ping enabled — Render will never sleep!")
-    asyncio.create_task(self_ping())
+    try:
+        all_modules = discover_modules()
+        for name, info in all_modules.items():
+            result = load_module(name, info)
+            if result:
+                MODULES[name] = result
+        
+        logger.info(f"🦁 {len(MODULES)} modules ready")
+        
+        # Background tasks — non-blocking
+        asyncio.create_task(sarwan_scheduler())
+        asyncio.create_task(self_ping())
+        
+        logger.info("🦁 Sarwan 330 Swarm scheduler started")
+    except Exception as e:
+        logger.error(f"Startup error: {e}")
 
 # ═══════════════════════════════════════════════════════
-# 🦁 ROOT & HEALTH
+# 🦁 HEALTH — IMMEDIATE RESPONSE (Railway compatible)
 # ═══════════════════════════════════════════════════════
-@app.api_route("/", methods=["GET", "HEAD"])
+@app.get("/")
+@app.head("/")
 async def root():
     return {
         "name": "🦁 Singh Ji AI Ultra v7.0",
-        "version": "7.0.0-complete",
-        "modules_loaded": len(MODULES),
-        "modules": list(MODULES.keys()),
+        "version": "7.0.0-sarwan",
+        "modules": len(MODULES),
+        "agents_active": SYSTEM_LOAD["active_agents"],
+        "agents_queued": len(AGENT_QUEUE),
+        "phase": SYSTEM_LOAD["phase"],
         "status": "🦁 LIVE",
         "timestamp": datetime.now().isoformat()
     }
 
-@app.api_route("/api/health", methods=["GET", "HEAD"])
-async def health():
-    return {"status": "ok", "timestamp": datetime.now().isoformat()}
-
 @app.get("/health")
-async def health_simple():
-    return {"status": "ok", "version": "7.0", "service": "Singh Ji AI Ultra"}
+@app.head("/health")
+def health():
+    """Sync function — Railway healthcheck needs fast response"""
+    return {"status": "ok", "service": "Singh Ji AI", "agents": SYSTEM_LOAD["active_agents"]}
+
+@app.get("/api/health")
+@app.head("/api/health")
+def api_health():
+    return {"status": "ok", "timestamp": datetime.now().isoformat()}
 
 @app.get("/api/status")
 async def status():
     return {
-        "name": "Singh Ji AI v7.0 Complete",
-        "loaded_modules": len(MODULES),
-        "discovered_modules": len(discover_modules()),
-        "memory_records": len(MEMORY_STORE),
-        "agent_swarm_size": len(AGENT_SWARM),
-        "status": "🦁 LIVE",
+        "name": "Singh Ji AI v7.0 Sarwan",
+        "modules": len(MODULES),
+        "agents": {
+            "total": 330,
+            "active": SYSTEM_LOAD["active_agents"],
+            "queued": len(AGENT_QUEUE),
+            "phase": SYSTEM_LOAD["phase"],
+            "phases": {
+                "phase_1": len([a for a in AGENT_SWARM.values() if a.get("phase") == 1]),
+                "phase_2": len([a for a in AGENT_SWARM.values() if a.get("phase") == 2]),
+                "phase_3": len([a for a in AGENT_SWARM.values() if a.get("phase") == 3])
+            }
+        },
         "timestamp": datetime.now().isoformat()
     }
 
@@ -199,34 +327,18 @@ async def status():
 async def run_handler(module_name: str, request: Request):
     handler_func = MODULES[module_name]
     if handler_func == "router_mounted":
-        return JSONResponse(status_code=400, content={
-            "error": "This module uses FastAPI router. Access directly via its route path."
-        })
-    
+        return JSONResponse(status_code=400, content={"error": "Use direct route path"})
     try:
         if asyncio.iscoroutinefunction(handler_func):
             result = await handler_func(request)
         else:
             loop = asyncio.get_event_loop()
             result = await loop.run_in_executor(None, handler_func, request)
-        
-        if isinstance(result, dict):
-            if "statusCode" in result:
-                status_code = result.get("statusCode", 200)
-                headers = result.get("headers", {})
-                body = result.get("body", "{}")
-                if isinstance(body, str):
-                    try:
-                        body = json.loads(body)
-                    except:
-                        body = {"response": body}
-                return JSONResponse(status_code=status_code, headers=headers, content=body)
-            else:
-                return JSONResponse(content=result)
-        return result
+        if isinstance(result, dict) and "statusCode" in result:
+            return JSONResponse(status_code=result.get("statusCode", 200), content=json.loads(result.get("body", "{}")) if isinstance(result.get("body"), str) else result.get("body"))
+        return JSONResponse(content=result) if isinstance(result, dict) else result
     except Exception as e:
-        logger.error(f"❌ Error in {module_name}: {e}")
-        return JSONResponse(status_code=500, content={"status": "error", "module": module_name, "error": str(e)})
+        return JSONResponse(status_code=500, content={"error": str(e)})
 
 @app.api_route("/api/{module_name}", methods=["GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS"])
 async def dynamic_router(request: Request, module_name: str):
@@ -236,17 +348,10 @@ async def dynamic_router(request: Request, module_name: str):
             handler = load_module(module_name, all_modules[module_name])
             if handler:
                 MODULES[module_name] = handler
-                logger.info(f"✅ Lazy loaded: {module_name}")
             else:
-                return JSONResponse(status_code=404, content={
-                    "status": "error", "message": f"'{module_name}' failed to load"
-                })
+                return JSONResponse(status_code=404, content={"error": f"'{module_name}' failed to load"})
         else:
-            return JSONResponse(status_code=404, content={
-                "status": "error", "message": f"'{module_name}' not found",
-                "available": list(discover_modules().keys())
-            })
-    
+            return JSONResponse(status_code=404, content={"error": f"'{module_name}' not found", "available": list(discover_modules().keys())})
     return await run_handler(module_name, request)
 
 # ═══════════════════════════════════════════════════════
@@ -254,26 +359,18 @@ async def dynamic_router(request: Request, module_name: str):
 # ═══════════════════════════════════════════════════════
 @app.get("/api/memory/")
 async def memory_list():
-    return {
-        "status": "Memory Module Active",
-        "records": len(MEMORY_STORE),
-        "keys": list(MEMORY_STORE.keys())[:20]  # Limit output
-    }
+    return {"status": "Memory Active", "records": len(MEMORY_STORE), "keys": list(MEMORY_STORE.keys())[:20]}
 
 @app.get("/api/memory/{key}")
 async def memory_get(key: str):
-    return {
-        "key": key,
-        "data": MEMORY_STORE.get(key, None),
-        "exists": key in MEMORY_STORE
-    }
+    return {"key": key, "data": MEMORY_STORE.get(key), "exists": key in MEMORY_STORE}
 
 @app.post("/api/memory/")
 async def memory_save(request: Request):
     data = await request.json()
     key = data.get("key", str(datetime.now().timestamp()))
     MEMORY_STORE[key] = data.get("value", data)
-    return {"saved": True, "key": key, "total_records": len(MEMORY_STORE)}
+    return {"saved": True, "key": key, "total": len(MEMORY_STORE)}
 
 @app.delete("/api/memory/{key}")
 async def memory_delete(key: str):
@@ -287,27 +384,20 @@ async def memory_delete(key: str):
 # ═══════════════════════════════════════════════════════
 @app.get("/api/weather/")
 async def weather_root():
-    return {"module": "Weather", "status": "active", "source": "OpenWeatherMap"}
+    return {"module": "Weather", "status": "active"}
 
 @app.get("/api/weather/{city}")
 async def weather_city(city: str):
     if not OPENWEATHER_API_KEY:
-        return {"error": "OPENWEATHER_API_KEY not set"}
+        return {"error": "API key not set"}
     try:
         import requests
         url = f"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={OPENWEATHER_API_KEY}&units=metric"
         resp = requests.get(url, timeout=10)
         data = resp.json()
         if resp.status_code == 200:
-            return {
-                "city": city,
-                "temperature": data["main"]["temp"],
-                "feels_like": data["main"]["feels_like"],
-                "humidity": data["main"]["humidity"],
-                "description": data["weather"][0]["description"],
-                "icon": f"https://openweathermap.org/img/wn/{data['weather'][0]['icon']}@2x.png"
-            }
-        return {"error": data.get("message", "Unknown error")}
+            return {"city": city, "temp": data["main"]["temp"], "humidity": data["main"]["humidity"], "desc": data["weather"][0]["description"]}
+        return {"error": data.get("message")}
     except Exception as e:
         return {"error": str(e)}
 
@@ -316,55 +406,46 @@ async def weather_city(city: str):
 # ═══════════════════════════════════════════════════════
 @app.get("/api/news/")
 async def news_root():
-    return {"module": "News", "status": "active", "sources": ["Currents", "NewsData"]}
+    return {"module": "News", "status": "active"}
 
 @app.get("/api/news/latest")
 async def news_latest():
     if not CURRENTS_API_KEY:
-        return {"error": "CURRENTS_API_KEY not set"}
+        return {"error": "API key not set"}
     try:
         import requests
-        url = f"https://api.currentsapi.services/v1/latest-news?apiKey={CURRENTS_API_KEY}"
-        resp = requests.get(url, timeout=10)
+        resp = requests.get(f"https://api.currentsapi.services/v1/latest-news?apiKey={CURRENTS_API_KEY}", timeout=10)
         return resp.json()
     except Exception as e:
         return {"error": str(e)}
 
 # ═══════════════════════════════════════════════════════
-# 🦁 MANDI (AGRICULTURE) MODULE
+# 🦁 MANDI MODULE
 # ═══════════════════════════════════════════════════════
 @app.get("/api/mandi/")
 async def mandi_root():
-    return {"module": "Mandi", "status": "active", "source": "data.gov.in"}
+    return {"module": "Mandi", "status": "active"}
 
 @app.get("/api/mandi/{state}")
 async def mandi_state(state: str):
-    return {
-        "state": state,
-        "commodities": ["Wheat", "Rice", "Corn", "Soybean", "Cotton"],
-        "note": "Full API integration pending"
-    }
+    return {"state": state, "commodities": ["Wheat", "Rice", "Corn", "Soybean", "Cotton"]}
 
 # ═══════════════════════════════════════════════════════
 # 🦁 PLANT ID MODULE
 # ═══════════════════════════════════════════════════════
 @app.get("/api/plant/")
 async def plant_root():
-    return {"module": "Plant ID", "status": "active", "provider": "Plant.id"}
+    return {"module": "Plant ID", "status": "active"}
 
 @app.post("/api/plant/identify")
 async def plant_identify(request: Request):
     if not PLANT_ID_API:
-        return {"error": "PLANT_ID_API not set"}
+        return {"error": "API key not set"}
     data = await request.json()
-    return {
-        "status": "identification_pending",
-        "image_received": data.get("image_url", "none"),
-        "note": "Connect to Plant.id API"
-    }
+    return {"status": "pending", "image": data.get("image_url", "none")}
 
 # ═══════════════════════════════════════════════════════
-# 🦁 PAYMENT GATEWAY (ON HOLD)
+# 🦁 PAYMENT MODULE
 # ═══════════════════════════════════════════════════════
 @app.get("/api/payment/")
 async def payment_root():
@@ -372,13 +453,7 @@ async def payment_root():
         "module": "Singh Ji Payment Gateway",
         "status": "ON_HOLD",
         "activate_at": "1000+ daily users",
-        "upi_id": "jp200883@sbi",
-        "features": {
-            "upi": "0% commission",
-            "card": "2% commission",
-            "merchant_loans": "18-24% (future)",
-            "insurance": "10-20% (future)"
-        }
+        "upi_id": "jp200883@sbi"
     }
 
 # ═══════════════════════════════════════════════════════
@@ -388,125 +463,129 @@ async def payment_root():
 async def admin_root():
     return {
         "module": "Admin",
-        "status": "active",
-        "total_modules": len(MODULES),
-        "memory_records": len(MEMORY_STORE),
-        "agent_swarm": len(AGENT_SWARM),
-        "uptime": "running"
-    }
-
-@app.get("/api/admin/modules")
-async def admin_modules():
-    all_modules = discover_modules()
-    return {
-        "discovered": list(all_modules.keys()),
-        "loaded": list(MODULES.keys()),
-        "total_discovered": len(all_modules),
-        "total_loaded": len(MODULES)
+        "modules": len(MODULES),
+        "memory": len(MEMORY_STORE),
+        "agents": {
+            "total": 330,
+            "active": SYSTEM_LOAD["active_agents"],
+            "queued": len(AGENT_QUEUE),
+            "phase": SYSTEM_LOAD["phase"]
+        }
     }
 
 @app.get("/api/admin/stats")
 async def admin_stats():
     return {
-        "modules_loaded": len(MODULES),
-        "modules_discovered": len(discover_modules()),
-        "memory_records": len(MEMORY_STORE),
-        "agent_count": len(AGENT_SWARM),
-        "active_sessions": len(USER_SESSIONS),
-        "api_keys_loaded": sum([
-            bool(CEREBRAS_API_KEY), bool(GEMINI_API_KEY), bool(GROQ_API_KEY),
-            bool(OPENWEATHER_API_KEY), bool(TELEGRAM_TOKEN), bool(SUPABASE_URL)
-        ]),
+        "modules": len(MODULES),
+        "memory": len(MEMORY_STORE),
+        "agents_active": SYSTEM_LOAD["active_agents"],
+        "agents_queued": len(AGENT_QUEUE),
+        "phase": SYSTEM_LOAD["phase"],
+        "load": f"{(SYSTEM_LOAD['active_agents']/SYSTEM_LOAD['max_agents']*100):.1f}%",
         "timestamp": datetime.now().isoformat()
     }
 
 # ═══════════════════════════════════════════════════════
-# 🦁 330 AGENT SWARM MODULE
+# 🦁 SARWAN 330 SWARM ROUTES
 # ═══════════════════════════════════════════════════════
 @app.get("/api/swarm/")
 async def swarm_root():
     return {
-        "module": "330 Agent Swarm",
+        "module": "Sarwan 330 Agent Swarm",
         "status": "active",
-        "total_agents": 330,
-        "registered": len(AGENT_SWARM),
+        "total": 330,
+        "active": SYSTEM_LOAD["active_agents"],
+        "queued": len(AGENT_QUEUE),
+        "current_phase": SYSTEM_LOAD["phase"],
+        "max_concurrent": SYSTEM_LOAD["max_agents"],
         "phases": {
-            "phase_1": "Core Agents (1-100)",
-            "phase_2": "Service Agents (101-200)",
-            "phase_3": "Specialized Agents (201-330)"
+            "phase_1": {"range": "1-100", "type": "Core", "delay": "0 min", "status": "active" if SYSTEM_LOAD["phase"] >= 1 else "pending"},
+            "phase_2": {"range": "101-200", "type": "Service", "delay": "5 min", "status": "active" if SYSTEM_LOAD["phase"] >= 2 else "pending"},
+            "phase_3": {"range": "201-330", "type": "Specialized", "delay": "10 min", "status": "active" if SYSTEM_LOAD["phase"] >= 3 else "pending"}
         }
-    }
-
-@app.post("/api/swarm/register")
-async def swarm_register(request: Request):
-    data = await request.json()
-    agent_id = data.get("agent_id")
-    agent_type = data.get("agent_type", "general")
-    agent_config = data.get("config", {})
-    
-    AGENT_SWARM[agent_id] = {
-        "id": agent_id,
-        "type": agent_type,
-        "config": agent_config,
-        "status": "registered",
-        "registered_at": datetime.now().isoformat(),
-        "last_active": datetime.now().isoformat()
-    }
-    
-    return {
-        "registered": True,
-        "agent_id": agent_id,
-        "total_agents": len(AGENT_SWARM)
     }
 
 @app.get("/api/swarm/agents")
 async def swarm_list():
     return {
         "total": len(AGENT_SWARM),
-        "agents": list(AGENT_SWARM.keys())[:50]  # Limit output
+        "active": SYSTEM_LOAD["active_agents"],
+        "queued": len(AGENT_QUEUE),
+        "sample": {k: {"type": v["type"], "phase": v["phase"], "status": v["status"]} 
+                   for k, v in list(AGENT_SWARM.items())[:10]}
     }
 
 @app.get("/api/swarm/agent/{agent_id}")
 async def swarm_agent_get(agent_id: str):
-    if agent_id not in AGENT_SWARM:
-        return {"error": "Agent not found"}
-    return AGENT_SWARM[agent_id]
+    if agent_id in AGENT_SWARM:
+        return AGENT_SWARM[agent_id]
+    if agent_id in AGENT_QUEUE:
+        return {"agent_id": agent_id, "status": "queued", "position": AGENT_QUEUE.index(agent_id)}
+    if agent_id in AGENT_DEFINITIONS:
+        return {"agent_id": agent_id, "status": "scheduled", "phase": AGENT_DEFINITIONS[agent_id]["phase"]}
+    return {"error": "Agent not found"}
 
 @app.post("/api/swarm/agent/{agent_id}/execute")
 async def swarm_agent_execute(agent_id: str, request: Request):
     if agent_id not in AGENT_SWARM:
-        return {"error": "Agent not found"}
-    
+        return {"error": "Agent not active yet"}
     data = await request.json()
     task = data.get("task", "unknown")
-    
     AGENT_SWARM[agent_id]["last_active"] = datetime.now().isoformat()
-    AGENT_SWARM[agent_id]["last_task"] = task
-    
+    AGENT_SWARM[agent_id]["tasks_completed"] += 1
     return {
         "agent_id": agent_id,
         "task": task,
         "status": "executed",
-        "result": f"Task '{task}' completed by agent {agent_id}"
+        "tasks_completed": AGENT_SWARM[agent_id]["tasks_completed"]
     }
 
 @app.post("/api/swarm/broadcast")
 async def swarm_broadcast(request: Request):
     data = await request.json()
     message = data.get("message", "")
-    targets = data.get("targets", list(AGENT_SWARM.keys()))
-    
+    targets = data.get("targets", list(AGENT_SWARM.keys())[:10])
     results = []
     for agent_id in targets:
         if agent_id in AGENT_SWARM:
             AGENT_SWARM[agent_id]["last_active"] = datetime.now().isoformat()
-            results.append({"agent": agent_id, "status": "broadcast_received"})
-    
+            results.append({"agent": agent_id, "status": "received"})
+    return {"broadcast": True, "message": message, "recipients": len(results)}
+
+# ═══════════════════════════════════════════════════════
+# 🦁 RETIREMENT TAX MODULE
+# ═══════════════════════════════════════════════════════
+@app.get("/api/retirement/")
+async def retirement_root():
+    return {"module": "Retirement & Tax", "features": ["PF", "NPS", "Tax", "SIP"]}
+
+@app.post("/api/retirement/tax-calculate")
+async def retirement_tax(request: Request):
+    data = await request.json()
+    income = data.get("income", 0)
+    regime = data.get("regime", "new")
+    tax = 0
+    if regime == "new":
+        if income <= 300000: tax = 0
+        elif income <= 600000: tax = (income - 300000) * 0.05
+        elif income <= 900000: tax = 15000 + (income - 600000) * 0.10
+        elif income <= 1200000: tax = 45000 + (income - 900000) * 0.15
+        elif income <= 1500000: tax = 90000 + (income - 1200000) * 0.20
+        else: tax = 150000 + (income - 1500000) * 0.30
+    else:
+        taxable = max(0, income - 50000 - data.get("deductions", 0))
+        if taxable <= 250000: tax = 0
+        elif taxable <= 500000: tax = (taxable - 250000) * 0.05
+        elif taxable <= 1000000: tax = 12500 + (taxable - 500000) * 0.20
+        else: tax = 112500 + (taxable - 1000000) * 0.30
+    cess = tax * 0.04
     return {
-        "broadcast": True,
-        "message": message,
-        "recipients": len(results),
-        "results": results
+        "income": income,
+        "regime": regime,
+        "tax": round(tax, 2),
+        "cess": round(cess, 2),
+        "total": round(tax + cess, 2),
+        "take_home": round(income - tax - cess, 2)
     }
 
 # ═══════════════════════════════════════════════════════
@@ -519,118 +598,21 @@ async def telegram_webhook(request: Request):
         message = data.get('message', {})
         text = message.get('text', '')
         chat_id = message.get('chat', {}).get('id')
-        
-        logger.info(f"📩 Telegram: {text} from chat {chat_id}")
-        
-        if text == '/start':
-            reply = "🦁 <b>Singh Ji AI Bot</b>\n\nShuruwat ho gayi!\n\nCommands:\n/start — Shuruwat\n/help — Madad\n/status — System check"
-        elif text == '/help':
-            reply = "🦁 <b>Madad</b>\n\n/start — Bot shuru\n/status — API status\nKuch bhi likho — Main jawab dunga!"
-        elif text == '/status':
-            reply = "🟢 <b>Singh Ji AI Status</b>\n\n✅ Bot Active\n✅ API Connected\n🦁 Singh Ji AI v7.0"
+        if text == '/status':
+            reply = f"🦁 Singh Ji AI\nAgents: {SYSTEM_LOAD['active_agents']}/330\nPhase: {SYSTEM_LOAD['phase']}"
         else:
-            reply = f"🦁 Aapne likha: <b>{text}</b>\n\nMain abhi sirf commands samajhta hoon:\n/start, /help, /status"
-        
+            reply = "🦁 Singh Ji AI Bot\nCommands: /status"
         if TELEGRAM_TOKEN and chat_id:
             import requests
-            url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-            requests.post(url, json={
-                "chat_id": chat_id,
-                "text": reply,
-                "parse_mode": "HTML"
-            }, timeout=10)
-            logger.info(f"✅ Reply sent to {chat_id}")
-        
-        return JSONResponse(status_code=200, content={"status": "ok"})
+            requests.post(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
+                json={"chat_id": chat_id, "text": reply, "parse_mode": "HTML"}, timeout=10)
+        return {"status": "ok"}
     except Exception as e:
-        logger.error(f"Telegram error: {e}")
-        return JSONResponse(status_code=200, content={"status": "ok"})
+        logger.error(f"Telegram: {e}")
+        return {"status": "ok"}
 
 # ═══════════════════════════════════════════════════════
-# 🦁 RETIREMENT TAX MODULE
-# ═══════════════════════════════════════════════════════
-@app.get("/api/retirement/")
-async def retirement_root():
-    return {
-        "module": "Retirement & Tax Planning",
-        "status": "active",
-        "features": [
-            "PF Calculator",
-            "NPS Calculator",
-            "Tax Calculator (Old vs New Regime)",
-            "SIP Planner",
-            "Pension Estimator"
-        ]
-    }
-
-@app.post("/api/retirement/pf-calculate")
-async def retirement_pf(request: Request):
-    data = await request.json()
-    basic_salary = data.get("basic_salary", 0)
-    years = data.get("years", 20)
-    rate = data.get("rate", 8.1)  # Current PF rate
-    
-    monthly_pf = basic_salary * 0.12  # 12% of basic
-    total_contribution = monthly_pf * 12 * years
-    interest = total_contribution * (rate / 100) * years * 0.5  # Approximate
-    maturity = total_contribution + interest
-    
-    return {
-        "basic_salary": basic_salary,
-        "monthly_pf": round(monthly_pf, 2),
-        "years": years,
-        "interest_rate": rate,
-        "total_contribution": round(total_contribution, 2),
-        "estimated_interest": round(interest, 2),
-        "maturity_amount": round(maturity, 2)
-    }
-
-@app.post("/api/retirement/tax-calculate")
-async def retirement_tax(request: Request):
-    data = await request.json()
-    income = data.get("income", 0)
-    regime = data.get("regime", "new")  # old or new
-    
-    tax = 0
-    if regime == "new":
-        if income <= 300000:
-            tax = 0
-        elif income <= 600000:
-            tax = (income - 300000) * 0.05
-        elif income <= 900000:
-            tax = 15000 + (income - 600000) * 0.10
-        elif income <= 1200000:
-            tax = 45000 + (income - 900000) * 0.15
-        elif income <= 1500000:
-            tax = 90000 + (income - 1200000) * 0.20
-        else:
-            tax = 150000 + (income - 1500000) * 0.30
-    else:  # Old regime with deductions
-        taxable = max(0, income - 50000 - data.get("deductions", 0))
-        if taxable <= 250000:
-            tax = 0
-        elif taxable <= 500000:
-            tax = (taxable - 250000) * 0.05
-        elif taxable <= 1000000:
-            tax = 12500 + (taxable - 500000) * 0.20
-        else:
-            tax = 112500 + (taxable - 1000000) * 0.30
-    
-    cess = tax * 0.04
-    total_tax = tax + cess
-    
-    return {
-        "income": income,
-        "regime": regime,
-        "taxable_income": income if regime == "new" else max(0, income - 50000 - data.get("deductions", 0)),
-        "base_tax": round(tax, 2),
-        "cess_4_percent": round(cess, 2),
-        "total_tax": round(total_tax, 2),
-        "take_home": round(income - total_tax, 2)
-    }
-
-# ═══════════════════════════════════════════════════════
-# 🦁 RUN SERVER
+# 🦁 RUN
 # ═══════════════════════════════════════════════════════
 if __name__ == "__main__":
     import uvicorn
