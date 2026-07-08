@@ -1,10 +1,13 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request  # ← Request ADD किया!
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Dict, List, Optional
 import os
 import random
 from datetime import datetime
+from mem0 import Memory
+
+memory = Memory()
 
 # SINGLE FastAPI app
 app = FastAPI(
@@ -21,6 +24,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ============================================================
+# 🧠 TRISHUL MEMORY SYSTEM
+# ============================================================
+
+@app.post("/api/memory/store")
+async def store_memory(request: Request):
+    data = await request.json()
+    memory.add(data.get("message"), user_id=data.get("user_id"))
+    return {"status": "stored"}
+
+@app.post("/api/memory/get")
+async def get_memory(request: Request):
+    data = await request.json()
+    memories = memory.get_all(user_id=data.get("user_id"))
+    return {"memories": memories}
+
+# ... (बाकी endpoints same)
 # ============================================================
 # 🦁 11 CLAWS — 300 AGENTS SWARM DATA
 # ============================================================
@@ -453,6 +473,11 @@ SWARM_DATA = {
 
 active_missions = {}
 step_tracker = {"current": 0, "max": 4000}
+@app.post("/api/memory/store")
+async def store_memory(request: Request):
+    data = await request.json()
+    memory.add(data.get("message"), user_id=data.get("user_id"))
+    return {"status": "stored"}
 
 # ============================================================
 # API ENDPOINTS
