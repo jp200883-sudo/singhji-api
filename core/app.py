@@ -1,5 +1,6 @@
 """
-🦁 SINGH JI AI — core/app.py
+🦁 SINGH JI AI ULTRA v7.0 - core/app.py
+Main FastAPI App — सब Routers यहां Register होते हैं!
 """
 
 from fastapi import FastAPI, Request, APIRouter
@@ -99,7 +100,7 @@ def create_app():
         allow_headers=["*"]
     )
     
-    # 🧠 TRISHUL MEMORY — REGISTER HERE
+    # 🧠 TRISHUL MEMORY — REGISTER HERE (CORS के बाद!)
     app.include_router(trishul_router, prefix="/api/memory", tags=["Trishul Memory"])
     logger.info("🧠 Trishul Memory Router Registered!")
     
