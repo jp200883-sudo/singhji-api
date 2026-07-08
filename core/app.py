@@ -29,6 +29,11 @@ app.add_middleware(
     allow_methods=["*"], 
     allow_headers=["*"]
 )
+ ============================================================
+    # 🧠 TRISHUL MEMORY (Khud ka!)
+    # ============================================================
+    from modules.trishul.handler import router as trishul_router
+    app.include_router(trishul_router, prefix="/api/memory", tags=["Trishul Memory"])
 
 MODULES = {}
 FASTAPI_ROUTERS = {}
