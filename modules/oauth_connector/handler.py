@@ -1,5 +1,5 @@
 """
-Singh Ji AI - OAuth Connector Handler
+Singh Ji AI - Video Aggregator Handler
 Video Generation + Delivery + Watermark Removal
 """
 import os
@@ -13,10 +13,51 @@ from fastapi import APIRouter, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 
 from .config import PLATFORM_CONFIGS, get_platform_config, get_all_platforms
-from .base import BaseConnector
+from .base import BasePlatformConnector, PlatformCredentials, VideoGenerationRequest, VideoGenerationResult
 from .router import VideoRouter
 from .video_delivery import VideoDelivery
 from .watermark_remover import WatermarkRemover
+
+# ============ PLATFORM CONNECTOR MAP ============
+# Sab platform connectors yahan register honge
+CONNECTOR_MAP = {}
+
+# Dynamic import — baad mein har platform ka connector add hoga
+try:
+    from .seedance import SeedanceConnector
+    CONNECTOR_MAP["seedance"] = SeedanceConnector
+except ImportError:
+    pass
+
+try:
+    from .kling import KlingConnector
+    CONNECTOR_MAP["kling"] = KlingConnector
+except ImportError:
+    pass
+
+try:
+    from .hailuo import HailuoConnector
+    CONNECTOR_MAP["hailuo"] = HailuoConnector
+except ImportError:
+    pass
+
+try:
+    from .luma import LumaConnector
+    CONNECTOR_MAP["luma"] = LumaConnector
+except ImportError:
+    pass
+
+try:
+    from .pika import PikaConnector
+    CONNECTOR_MAP["pika"] = PikaConnector
+except ImportError:
+    pass
+
+try:
+    from .veo import VeoConnector
+    CONNECTOR_MAP["veo"] = VeoConnector
+except ImportError:
+    pass
 
 router = APIRouter(prefix="/video", tags=["Video Generation & Delivery"])
 
@@ -59,6 +100,27 @@ video_router = VideoRouter()
 video_delivery = VideoDelivery()
 watermark_remover = WatermarkRemover()
 
+# ============ HELPER FUNCTIONS ============
+
+def get_connector(platform: str, api_key: Optional[str] = None):
+    """Platform ke hisaab se sahi connector banao"""
+    connector_class = CONNECTOR_MAP.get(platform)
+    if not connector_class:
+        raise HTTPException(status_code=400, detail=f"❌ Platform '{platform}' ka connector nahi mila!")
+    
+    config = get_platform_config(platform)
+    if not config:
+        raise HTTPException(status_code=400, detail=f"❌ Platform '{platform}' ka config nahi mila!")
+    
+    credentials = PlatformCredentials(
+        platform=platform,
+        api_key=api_key or os.getenv(f"{platform.upper()}_API_KEY", ""),
+        base_url=config.base_url,
+        is_active=True
+    )
+    
+    return connector_class(credentials)
+
 # ============ API ENDPOINTS ============
 
 @router.get("/platforms")
@@ -74,13 +136,15 @@ async def list_platforms():
             "supports_image_to_video": config.supports_image_to_video,
             "supports_audio_sync": config.supports_audio_sync,
             "watermark_on_free": config.watermark_on_free,
+            "connector_available": name in CONNECTOR_MAP,
             "status": "available"
         })
     return {
         "success": True,
         "platforms": platforms,
         "total": len(platforms),
-        "message": "✅ 6 platforms ready!"
+        "connectors_ready": len(CONNECTOR_MAP),
+        "message": f"✅ {len(platforms)} platforms ready! {len(CONNECTOR_MAP)} connectors active!"
     }
 
 @router.post("/generate", response_model=VideoResponse)
@@ -104,6 +168,10 @@ async def generate_video(request: VideoRequest, background_tasks: BackgroundTask
     if config.free_credits <= 0:
         raise HTTPException(status_code=402, detail=f"⚠️ {config.display_name} credits khatam!")
     
+    # Check connector available
+    if platform_name not in CONNECTOR_MAP:
+        raise HTTPException(status_code=503, detail=f"🔧 {config.display_name} connector abhi ready nahi hai!")
+    
     # Generate video_id
     video_id = hashlib.sha256(
         f"{request.prompt}{platform_name}{datetime.now().isoformat()}".encode()
@@ -126,7 +194,7 @@ async def generate_video(request: VideoRequest, background_tasks: BackgroundTask
         video_id=video_id,
         platform=platform_name,
         status="processing",
-        estimated_time=config.max_duration * 3,  # Approximate
+        estimated_time=config.max_duration * 3,
         credits_used=1,
         message=f"🎬 {config.display_name} pe video ban raha hai! ID: {video_id}"
     )
@@ -134,7 +202,6 @@ async def generate_video(request: VideoRequest, background_tasks: BackgroundTask
 @router.get("/status/{video_id}")
 async def check_status(video_id: str):
     """⏳ Video generation status check karo"""
-    # Supabase/memory se status fetch karo
     status = await video_delivery.get_status(video_id)
     return status
 
@@ -158,8 +225,9 @@ async def deliver_video(request: DeliveryRequest):
         watermark_removed = result.get("success", False)
     
     # Generate clean URLs
-    stream_url = f"{route['cdn_url']}/stream/{hashlib.md5(request.video_url.encode()).hexdigest()}"
-    download_url = f"{route['cdn_url']}/download/{hashlib.md5(request.video_url.encode()).hexdigest()}"
+    video_hash = hashlib.md5(request.video_url.encode()).hexdigest()
+    stream_url = f"{route['cdn_url']}/stream/{video_hash}"
+    download_url = f"{route['cdn_url']}/download/{video_hash}"
     
     return DeliveryResponse(
         success=True,
@@ -174,12 +242,14 @@ async def deliver_video(request: DeliveryRequest):
 @router.post("/batch")
 async def batch_generate(requests: List[VideoRequest]):
     """🔄 Multiple videos ek saath generate karo"""
-    tasks = []
+    results = []
     for req in requests:
-        # Har request ko alag platform pe bhejo
-        tasks.append(generate_video(req, BackgroundTasks()))
+        try:
+            result = await generate_video(req, BackgroundTasks())
+            results.append(result)
+        except Exception as e:
+            results.append({"error": str(e)})
     
-    results = await asyncio.gather(*tasks, return_exceptions=True)
     return {
         "success": True,
         "total": len(results),
@@ -200,17 +270,31 @@ async def _generate_video_task(video_id: str, platform: str, prompt: str,
                                negative_prompt: str, aspect_ratio: str):
     """Background mein video generate karo"""
     try:
-        connector = BaseConnector(platform)
-        result = await connector.generate(
+        # API key from environment
+        api_key = os.getenv(f"{platform.upper()}_API_KEY", "")
+        
+        # Connector banao
+        connector = get_connector(platform, api_key)
+        
+        # Request banao
+        request = VideoGenerationRequest(
             prompt=prompt,
-            image_url=image_url,
             duration=duration,
-            negative_prompt=negative_prompt,
-            aspect_ratio=aspect_ratio
+            aspect_ratio=aspect_ratio,
+            image_url=image_url
         )
         
+        # Generate karo
+        async with connector:
+            result = await connector.generate_video(request)
+        
         # Status update karo
-        await video_delivery.update_status(video_id, "completed", result)
+        await video_delivery.update_status(video_id, "completed", {
+            "video_url": result.video_url,
+            "task_id": result.task_id,
+            "credits_used": result.credits_used,
+            "generation_time": result.generation_time
+        })
         
     except Exception as e:
         await video_delivery.update_status(video_id, "failed", {"error": str(e)})
@@ -229,11 +313,15 @@ async def health_check():
     
     for name in PLATFORM_CONFIGS.keys():
         try:
-            # Quick ping
-            connector = BaseConnector(name)
-            status = await connector.health_check()
-            health["platforms"][name] = "ok" if status else "degraded"
-        except:
-            health["platforms"][name] = "offline"
+            if name in CONNECTOR_MAP:
+                api_key = os.getenv(f"{name.upper()}_API_KEY", "")
+                connector = get_connector(name, api_key)
+                async with connector:
+                    status = await connector.validate_credentials()
+                health["platforms"][name] = "ok" if status else "degraded"
+            else:
+                health["platforms"][name] = "no_connector"
+        except Exception as e:
+            health["platforms"][name] = f"offline: {str(e)}"
     
     return health
