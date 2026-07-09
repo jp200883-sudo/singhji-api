@@ -92,6 +92,34 @@ class DeliveryResponse(BaseModel):
     quality: str
     watermark_removed: bool
     expires_at: str
+    # ============ DOWNLOAD ENDPOINT (MISSING!) ============
+
+@router.get("/download/{video_id}")
+async def download_video(video_id: str):
+    """Download generated video by ID"""
+    # Try to get from video_delivery
+    status = await video_delivery.get_status(video_id)
+    
+    if status.get("status") == "completed" and status.get("video_url"):
+        return {
+            "success": True,
+            "video_id": video_id,
+            "download_url": status["video_url"],
+            "status": "ready",
+            "message": "🎬 Video ready! Download kar lo!",
+            "source": "video_delivery"
+        }
+    
+    # If still processing
+    return {
+        "success": False,
+        "video_id": video_id,
+        "status": status.get("status", "processing"),
+        "message": "🎬 Video abhi ban raha hai! Thoda wait karo...",
+        "check_status_at": f"/api/oauth_connector/video/status/{video_id}",
+        "estimated_time": 60,
+        "source": "fallback"
+    }
 
 # ============ INITIALIZE ============
 
