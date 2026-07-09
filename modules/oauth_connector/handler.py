@@ -19,10 +19,8 @@ from .video_delivery import VideoDelivery
 from .watermark_remover import WatermarkRemover
 
 # ============ PLATFORM CONNECTOR MAP ============
-# Sab platform connectors yahan register honge
 CONNECTOR_MAP = {}
 
-# Dynamic import — baad mein har platform ka connector add hoga
 try:
     from .seedance import SeedanceConnector
     CONNECTOR_MAP["seedance"] = SeedanceConnector
@@ -65,7 +63,7 @@ router = APIRouter(prefix="/video", tags=["Video Generation & Delivery"])
 
 class VideoRequest(BaseModel):
     prompt: str
-    platform: Optional[str] = None  # None = auto-select
+    platform: Optional[str] = None
     image_url: Optional[str] = None
     duration: Optional[int] = 5
     negative_prompt: Optional[str] = ""
@@ -103,7 +101,6 @@ watermark_remover = WatermarkRemover()
 # ============ HELPER FUNCTIONS ============
 
 def get_connector(platform: str, api_key: Optional[str] = None):
-    """Platform ke hisaab se sahi connector banao"""
     connector_class = CONNECTOR_MAP.get(platform)
     if not connector_class:
         raise HTTPException(status_code=400, detail=f"❌ Platform '{platform}' ka connector nahi mila!")
@@ -125,7 +122,6 @@ def get_connector(platform: str, api_key: Optional[str] = None):
 
 @router.get("/platforms")
 async def list_platforms():
-    """📺 Sab video platforms ka status"""
     platforms = []
     for name, config in PLATFORM_CONFIGS.items():
         platforms.append({
@@ -149,14 +145,8 @@ async def list_platforms():
 
 @router.post("/generate", response_model=VideoResponse)
 async def generate_video(request: VideoRequest, background_tasks: BackgroundTasks):
-    """🎬 Video generate karo — Auto platform select ya manual"""
-    
-    # Auto-select best platform
     if not request.platform:
-        platform_name = await video_router.get_best_platform(
-            image_to_video=request.image_url is not None,
-            duration=request.duration
-        )
+        platform_name = "seedance"
     else:
         platform_name = request.platform
     
@@ -164,20 +154,16 @@ async def generate_video(request: VideoRequest, background_tasks: BackgroundTask
     if not config:
         raise HTTPException(status_code=400, detail=f"❌ Platform '{platform_name}' not found!")
     
-    # Check credits
     if config.free_credits <= 0:
         raise HTTPException(status_code=402, detail=f"⚠️ {config.display_name} credits khatam!")
     
-    # Check connector available
     if platform_name not in CONNECTOR_MAP:
         raise HTTPException(status_code=503, detail=f"🔧 {config.display_name} connector abhi ready nahi hai!")
     
-    # Generate video_id
     video_id = hashlib.sha256(
         f"{request.prompt}{platform_name}{datetime.now().isoformat()}".encode()
     ).hexdigest()[:16]
     
-    # Background mein generate karo
     background_tasks.add_task(
         _generate_video_task,
         video_id=video_id,
@@ -201,21 +187,16 @@ async def generate_video(request: VideoRequest, background_tasks: BackgroundTask
 
 @router.get("/status/{video_id}")
 async def check_status(video_id: str):
-    """⏳ Video generation status check karo"""
     status = await video_delivery.get_status(video_id)
     return status
 
 @router.post("/deliver", response_model=DeliveryResponse)
 async def deliver_video(request: DeliveryRequest):
-    """📦 Video deliver karo — CDN + Watermark removal"""
-    
-    # Route to best CDN
     route = await video_delivery.route_video(request.video_url)
     
     if not route["success"]:
         raise HTTPException(status_code=503, detail=route["error"])
     
-    # Watermark removal if requested
     watermark_removed = False
     if request.remove_watermark:
         result = await watermark_remover.remove_watermark(
@@ -224,7 +205,6 @@ async def deliver_video(request: DeliveryRequest):
         )
         watermark_removed = result.get("success", False)
     
-    # Generate clean URLs
     video_hash = hashlib.md5(request.video_url.encode()).hexdigest()
     stream_url = f"{route['cdn_url']}/stream/{video_hash}"
     download_url = f"{route['cdn_url']}/download/{video_hash}"
@@ -241,7 +221,6 @@ async def deliver_video(request: DeliveryRequest):
 
 @router.post("/batch")
 async def batch_generate(requests: List[VideoRequest]):
-    """🔄 Multiple videos ek saath generate karo"""
     results = []
     for req in requests:
         try:
@@ -259,7 +238,6 @@ async def batch_generate(requests: List[VideoRequest]):
 
 @router.post("/watermark/remove")
 async def remove_watermark_endpoint(video_url: str, method: str = "auto"):
-    """💧 Watermark hatao — Auto-detect + AI removal"""
     result = await watermark_remover.remove_watermark(video_url, method=method)
     return result
 
@@ -268,15 +246,10 @@ async def remove_watermark_endpoint(video_url: str, method: str = "auto"):
 async def _generate_video_task(video_id: str, platform: str, prompt: str, 
                                image_url: Optional[str], duration: int,
                                negative_prompt: str, aspect_ratio: str):
-    """Background mein video generate karo"""
     try:
-        # API key from environment
         api_key = os.getenv(f"{platform.upper()}_API_KEY", "")
-        
-        # Connector banao
         connector = get_connector(platform, api_key)
         
-        # Request banao
         request = VideoGenerationRequest(
             prompt=prompt,
             duration=duration,
@@ -284,11 +257,9 @@ async def _generate_video_task(video_id: str, platform: str, prompt: str,
             image_url=image_url
         )
         
-        # Generate karo
         async with connector:
             result = await connector.generate_video(request)
         
-        # Status update karo
         await video_delivery.update_status(video_id, "completed", {
             "video_url": result.video_url,
             "task_id": result.task_id,
@@ -303,7 +274,6 @@ async def _generate_video_task(video_id: str, platform: str, prompt: str,
 
 @router.get("/health")
 async def health_check():
-    """🏥 Video system health check"""
     health = {
         "router": "ok",
         "delivery": "ok",
