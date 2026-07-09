@@ -107,6 +107,15 @@ MODULES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "modules"
 # 🎯 ROUTER-MOUNTED MODULES TRACK KARO (Trishul fix!)
 ROUTER_MOUNTED_MODULES = set()
 
+# 🎯 FIX: 'modules' ko ek proper namespace package banao,
+# taaki folder-wale modules (jaise oauth_connector) ke andar
+# relative imports (.config, .base, etc.) sahi se resolve ho sakein
+import types as _types
+if "modules" not in sys.modules:
+    _modules_pkg = _types.ModuleType("modules")
+    _modules_pkg.__path__ = [MODULES_DIR]
+    sys.modules["modules"] = _modules_pkg
+
 # ═══════════════════════════════════════════════════════
 # 🦁 SARWAN 330 AGENT DEFINITIONS
 # ═══════════════════════════════════════════════════════
@@ -154,7 +163,14 @@ def load_module(name, info):
     """Module load karo — router wale ko track karo!"""
     try:
         if info["type"] == "folder":
-            spec = importlib.util.spec_from_file_location(f"modules.{name}", info["path"])
+            # 🎯 FIX: submodule_search_locations dena zaroori hai,
+            # taaki Python is module ko "package" maane aur andar wali
+            # files (config.py, base.py, etc.) tak relative import se pahunch sake
+            folder_path = os.path.dirname(info["path"])
+            spec = importlib.util.spec_from_file_location(
+                f"modules.{name}", info["path"],
+                submodule_search_locations=[folder_path]
+            )
             module = importlib.util.module_from_spec(spec)
             sys.modules[f"modules.{name}"] = module
             spec.loader.exec_module(module)
