@@ -13,7 +13,7 @@ from datetime import datetime
 import logging
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api/aavishkar", tags=["aavishkar"])
+router = APIRouter(tags=["aavishkar"])
 
 # ═══════════════════════════════════════════════════════
 # 🦁 HYBRID IMAGE APIS
