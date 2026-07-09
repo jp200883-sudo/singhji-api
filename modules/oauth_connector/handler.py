@@ -1,6 +1,6 @@
 """
+"""
 Singh Ji AI - Video Aggregator Handler
-Video Generation + Delivery + Watermark Removal
 """
 import os
 import asyncio
@@ -12,12 +12,19 @@ from datetime import datetime
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 
+# ============ SUPABASE OPTIONAL ============
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY") or os.getenv("SUPABASE_SERVICE_KEY")
+
+if not SUPABASE_KEY:
+    print("⚠️ oauth_connector: Demo mode — Supabase key missing")
+    # Create dummy values
+    SUPABASE_KEY = "demo_key"
+
+# ============ REST OF IMPORTS ============
 from .config import PLATFORM_CONFIGS, get_platform_config, get_all_platforms
 from .base import BasePlatformConnector, PlatformCredentials, VideoGenerationRequest, VideoGenerationResult
 from .router import SmartVideoRouter
-video_router = SmartVideoRouter({})
-from .video_delivery import VideoDelivery
-from .watermark_remover import WatermarkRemover
 
 # ============ PLATFORM CONNECTOR MAP ============
 CONNECTOR_MAP = {}
