@@ -14,9 +14,7 @@ logger = logging.getLogger(__name__)
 # POOLER CONNECTION
 DATABASE_URL = os.getenv("DATABASE_URL", "")
 POOLER_URL = os.getenv("POOLER_URL", "")
-SUPABASE_URL = os.getenv("SUPABASE_URL", "")
-SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_KEY", "") or os.getenv("SUPABASE_KEY", "")
-
+DATABASE_URL = os.getenv("DATABASE_URL", "")
 USE_POOLER = False
 connection_string = ""
 
