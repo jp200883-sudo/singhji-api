@@ -270,6 +270,35 @@ async def remove_watermark_endpoint(video_url: str, method: str = "auto"):
     result = await watermark_remover.remove_watermark(video_url, method=method)
     return result
 
+# ============ DOWNLOAD ENDPOINT (ADD KARO YAHAN!) ============
+
+@router.get("/download/{video_id}")
+async def download_video(video_id: str):
+    """Download generated video by ID"""
+    status = await video_delivery.get_status(video_id)
+    
+    if status.get("status") == "completed" and status.get("video_url"):
+        return {
+            "success": True,
+            "video_id": video_id,
+            "download_url": status["video_url"],
+            "status": "ready",
+            "message": "🎬 Video ready! Download kar lo!",
+            "source": "video_delivery"
+        }
+    
+    return {
+        "success": False,
+        "video_id": video_id,
+        "status": status.get("status", "processing"),
+        "message": "🎬 Video abhi ban raha hai! Thoda wait karo...",
+        "check_status_at": f"/api/oauth_connector/video/status/{video_id}",
+        "estimated_time": 60,
+        "source": "fallback"
+    }
+
+# ============ BACKGROUND TASKS ============
+
 # ============ BACKGROUND TASKS ============
 
 async def _generate_video_task(video_id: str, platform: str, prompt: str, 
