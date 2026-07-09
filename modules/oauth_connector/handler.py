@@ -14,7 +14,7 @@ from pydantic import BaseModel
 
 from .config import PLATFORM_CONFIGS, get_platform_config, get_all_platforms
 from .base import BasePlatformConnector, PlatformCredentials, VideoGenerationRequest, VideoGenerationResult
-from .router import VideoRouter
+from .router import SmartVideoRouter as VideoRouter
 from .video_delivery import VideoDelivery
 from .watermark_remover import WatermarkRemover
 
@@ -96,7 +96,7 @@ class DeliveryResponse(BaseModel):
 
 # ============ INITIALIZE ============
 
-video_router = VideoRouter()
+video_router = SmartVideoRouter({})
 video_delivery = VideoDelivery()
 watermark_remover = WatermarkRemover()
 
