@@ -55,6 +55,17 @@ AVAILABLE_KEYS = {
     "GROQ": bool(GROQ_API_KEY),
     "GEMINI": bool(GEMINI_API_KEY),
     "TELEGRAM": bool(TELEGRAM_TOKEN),
+    "SUPABASE": bool(SUPABASE_URL and SUPABASE_SERVICE_KEY),
+    "CEREBRAS": bool(CEREBRAS_API_KEY),
+    "CF": bool(CF_API_TOKEN),
+    "HUGGINGFACE": bool(HUGGINGFACE_TOKEN),
+    "MANDI": bool(MANDI_API_KEY),
+    "NEWSDATA": bool(NEWSDATA_API_KEY),
+    "PLANT_ID": bool(PLANT_ID_API),
+    "RAPIDAPI": bool(RAPIDAPI_KEY),
+    "RAZORPAY": bool(RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET),
+    "TAVILY": bool(TAVILY_API_KEY),
+    "TWILIO": bool(TWILIO_SID and TWILIO_TOKEN),
 }
 
 # ═══════════════════════════════════════════════════════
@@ -91,6 +102,9 @@ USER_SESSIONS = {}
 SYSTEM_LOAD = {"active_agents": 0, "max_agents": 100, "phase": 0}
 
 MODULES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "modules")
+
+# 🎯 ROUTER-MOUNTED MODULES TRACK KARO (Trishul fix!)
+ROUTER_MOUNTED_MODULES = set()
 
 # ═══════════════════════════════════════════════════════
 # 🦁 SARWAN 330 AGENT DEFINITIONS
@@ -136,6 +150,7 @@ def discover_modules():
     return modules
 
 def load_module(name, info):
+    """Module load karo — router wale ko track karo!"""
     try:
         if info["type"] == "folder":
             spec = importlib.util.spec_from_file_location(f"modules.{name}", info["path"])
@@ -144,7 +159,10 @@ def load_module(name, info):
             spec.loader.exec_module(module)
             router = getattr(module, "router", None)
             if router:
-                app.include_router(router)
+                # 🎯 ROUTER MOUNT KARO AUR TRACK KARO!
+                app.include_router(router, prefix=f"/api/{name}")
+                ROUTER_MOUNTED_MODULES.add(name)
+                logger.info(f"🎯 Router mounted: /api/{name}")
                 return "router_mounted"
             return getattr(module, "handler", None)
         else:
@@ -154,7 +172,10 @@ def load_module(name, info):
             spec.loader.exec_module(module)
             router = getattr(module, "router", None)
             if router:
-                app.include_router(router)
+                # 🎯 ROUTER MOUNT KARO AUR TRACK KARO!
+                app.include_router(router, prefix=f"/api/{name}")
+                ROUTER_MOUNTED_MODULES.add(name)
+                logger.info(f"🎯 Router mounted: /api/{name}")
                 return "router_mounted"
             return getattr(module, "handler", None)
     except Exception as e:
@@ -180,7 +201,7 @@ async def fallback_fetch(endpoint: str, method="GET", data=None, headers=None):
     urls = [
         f"{RENDER_URL}{endpoint}",  # Render has keys
     ]
-    
+
     # Try Render first (it has all keys)
     for url in urls:
         try:
@@ -196,7 +217,7 @@ async def fallback_fetch(endpoint: str, method="GET", data=None, headers=None):
         except Exception as e:
             logger.warning(f"Fallback fetch failed for {url}: {e}")
             continue
-    
+
     return None
 
 # ═══════════════════════════════════════════════════════
@@ -204,24 +225,24 @@ async def fallback_fetch(endpoint: str, method="GET", data=None, headers=None):
 # ═══════════════════════════════════════════════════════
 async def sarwan_scheduler():
     await asyncio.sleep(30)
-    
+
     phases = [1, 2, 3]
     phase_delays = {1: 0, 2: 300, 3: 600}
-    
+
     for phase in phases:
         SYSTEM_LOAD["phase"] = phase
         logger.info(f"🦁 Sarwan Phase {phase} starting...")
         await asyncio.sleep(phase_delays[phase])
-        
+
         phase_agents = [k for k, v in AGENT_DEFINITIONS.items() if v["phase"] == phase]
-        
+
         for agent_id in phase_agents:
             can_add = await check_system_load()
             if not can_add:
                 AGENT_QUEUE.append(agent_id)
                 await asyncio.sleep(5)
                 continue
-            
+
             AGENT_SWARM[agent_id] = {
                 "id": agent_id,
                 "type": AGENT_DEFINITIONS[agent_id]["type"],
@@ -237,14 +258,14 @@ async def sarwan_scheduler():
                 }
             }
             SYSTEM_LOAD["active_agents"] += 1
-            
+
             if int(agent_id.split("_")[1]) % 10 == 0:
                 logger.info(f"✅ {agent_id} activated (Phase {phase})")
-            
+
             await asyncio.sleep(0.2)
-        
+
         logger.info(f"🦁 Phase {phase} complete: {len([a for a in AGENT_SWARM.values() if a.get('phase')==phase])} agents")
-    
+
     while AGENT_QUEUE:
         can_add = await check_system_load()
         if can_add:
@@ -261,7 +282,7 @@ async def sarwan_scheduler():
             }
             SYSTEM_LOAD["active_agents"] += 1
         await asyncio.sleep(10)
-    
+
     logger.info("🦁 SARWAN 330 ALL ACTIVE!")
 
 # ═══════════════════════════════════════════════════════
@@ -292,13 +313,14 @@ async def startup():
             result = load_module(name, info)
             if result:
                 MODULES[name] = result
-        
+
         logger.info(f"🦁 {len(MODULES)} modules ready")
+        logger.info(f"🦁 Router-mounted modules: {list(ROUTER_MOUNTED_MODULES)}")
         logger.info(f"🦁 Available API Keys: {AVAILABLE_KEYS}")
-        
+
         asyncio.create_task(sarwan_scheduler())
         asyncio.create_task(self_ping())
-        
+
         logger.info("🦁 Sarwan 330 Swarm scheduler started")
     except Exception as e:
         logger.error(f"Startup error: {e}")
@@ -317,6 +339,7 @@ async def root():
         "agents_queued": len(AGENT_QUEUE),
         "phase": SYSTEM_LOAD["phase"],
         "available_keys": AVAILABLE_KEYS,
+        "router_modules": list(ROUTER_MOUNTED_MODULES),
         "status": "🦁 LIVE",
         "timestamp": datetime.now().isoformat()
     }
@@ -341,6 +364,7 @@ async def status():
     return {
         "name": "Singh Ji AI v7.0 Sarwan Hybrid",
         "modules": len(MODULES),
+        "router_modules": list(ROUTER_MOUNTED_MODULES),
         "agents": {
             "total": 330,
             "active": SYSTEM_LOAD["active_agents"],
@@ -357,7 +381,7 @@ async def status():
     }
 
 # ═══════════════════════════════════════════════════════
-# 🦁 DYNAMIC MODULE ROUTER
+# 🦁 DYNAMIC MODULE ROUTER (FIXED!)
 # ═══════════════════════════════════════════════════════
 async def run_handler(module_name: str, request: Request):
     handler_func = MODULES[module_name]
@@ -377,6 +401,19 @@ async def run_handler(module_name: str, request: Request):
 
 @app.api_route("/api/{module_name}", methods=["GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS"])
 async def dynamic_router(request: Request, module_name: str):
+    # 🦁 FIX: Router-mounted modules ko skip karo!
+    if module_name in ROUTER_MOUNTED_MODULES:
+        return JSONResponse(
+            status_code=307,
+            content={
+                "error": f"'{module_name}' uses FastAPI router",
+                "use": f"/api/{module_name}/ or /api/{module_name}/store",
+                "hint": "Router-mounted modules ka direct path use karo",
+                "mounted_routes": [f"/api/{module_name}/", f"/api/{module_name}/store", f"/api/{module_name}/recall"]
+            },
+            headers={"Location": f"/api/{module_name}/"}
+        )
+
     if module_name not in MODULES:
         all_modules = discover_modules()
         if module_name in all_modules:
@@ -390,7 +427,7 @@ async def dynamic_router(request: Request, module_name: str):
     return await run_handler(module_name, request)
 
 # ═══════════════════════════════════════════════════════
-# 🦁 MEMORY MODULE
+# 🦁 MEMORY MODULE (Direct Routes)
 # ═══════════════════════════════════════════════════════
 @app.get("/api/memory/")
 async def memory_list():
@@ -440,7 +477,7 @@ async def weather_city(city: str):
                 }
         except Exception as e:
             logger.warning(f"Railway weather failed: {e}")
-    
+
     # Fallback to Render
     try:
         fallback_data = await fallback_fetch(f"/api/weather/{city}")
@@ -449,7 +486,7 @@ async def weather_city(city: str):
             return fallback_data
     except Exception as e:
         logger.warning(f"Render weather fallback failed: {e}")
-    
+
     # No keys available — return demo data
     return {
         "city": city,
@@ -476,13 +513,13 @@ async def news_latest():
             return resp.json()
         except Exception as e:
             logger.warning(f"Railway news failed: {e}")
-    
+
     # Fallback to Render
     fallback_data = await fallback_fetch("/api/news/latest")
     if fallback_data:
         fallback_data["source"] = "Render (Fallback)"
         return fallback_data
-    
+
     return {
         "status": "demo",
         "news": [
@@ -536,6 +573,7 @@ async def admin_root():
     return {
         "module": "Admin",
         "modules": len(MODULES),
+        "router_modules": list(ROUTER_MOUNTED_MODULES),
         "memory": len(MEMORY_STORE),
         "agents": {
             "total": 330,
@@ -550,6 +588,7 @@ async def admin_root():
 async def admin_stats():
     return {
         "modules": len(MODULES),
+        "router_modules": list(ROUTER_MOUNTED_MODULES),
         "memory": len(MEMORY_STORE),
         "agents_active": SYSTEM_LOAD["active_agents"],
         "agents_queued": len(AGENT_QUEUE),
