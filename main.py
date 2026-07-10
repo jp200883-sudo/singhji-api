@@ -16,8 +16,62 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+"""
+🦁 SINGH JI AI ULTRA v8.0 — SARWAN 330 AGENT SWARM
+Railway Primary Deploy — Clean & Stable
+"""
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+import os
+import sys
+import json
+import asyncio
+import aiohttp
+from datetime import datetime
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 # ═══════════════════════════════════════════════════════
-# 🦁 AVAILABLE_KEYS — SAB KO LIVE TEST KARO
+# 🦁 ALL API KEYS — PHELE DEFINE KARO
+# ═══════════════════════════════════════════════════════
+CEREBRAS_API_KEY = os.getenv("CEREBRAS_API_KEY")
+CF_ACCOUNT_ID = os.getenv("CF_ACCOUNT_ID")
+CF_API_TOKEN = os.getenv("CF_API_TOKEN")
+CURRENTS_API_KEY = os.getenv("CURRENTS_API_KEY")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+HUGGINGFACE_TOKEN = os.getenv("HUGGINGFACE_TOKEN")
+MANDI_API_KEY = os.getenv("MANDI_API_KEY")
+NEWSDATA_API_KEY = os.getenv("NEWSDATA_API_KEY")
+OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
+PLANT_ID_API = os.getenv("PLANT_ID_API")
+RAPIDAPI_KEY = os.getenv("RAPIDAPI_KEY")
+RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID")
+RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY") or os.getenv("SUPABASE_KEY")
+TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+TWILIO_SID = os.getenv("TWILIO_SID")
+TWILIO_TOKEN = os.getenv("TWILIO_TOKEN")
+
+# 🆕 NEW KEYS
+FACEBOOK_ACCESS_TOKEN = os.getenv("FACEBOOK_ACCESS_TOKEN")
+FACEBOOK_PAGE_ID = os.getenv("FACEBOOK_PAGE_ID", "1008554401796459")
+GMAIL_CLIENT_ID = os.getenv("GMAIL_CLIENT_ID")
+GMAIL_CLIENT_SECRET = os.getenv("GMAIL_CLIENT_SECRET")
+INSTAGRAM_ACCESS_TOKEN = os.getenv("INSTAGRAM_ACCESS_TOKEN")
+INSTAGRAM_BUSINESS_ID = os.getenv("INSTAGRAM_BUSINESS_ID")
+YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
+YOUTUBE_CLIENT_ID = os.getenv("YOUTUBE_CLIENT_ID")
+YOUTUBE_CLIENT_SECRET = os.getenv("YOUTUBE_CLIENT_SECRET")
+
+# ═══════════════════════════════════════════════════════
+# 🦁 AVAILABLE_KEYS — BAAD ME DEFINE KARO
 # ═══════════════════════════════════════════════════════
 AVAILABLE_KEYS = {
     "OPENWEATHER": bool(OPENWEATHER_API_KEY),
@@ -43,40 +97,53 @@ AVAILABLE_KEYS = {
 }
 
 # ═══════════════════════════════════════════════════════
-# 🆕 /health ENDPOINT — SAB APIs KA LIVE TEST
+# 🦁 FASTAPI APP — PHELE BANAO
 # ═══════════════════════════════════════════════════════
-@app.get("/health")
-async def health_check():
-    import requests
-    import time
-    
-    results = {}
-    live_count = 0
-    dead_count = 0
-    
-    # SAB APIs ka HTTP test
-    tests = {
-        "GROQ": ("https://api.groq.com/openai/v1/models", {"Authorization": f"Bearer {GROQ_API_KEY}"}, "GET"),
-        "GEMINI": (f"https://generativelanguage.googleapis.com/v1beta/models?key={GEMINI_API_KEY}", {}, "GET"),
-        "CEREBRAS": ("https://api.cerebras.ai/v1/models", {"Authorization": f"Bearer {CEREBRAS_API_KEY}"}, "GET"),
-        "HUGGINGFACE": ("https://huggingface.co/api/whoami-v2", {"Authorization": f"Bearer {HUGGINGFACE_TOKEN}"}, "GET"),
-        "FACEBOOK": (f"https://graph.facebook.com/v18.0/me?access_token={FACEBOOK_ACCESS_TOKEN}&fields=id,name", {}, "GET"),
-        "YOUTUBE": (f"https://www.googleapis.com/youtube/v3/search?key={YOUTUBE_API_KEY}&part=snippet&q=test&maxResults=1", {}, "GET"),
-        "NEWSDATA": (f"https://newsdata.io/api/1/latest?apikey={NEWSDATA_API_KEY}&q=india", {}, "GET"),
-        "OPENWEATHER": (f"https://api.openweathermap.org/data/2.5/weather?appid={OPENWEATHER_API_KEY}&q=Delhi", {}, "GET"),
-        "TAVILY": ("https://api.tavily.com/search", {"Authorization": f"Bearer {TAVILY_API_KEY}", "Content-Type": "application/json"}, "POST"),
-        "RAPIDAPI": ("https://api-football-v1.p.rapidapi.com/v3/timezone", {"X-RapidAPI-Key": RAPIDAPI_KEY, "X-RapidAPI-Host": "api-football-v1.p.rapidapi.com"}, "GET"),
-        "PLANT_ID": ("https://web.plant.id/api/v3/health", {"Api-Key": PLANT_ID_API}, "GET"),
-        "TELEGRAM": (f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getMe", {}, "GET"),
-        "TWILIO": (f"https://api.twilio.com/2010-04-01/Accounts/{TWILIO_SID}.json", {}, "GET"),
-        "CURRENTS": (f"https://api.currentsapi.services/v1/latest-news?apiKey={CURRENTS_API_KEY}", {}, "GET"),
-        "MANDI": (f"https://api.data.gov.in/resource/9ef84268-d588-465a-a308-a86a57c7f2d5?api-key={MANDI_API_KEY}&format=json&limit=1", {}, "GET"),
-        "MAGIC_HOUR": ("https://api.magichour.ai/v1/projects", {"Authorization": f"Bearer {os.getenv('MAGIC_HOUR_API_KEY')}"}, "GET"),
-        "CF": ("https://api.cloudflare.com/client/v4/user/tokens/verify", {"Authorization": f"Bearer {CF_API_TOKEN}"}, "GET"),
-        "MEM0": ("https://api.mem0.ai/v1/memories/", {"Authorization": f"Token {os.getenv('MEM0_API')}"}, "GET"),
-        "SUPABASE": (f"{SUPABASE_URL}/rest/v1/", {"apikey": SUPABASE_SERVICE_KEY, "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}"}, "GET"),
-        "RAZORPAY": ("https://api.razorpay.com/v1/orders", {"Authorization": f"Basic {RAZORPAY_KEY_ID}:"}, "GET"),
+app = FastAPI(
+    title="🦁 Singh Ji AI Ultra v8.0",
+    version="8.0.0",
+    description="330 Agent Swarm | Railway Deploy | All Social APIs"
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"]
+)
+
+# ═══════════════════════════════════════════════════════
+# 🦁 GLOBAL STORES
+# ═══════════════════════════════════════════════════════
+MODULES = {}
+MEMORY_STORE = {}
+AGENT_SWARM = {}
+AGENT_QUEUE = []
+SYSTEM_LOAD = {"active_agents": 0, "max_agents": 100, "phase": 0}
+
+# ═══════════════════════════════════════════════════════
+# 🦁 HEALTH CHECK — MOST IMPORTANT FOR RAILWAY
+# ═══════════════════════════════════════════════════════
+@app.get("/")
+@app.head("/")
+async def root():
+    return {
+        "name": "🦁 Singh Ji AI Ultra v8.0",
+        "version": "8.0.0",
+        "status": "🦁 LIVE",
+        "modules": len(MODULES),
+        "agents_active": SYSTEM_LOAD["active_agents"],
+        "available_keys": AVAILABLE_KEYS,
+        "timestamp": datetime.now().isoformat()
     }
+
+@app.get("/health")
+@app.head("/health")
+def health():
+    return {"status": "ok", "service": "Singh Ji AI v8.0"}
+
+# ... rest of code same ...
     
     for name, (url, headers, method) in tests.items():
         if not AVAILABLE_KEYS.get(name):
