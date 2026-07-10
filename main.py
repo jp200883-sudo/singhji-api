@@ -2,33 +2,18 @@
 🦁 SINGH JI AI ULTRA v8.0 — SARWAN 330 AGENT SWARM
 Railway Primary Deploy — Clean & Stable
 """
-from fastapi import FastAPI, Request
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from miniprogram.sandbox import SandboxRunner
-from miniprogram.developer import DeveloperPortal
-import os
-import sys
-import json
-import asyncio
-import aiohttp
-from datetime import datetime
-import logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
-"""
-🦁 SINGH JI AI ULTRA v8.0 — SARWAN 330 AGENT SWARM
-Railway Primary Deploy — Clean & Stable
-"""
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from contextlib import asynccontextmanager
 import os
 import sys
 import json
+import time
 import asyncio
 import aiohttp
+import requests
 from datetime import datetime
 import logging
 
@@ -36,7 +21,59 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # ═══════════════════════════════════════════════════════
-# 🦁 ALL API KEYS — PHELE DEFINE KARO
+# 🦁 MINI-PROGRAM IMPORTS
+# ═══════════════════════════════════════════════════════
+try:
+    from miniprogram.auth import MiniAuth
+    from miniprogram.payment import MiniPayment
+    from miniprogram.storage import MiniStorage
+    from miniprogram.developer import DeveloperPortal
+    MINIPROGRAM_AVAILABLE = True
+except ImportError as e:
+    logger.warning(f"Mini-Program modules not available: {e}")
+    MINIPROGRAM_AVAILABLE = False
+    # Fallback classes
+    class MiniAuth:
+        @staticmethod
+        def register_developer(*args, **kwargs):
+            return {"status": "demo", "message": "Mini-Program auth not available"}
+        @staticmethod
+        def submit_app(*args, **kwargs):
+            return {"status": "demo", "message": "Mini-Program auth not available"}
+        @staticmethod
+        def generate_token(*args, **kwargs):
+            return "demo-token"
+        @staticmethod
+        def validate_token(*args, **kwargs):
+            return {"user_id": "demo", "app_id": "demo"}
+        @staticmethod
+        def approve_app(*args, **kwargs):
+            return {"status": "approved"}
+        APPROVED_APPS = {}
+
+    class MiniPayment:
+        @staticmethod
+        def process(*args, **kwargs):
+            return {"status": "demo", "message": "Payment gateway on hold"}
+
+    class MiniStorage:
+        @staticmethod
+        def put(*args, **kwargs):
+            return {"status": "saved"}
+        @staticmethod
+        def get(*args, **kwargs):
+            return {"status": "demo", "value": None}
+
+    class DeveloperPortal:
+        @staticmethod
+        def get_dashboard(*args, **kwargs):
+            return {"status": "demo"}
+        @staticmethod
+        def get_all_apps(*args, **kwargs):
+            return []
+
+# ═══════════════════════════════════════════════════════
+# 🦁 ALL API KEYS
 # ═══════════════════════════════════════════════════════
 CEREBRAS_API_KEY = os.getenv("CEREBRAS_API_KEY")
 CF_ACCOUNT_ID = os.getenv("CF_ACCOUNT_ID")
@@ -60,7 +97,6 @@ TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 TWILIO_SID = os.getenv("TWILIO_SID")
 TWILIO_TOKEN = os.getenv("TWILIO_TOKEN")
 
-# 🆕 NEW KEYS
 FACEBOOK_ACCESS_TOKEN = os.getenv("FACEBOOK_ACCESS_TOKEN")
 FACEBOOK_PAGE_ID = os.getenv("FACEBOOK_PAGE_ID", "1008554401796459")
 GMAIL_CLIENT_ID = os.getenv("GMAIL_CLIENT_ID")
@@ -72,7 +108,7 @@ YOUTUBE_CLIENT_ID = os.getenv("YOUTUBE_CLIENT_ID")
 YOUTUBE_CLIENT_SECRET = os.getenv("YOUTUBE_CLIENT_SECRET")
 
 # ═══════════════════════════════════════════════════════
-# 🦁 AVAILABLE_KEYS — BAAD ME DEFINE KARO
+# 🦁 AVAILABLE KEYS MAP
 # ═══════════════════════════════════════════════════════
 AVAILABLE_KEYS = {
     "OPENWEATHER": bool(OPENWEATHER_API_KEY),
@@ -98,23 +134,6 @@ AVAILABLE_KEYS = {
 }
 
 # ═══════════════════════════════════════════════════════
-# 🦁 FASTAPI APP — PHELE BANAO
-# ═══════════════════════════════════════════════════════
-app = FastAPI(
-    title="🦁 Singh Ji AI Ultra v8.0",
-    version="8.0.0",
-    description="330 Agent Swarm | Railway Deploy | All Social APIs"
-)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"]
-)
-
-# ═══════════════════════════════════════════════════════
 # 🦁 GLOBAL STORES
 # ═══════════════════════════════════════════════════════
 MODULES = {}
@@ -122,67 +141,28 @@ MEMORY_STORE = {}
 AGENT_SWARM = {}
 AGENT_QUEUE = []
 SYSTEM_LOAD = {"active_agents": 0, "max_agents": 100, "phase": 0}
+TRISHUL_MEMORY = {}
 
 # ═══════════════════════════════════════════════════════
-# 🦁 HEALTH CHECK — MOST IMPORTANT FOR RAILWAY
+# 🦁 LIFESPAN (replaces deprecated @app.on_event)
 # ═══════════════════════════════════════════════════════
-@app.get("/")
-@app.head("/")
-async def root():
-    return {
-        "name": "🦁 Singh Ji AI Ultra v8.0",
-        "version": "8.0.0",
-        "status": "🦁 LIVE",
-        "modules": len(MODULES),
-        "agents_active": SYSTEM_LOAD["active_agents"],
-        "available_keys": AVAILABLE_KEYS,
-        "timestamp": datetime.now().isoformat()
-    }
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    SYSTEM_LOAD["phase"] = 1
+    logger.info("🦁 Singh Ji AI Ultra v8.0 Started!")
+    logger.info(f"🦁 Available Keys: {AVAILABLE_KEYS}")
+    logger.info(f"🦁 Mini-Program Available: {MINIPROGRAM_AVAILABLE}")
+    yield
+    logger.info("🦁 Singh Ji AI Ultra v8.0 Stopped!")
 
-@app.get("/health")
-@app.head("/health")
-def health():
-    return {"status": "ok", "service": "Singh Ji AI v8.0"}
-
-# ... rest of code same ...
-    
-    for name, (url, headers, method) in tests.items():
-        if not AVAILABLE_KEYS.get(name):
-            results[name] = {"status": "MISSING", "code": None, "ms": None}
-            dead_count += 1
-            continue
-            
-        try:
-            start = time.time()
-            if method == "GET":
-                r = requests.get(url, headers=headers, timeout=5)
-            else:
-                r = requests.post(url, headers=headers, timeout=5)
-            elapsed = round((time.time() - start) * 1000, 2)
-            
-            if r.status_code == 200:
-                results[name] = {"status": "LIVE", "code": 200, "ms": elapsed}
-                live_count += 1
-            else:
-                results[name] = {"status": "ERROR", "code": r.status_code, "ms": elapsed, "detail": r.text[:100]}
-                dead_count += 1
-        except Exception as e:
-            results[name] = {"status": "FAIL", "error": str(e)[:50], "ms": None}
-            dead_count += 1
-    
-    return {
-        "timestamp": datetime.now().isoformat(),
-        "version": "8.0.0",
-        "summary": {"live": live_count, "dead": dead_count, "total": live_count + dead_count},
-        "results": results
-    }
 # ═══════════════════════════════════════════════════════
 # 🦁 FASTAPI APP
 # ═══════════════════════════════════════════════════════
 app = FastAPI(
-    title="🦁 Singh Ji AI Ultra v8.0",
+    title="Singh Ji AI Ultra v8.0",
     version="8.0.0",
-    description="330 Agent Swarm | Railway Deploy | All Social APIs"
+    description="330 Agent Swarm | Railway Deploy | All Social APIs",
+    lifespan=lifespan
 )
 
 app.add_middleware(
@@ -194,27 +174,19 @@ app.add_middleware(
 )
 
 # ═══════════════════════════════════════════════════════
-# 🦁 GLOBAL STORES
-# ═══════════════════════════════════════════════════════
-MODULES = {}
-MEMORY_STORE = {}
-AGENT_SWARM = {}
-AGENT_QUEUE = []
-SYSTEM_LOAD = {"active_agents": 0, "max_agents": 100, "phase": 0}
-
-# ═══════════════════════════════════════════════════════
-# 🦁 HEALTH CHECK — MOST IMPORTANT FOR RAILWAY
+# 🦁 HEALTH CHECK
 # ═══════════════════════════════════════════════════════
 @app.get("/")
 @app.head("/")
 async def root():
     return {
-        "name": "🦁 Singh Ji AI Ultra v8.0",
+        "name": "Singh Ji AI Ultra v8.0",
         "version": "8.0.0",
-        "status": "🦁 LIVE",
+        "status": "LIVE",
         "modules": len(MODULES),
         "agents_active": SYSTEM_LOAD["active_agents"],
         "available_keys": AVAILABLE_KEYS,
+        "miniprogram": MINIPROGRAM_AVAILABLE,
         "timestamp": datetime.now().isoformat()
     }
 
@@ -233,6 +205,7 @@ async def status():
         "modules": len(MODULES),
         "agents": {"total": 330, "active": SYSTEM_LOAD["active_agents"], "phase": SYSTEM_LOAD["phase"]},
         "available_keys": AVAILABLE_KEYS,
+        "miniprogram": MINIPROGRAM_AVAILABLE,
         "timestamp": datetime.now().isoformat()
     }
 
@@ -265,7 +238,6 @@ async def weather_root():
 async def weather_city(city: str):
     if OPENWEATHER_API_KEY:
         try:
-            import requests
             url = f"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={OPENWEATHER_API_KEY}&units=metric"
             resp = requests.get(url, timeout=10)
             data = resp.json()
@@ -290,12 +262,11 @@ async def news_root():
 async def news_latest():
     if CURRENTS_API_KEY:
         try:
-            import requests
             resp = requests.get(f"https://api.currentsapi.services/v1/latest-news?apiKey={CURRENTS_API_KEY}", timeout=10)
             return resp.json()
         except Exception as e:
             logger.warning(f"News error: {e}")
-    return {"status": "demo", "news": [{"title": "🦁 Singh Ji AI News", "description": "Add CURRENTS_API_KEY"}]}
+    return {"status": "demo", "news": [{"title": "Singh Ji AI News", "description": "Add CURRENTS_API_KEY"}]}
 
 # ═══════════════════════════════════════════════════════
 # 🦁 MANDI MODULE
@@ -350,7 +321,6 @@ async def facebook_status():
     if not FACEBOOK_ACCESS_TOKEN:
         return {"status": "error", "error": "FACEBOOK_ACCESS_TOKEN not set"}
     try:
-        import requests
         url = f"https://graph.facebook.com/v25.0/{FACEBOOK_PAGE_ID}?access_token={FACEBOOK_ACCESS_TOKEN}&fields=id,name,followers_count"
         resp = requests.get(url, timeout=10)
         data = resp.json()
@@ -366,7 +336,6 @@ async def facebook_post(request: Request):
         return {"error": "FACEBOOK_ACCESS_TOKEN not set"}
     data = await request.json()
     try:
-        import requests
         url = f"https://graph.facebook.com/v25.0/{FACEBOOK_PAGE_ID}/feed"
         payload = {"access_token": FACEBOOK_ACCESS_TOKEN, "message": data.get("message", "")}
         if data.get("link"):
@@ -388,7 +357,6 @@ async def instagram_status():
     if not INSTAGRAM_ACCESS_TOKEN:
         return {"status": "error", "error": "INSTAGRAM_ACCESS_TOKEN not set"}
     try:
-        import requests
         url = f"https://graph.facebook.com/v25.0/{INSTAGRAM_BUSINESS_ID}?access_token={INSTAGRAM_ACCESS_TOKEN}&fields=id,username,followers_count"
         resp = requests.get(url, timeout=10)
         data = resp.json()
@@ -404,8 +372,6 @@ async def instagram_post(request: Request):
         return {"error": "INSTAGRAM_ACCESS_TOKEN not set"}
     data = await request.json()
     try:
-        import requests
-        # Instagram Graph API requires media container first
         url = f"https://graph.facebook.com/v25.0/{INSTAGRAM_BUSINESS_ID}/media"
         payload = {
             "access_token": INSTAGRAM_ACCESS_TOKEN,
@@ -415,7 +381,6 @@ async def instagram_post(request: Request):
         resp = requests.post(url, data=payload, timeout=10)
         result = resp.json()
         if "id" in result:
-            # Publish the container
             publish_url = f"https://graph.facebook.com/v25.0/{INSTAGRAM_BUSINESS_ID}/media_publish"
             pub_resp = requests.post(publish_url, data={"access_token": INSTAGRAM_ACCESS_TOKEN, "creation_id": result["id"]}, timeout=10)
             return pub_resp.json()
@@ -435,7 +400,6 @@ async def youtube_channel(channel_id: str):
     if not YOUTUBE_API_KEY:
         return {"error": "YOUTUBE_API_KEY not set"}
     try:
-        import requests
         url = f"https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&id={channel_id}&key={YOUTUBE_API_KEY}"
         resp = requests.get(url, timeout=10)
         return resp.json()
@@ -447,7 +411,6 @@ async def youtube_search(q: str = "", max_results: int = 10):
     if not YOUTUBE_API_KEY:
         return {"error": "YOUTUBE_API_KEY not set"}
     try:
-        import requests
         url = f"https://www.googleapis.com/youtube/v3/search?part=snippet&q={q}&maxResults={max_results}&key={YOUTUBE_API_KEY}"
         resp = requests.get(url, timeout=10)
         return resp.json()
@@ -521,11 +484,10 @@ async def telegram_webhook(request: Request):
         text = message.get("text", "")
         chat_id = message.get("chat", {}).get("id")
         if text == "/status":
-            reply = f"🦁 Singh Ji AI v8.0\nAgents: {SYSTEM_LOAD['active_agents']}/330"
+            reply = f"Singh Ji AI v8.0\nAgents: {SYSTEM_LOAD['active_agents']}/330"
         else:
-            reply = "🦁 Singh Ji AI Bot\nCommands: /status"
+            reply = "Singh Ji AI Bot\nCommands: /status"
         if TELEGRAM_TOKEN and chat_id:
-            import requests
             requests.post(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
                 json={"chat_id": chat_id, "text": reply}, timeout=10)
         return {"status": "ok"}
@@ -534,10 +496,8 @@ async def telegram_webhook(request: Request):
         return {"status": "ok"}
 
 # ═══════════════════════════════════════════════════════
-# 🦁 TRISHUL MODULE (Inline — no external file needed)
+# 🦁 TRISHUL MODULE
 # ═══════════════════════════════════════════════════════
-TRISHUL_MEMORY = {}
-
 @app.get("/api/trishul/")
 async def trishul_root():
     return {"module": "Trishul Memory", "status": "active", "records": len(TRISHUL_MEMORY)}
@@ -570,7 +530,7 @@ async def trishul_delete(key: str):
     return {"deleted": False, "error": "Key not found"}
 
 # ═══════════════════════════════════════════════════════
-# 🦁 AAVISHKAR MODULE (Inline — AI Generator)
+# 🦁 AAVISHKAR MODULE
 # ═══════════════════════════════════════════════════════
 @app.get("/api/aavishkar/")
 async def aavishkar_root():
@@ -582,10 +542,8 @@ async def aavishkar_generate(request: Request):
     prompt = data.get("prompt", "")
     model = data.get("model", "groq")
 
-    # Try Groq first
     if model == "groq" and GROQ_API_KEY:
         try:
-            import requests
             resp = requests.post("https://api.groq.com/openai/v1/chat/completions",
                 headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"},
                 json={"model": "llama3-8b-8192", "messages": [{"role": "user", "content": prompt}]},
@@ -595,10 +553,8 @@ async def aavishkar_generate(request: Request):
         except Exception as e:
             logger.warning(f"Groq failed: {e}")
 
-    # Fallback to Gemini
     if GEMINI_API_KEY:
         try:
-            import requests
             url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
             resp = requests.post(url, json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=30)
             result = resp.json()
@@ -607,7 +563,7 @@ async def aavishkar_generate(request: Request):
         except Exception as e:
             logger.warning(f"Gemini failed: {e}")
 
-    return {"status": "demo", "response": f"🦁 Singh Ji AI Demo Response for: {prompt[:50]}...", "note": "Add GROQ_API_KEY or GEMINI_API_KEY"}
+    return {"status": "demo", "response": f"Singh Ji AI Demo Response for: {prompt[:50]}...", "note": "Add GROQ_API_KEY or GEMINI_API_KEY"}
 
 @app.post("/api/aavishkar/translate")
 async def aavishkar_translate(request: Request):
@@ -623,17 +579,8 @@ async def aavishkar_summarize(request: Request):
     return {"summary": text[:200] + "..." if len(text) > 200 else text, "original_length": len(text)}
 
 # ═══════════════════════════════════════════════════════
-# 🦁 AGENT SCHEDULER
-# ═══════════════════════════════════════════════════════
-@app.on_event("startup")
-async def startup():
-    SYSTEM_LOAD["phase"] = 1
-    logger.info("🦁 Singh Ji AI Ultra v8.0 Started!")
-    logger.info(f"🦁 Available Keys: {AVAILABLE_KEYS}")
-    # ═══════════════════════════════════════════════════════
 # 🦁 MINI-PROGRAM ROUTES
 # ═══════════════════════════════════════════════════════
-
 @app.post("/api/miniprogram/register")
 async def mp_register(request: Request):
     data = await request.json()
@@ -692,6 +639,55 @@ async def mp_admin_apps(status: str = None):
 @app.post("/api/miniprogram/admin/approve/{app_id}")
 async def mp_admin_approve(app_id: str):
     return MiniAuth.approve_app(app_id)
+
+# ═══════════════════════════════════════════════════════
+# 🦁 API STATUS CHECK
+# ═══════════════════════════════════════════════════════
+@app.get("/api/check")
+async def api_check():
+    tests = {
+        "OPENWEATHER": ("https://api.openweathermap.org/data/2.5/weather?q=Delhi&appid=" + str(OPENWEATHER_API_KEY or ""), {}, "GET"),
+        "GROQ": ("https://api.groq.com/openai/v1/models", {"Authorization": f"Bearer {GROQ_API_KEY or ''}"}, "GET"),
+        "GEMINI": ("https://generativelanguage.googleapis.com/v1beta/models?key=" + str(GEMINI_API_KEY or ""), {}, "GET"),
+        "TELEGRAM": (f"https://api.telegram.org/bot{TELEGRAM_TOKEN or ''}/getMe", {}, "GET"),
+        "SUPABASE": (f"{SUPABASE_URL or ''}/rest/v1/", {"apikey": SUPABASE_SERVICE_KEY or "", "Authorization": f"Bearer {SUPABASE_SERVICE_KEY or ''}"}, "GET"),
+        "FACEBOOK": (f"https://graph.facebook.com/v25.0/{FACEBOOK_PAGE_ID}?access_token={FACEBOOK_ACCESS_TOKEN or ''}", {}, "GET"),
+    }
+
+    results = {}
+    live_count = 0
+    dead_count = 0
+
+    for name, (url, headers, method) in tests.items():
+        if not AVAILABLE_KEYS.get(name):
+            results[name] = {"status": "MISSING", "code": None, "ms": None}
+            dead_count += 1
+            continue
+
+        try:
+            start = time.time()
+            if method == "GET":
+                r = requests.get(url, headers=headers, timeout=5)
+            else:
+                r = requests.post(url, headers=headers, timeout=5)
+            elapsed = round((time.time() - start) * 1000, 2)
+
+            if r.status_code == 200:
+                results[name] = {"status": "LIVE", "code": 200, "ms": elapsed}
+                live_count += 1
+            else:
+                results[name] = {"status": "ERROR", "code": r.status_code, "ms": elapsed, "detail": r.text[:100]}
+                dead_count += 1
+        except Exception as e:
+            results[name] = {"status": "FAIL", "error": str(e)[:50], "ms": None}
+            dead_count += 1
+
+    return {
+        "timestamp": datetime.now().isoformat(),
+        "version": "8.0.0",
+        "summary": {"live": live_count, "dead": dead_count, "total": live_count + dead_count},
+        "results": results
+    }
 
 # ═══════════════════════════════════════════════════════
 # 🦁 RUN
