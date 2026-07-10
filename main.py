@@ -433,6 +433,95 @@ async def telegram_webhook(request: Request):
         return {"status": "ok"}
 
 # ═══════════════════════════════════════════════════════
+# 🦁 TRISHUL MODULE (Inline — no external file needed)
+# ═══════════════════════════════════════════════════════
+TRISHUL_MEMORY = {}
+
+@app.get("/api/trishul/")
+async def trishul_root():
+    return {"module": "Trishul Memory", "status": "active", "records": len(TRISHUL_MEMORY)}
+
+@app.post("/api/trishul/store")
+async def trishul_store(request: Request):
+    data = await request.json()
+    key = data.get("key", str(datetime.now().timestamp()))
+    TRISHUL_MEMORY[key] = {
+        "value": data.get("value", data),
+        "timestamp": datetime.now().isoformat(),
+        "tags": data.get("tags", [])
+    }
+    return {"saved": True, "key": key, "total": len(TRISHUL_MEMORY)}
+
+@app.get("/api/trishul/recall/{key}")
+async def trishul_recall(key: str):
+    return {"key": key, "data": TRISHUL_MEMORY.get(key), "exists": key in TRISHUL_MEMORY}
+
+@app.get("/api/trishul/search")
+async def trishul_search(q: str = ""):
+    results = {k: v for k, v in TRISHUL_MEMORY.items() if q.lower() in str(v).lower()}
+    return {"query": q, "results": results, "count": len(results)}
+
+@app.delete("/api/trishul/delete/{key}")
+async def trishul_delete(key: str):
+    if key in TRISHUL_MEMORY:
+        del TRISHUL_MEMORY[key]
+        return {"deleted": True}
+    return {"deleted": False, "error": "Key not found"}
+
+# ═══════════════════════════════════════════════════════
+# 🦁 AAVISHKAR MODULE (Inline — AI Generator)
+# ═══════════════════════════════════════════════════════
+@app.get("/api/aavishkar/")
+async def aavishkar_root():
+    return {"module": "Aavishkar AI", "status": "active", "version": "4.1"}
+
+@app.post("/api/aavishkar/generate")
+async def aavishkar_generate(request: Request):
+    data = await request.json()
+    prompt = data.get("prompt", "")
+    model = data.get("model", "groq")
+
+    # Try Groq first
+    if model == "groq" and GROQ_API_KEY:
+        try:
+            import requests
+            resp = requests.post("https://api.groq.com/openai/v1/chat/completions",
+                headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"},
+                json={"model": "llama3-8b-8192", "messages": [{"role": "user", "content": prompt}]},
+                timeout=30)
+            result = resp.json()
+            return {"status": "success", "model": "groq", "response": result["choices"][0]["message"]["content"]}
+        except Exception as e:
+            logger.warning(f"Groq failed: {e}")
+
+    # Fallback to Gemini
+    if GEMINI_API_KEY:
+        try:
+            import requests
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+            resp = requests.post(url, json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=30)
+            result = resp.json()
+            text = result["candidates"][0]["content"]["parts"][0]["text"]
+            return {"status": "success", "model": "gemini", "response": text}
+        except Exception as e:
+            logger.warning(f"Gemini failed: {e}")
+
+    return {"status": "demo", "response": f"🦁 Singh Ji AI Demo Response for: {prompt[:50]}...", "note": "Add GROQ_API_KEY or GEMINI_API_KEY"}
+
+@app.post("/api/aavishkar/translate")
+async def aavishkar_translate(request: Request):
+    data = await request.json()
+    text = data.get("text", "")
+    target_lang = data.get("target", "hi")
+    return {"original": text, "translated": f"[{target_lang}] {text}", "status": "demo"}
+
+@app.post("/api/aavishkar/summarize")
+async def aavishkar_summarize(request: Request):
+    data = await request.json()
+    text = data.get("text", "")
+    return {"summary": text[:200] + "..." if len(text) > 200 else text, "original_length": len(text)}
+
+# ═══════════════════════════════════════════════════════
 # 🦁 AGENT SCHEDULER
 # ═══════════════════════════════════════════════════════
 @app.on_event("startup")
