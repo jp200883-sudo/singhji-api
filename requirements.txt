@@ -79,5 +79,5 @@ click==8.1.8
 typer==0.24.1
 rich==14.0.0
 packaging==25.0
-typing-extensions==4.13.2
+typing-extensions==4.14.1
 annotated-types==0.7.0
