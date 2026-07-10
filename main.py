@@ -5,6 +5,8 @@ Railway Primary Deploy — Clean & Stable
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from miniprogram.sandbox import SandboxRunner
+from miniprogram.developer import DeveloperPortal
 import os
 import sys
 import json
@@ -12,7 +14,6 @@ import asyncio
 import aiohttp
 from datetime import datetime
 import logging
-
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -629,6 +630,68 @@ async def startup():
     SYSTEM_LOAD["phase"] = 1
     logger.info("🦁 Singh Ji AI Ultra v8.0 Started!")
     logger.info(f"🦁 Available Keys: {AVAILABLE_KEYS}")
+    # ═══════════════════════════════════════════════════════
+# 🦁 MINI-PROGRAM ROUTES
+# ═══════════════════════════════════════════════════════
+
+@app.post("/api/miniprogram/register")
+async def mp_register(request: Request):
+    data = await request.json()
+    return MiniAuth.register_developer(data.get("name"), data.get("email"), data.get("business_type", "general"))
+
+@app.post("/api/miniprogram/submit")
+async def mp_submit(request: Request):
+    data = await request.json()
+    return MiniAuth.submit_app(data.get("developer_id"), data.get("name"), data.get("type"), data.get("code"), data.get("permissions", []))
+
+@app.get("/api/miniprogram/status/{app_id}")
+async def mp_status(app_id: str):
+    app = MiniAuth.APPROVED_APPS.get(app_id)
+    return {"app_id": app_id, "status": app["status"]} if app else {"error": "App not found"}
+
+@app.post("/api/miniprogram/auth")
+async def mp_auth(request: Request):
+    data = await request.json()
+    try:
+        token = MiniAuth.generate_token(data.get("app_id"), data.get("phone"))
+        return {"token": token, "expires_in": 86400}
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.post("/api/miniprogram/payment")
+async def mp_payment(request: Request):
+    data = await request.json()
+    user = MiniAuth.validate_token(data.get("token"))
+    if not user:
+        return {"error": "Invalid token"}
+    return MiniPayment.process(data.get("amount", 0), user["user_id"], data.get("merchant_id"), data.get("method", "upi"), {"app_id": user["app_id"]})
+
+@app.post("/api/miniprogram/storage/put")
+async def mp_storage_put(request: Request):
+    data = await request.json()
+    user = MiniAuth.validate_token(data.get("token"))
+    if not user:
+        return {"error": "Invalid token"}
+    return MiniStorage.put(user["app_id"], user["user_id"], data.get("key"), data.get("value"))
+
+@app.get("/api/miniprogram/storage/get")
+async def mp_storage_get(key: str, token: str):
+    user = MiniAuth.validate_token(token)
+    if not user:
+        return {"error": "Invalid token"}
+    return MiniStorage.get(user["app_id"], user["user_id"], key)
+
+@app.get("/api/miniprogram/developer/{developer_id}/dashboard")
+async def mp_dashboard(developer_id: str):
+    return DeveloperPortal.get_dashboard(developer_id)
+
+@app.get("/api/miniprogram/admin/apps")
+async def mp_admin_apps(status: str = None):
+    return {"apps": DeveloperPortal.get_all_apps(status)}
+
+@app.post("/api/miniprogram/admin/approve/{app_id}")
+async def mp_admin_approve(app_id: str):
+    return MiniAuth.approve_app(app_id)
 
 # ═══════════════════════════════════════════════════════
 # 🦁 RUN
