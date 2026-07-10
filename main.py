@@ -17,41 +17,8 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # ═══════════════════════════════════════════════════════
-# 🦁 ALL API KEYS
+# 🦁 AVAILABLE_KEYS — SAB KO LIVE TEST KARO
 # ═══════════════════════════════════════════════════════
-CEREBRAS_API_KEY = os.getenv("CEREBRAS_API_KEY")
-CF_ACCOUNT_ID = os.getenv("CF_ACCOUNT_ID")
-CF_API_TOKEN = os.getenv("CF_API_TOKEN")
-CURRENTS_API_KEY = os.getenv("CURRENTS_API_KEY")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-HUGGINGFACE_TOKEN = os.getenv("HUGGINGFACE_TOKEN")
-MANDI_API_KEY = os.getenv("MANDI_API_KEY")
-NEWSDATA_API_KEY = os.getenv("NEWSDATA_API_KEY")
-OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
-PLANT_ID_API = os.getenv("PLANT_ID_API")
-RAPIDAPI_KEY = os.getenv("RAPIDAPI_KEY")
-RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID")
-RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY") or os.getenv("SUPABASE_KEY")
-TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-TWILIO_SID = os.getenv("TWILIO_SID")
-TWILIO_TOKEN = os.getenv("TWILIO_TOKEN")
-
-# 🆕 NEW KEYS
-FACEBOOK_ACCESS_TOKEN = os.getenv("FACEBOOK_ACCESS_TOKEN")
-FACEBOOK_PAGE_ID = os.getenv("FACEBOOK_PAGE_ID", "1008554401796459")
-GMAIL_CLIENT_ID = os.getenv("GMAIL_CLIENT_ID")
-GMAIL_CLIENT_SECRET = os.getenv("GMAIL_CLIENT_SECRET")
-INSTAGRAM_ACCESS_TOKEN = os.getenv("INSTAGRAM_ACCESS_TOKEN")
-INSTAGRAM_BUSINESS_ID = os.getenv("INSTAGRAM_BUSINESS_ID")
-YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
-YOUTUBE_CLIENT_ID = os.getenv("YOUTUBE_CLIENT_ID")
-YOUTUBE_CLIENT_SECRET = os.getenv("YOUTUBE_CLIENT_SECRET")
-
 AVAILABLE_KEYS = {
     "OPENWEATHER": bool(OPENWEATHER_API_KEY),
     "CURRENTS": bool(CURRENTS_API_KEY),
@@ -75,6 +42,72 @@ AVAILABLE_KEYS = {
     "YOUTUBE": bool(YOUTUBE_API_KEY),
 }
 
+# ═══════════════════════════════════════════════════════
+# 🆕 /health ENDPOINT — SAB APIs KA LIVE TEST
+# ═══════════════════════════════════════════════════════
+@app.get("/health")
+async def health_check():
+    import requests
+    import time
+    
+    results = {}
+    live_count = 0
+    dead_count = 0
+    
+    # SAB APIs ka HTTP test
+    tests = {
+        "GROQ": ("https://api.groq.com/openai/v1/models", {"Authorization": f"Bearer {GROQ_API_KEY}"}, "GET"),
+        "GEMINI": (f"https://generativelanguage.googleapis.com/v1beta/models?key={GEMINI_API_KEY}", {}, "GET"),
+        "CEREBRAS": ("https://api.cerebras.ai/v1/models", {"Authorization": f"Bearer {CEREBRAS_API_KEY}"}, "GET"),
+        "HUGGINGFACE": ("https://huggingface.co/api/whoami-v2", {"Authorization": f"Bearer {HUGGINGFACE_TOKEN}"}, "GET"),
+        "FACEBOOK": (f"https://graph.facebook.com/v18.0/me?access_token={FACEBOOK_ACCESS_TOKEN}&fields=id,name", {}, "GET"),
+        "YOUTUBE": (f"https://www.googleapis.com/youtube/v3/search?key={YOUTUBE_API_KEY}&part=snippet&q=test&maxResults=1", {}, "GET"),
+        "NEWSDATA": (f"https://newsdata.io/api/1/latest?apikey={NEWSDATA_API_KEY}&q=india", {}, "GET"),
+        "OPENWEATHER": (f"https://api.openweathermap.org/data/2.5/weather?appid={OPENWEATHER_API_KEY}&q=Delhi", {}, "GET"),
+        "TAVILY": ("https://api.tavily.com/search", {"Authorization": f"Bearer {TAVILY_API_KEY}", "Content-Type": "application/json"}, "POST"),
+        "RAPIDAPI": ("https://api-football-v1.p.rapidapi.com/v3/timezone", {"X-RapidAPI-Key": RAPIDAPI_KEY, "X-RapidAPI-Host": "api-football-v1.p.rapidapi.com"}, "GET"),
+        "PLANT_ID": ("https://web.plant.id/api/v3/health", {"Api-Key": PLANT_ID_API}, "GET"),
+        "TELEGRAM": (f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getMe", {}, "GET"),
+        "TWILIO": (f"https://api.twilio.com/2010-04-01/Accounts/{TWILIO_SID}.json", {}, "GET"),
+        "CURRENTS": (f"https://api.currentsapi.services/v1/latest-news?apiKey={CURRENTS_API_KEY}", {}, "GET"),
+        "MANDI": (f"https://api.data.gov.in/resource/9ef84268-d588-465a-a308-a86a57c7f2d5?api-key={MANDI_API_KEY}&format=json&limit=1", {}, "GET"),
+        "MAGIC_HOUR": ("https://api.magichour.ai/v1/projects", {"Authorization": f"Bearer {os.getenv('MAGIC_HOUR_API_KEY')}"}, "GET"),
+        "CF": ("https://api.cloudflare.com/client/v4/user/tokens/verify", {"Authorization": f"Bearer {CF_API_TOKEN}"}, "GET"),
+        "MEM0": ("https://api.mem0.ai/v1/memories/", {"Authorization": f"Token {os.getenv('MEM0_API')}"}, "GET"),
+        "SUPABASE": (f"{SUPABASE_URL}/rest/v1/", {"apikey": SUPABASE_SERVICE_KEY, "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}"}, "GET"),
+        "RAZORPAY": ("https://api.razorpay.com/v1/orders", {"Authorization": f"Basic {RAZORPAY_KEY_ID}:"}, "GET"),
+    }
+    
+    for name, (url, headers, method) in tests.items():
+        if not AVAILABLE_KEYS.get(name):
+            results[name] = {"status": "MISSING", "code": None, "ms": None}
+            dead_count += 1
+            continue
+            
+        try:
+            start = time.time()
+            if method == "GET":
+                r = requests.get(url, headers=headers, timeout=5)
+            else:
+                r = requests.post(url, headers=headers, timeout=5)
+            elapsed = round((time.time() - start) * 1000, 2)
+            
+            if r.status_code == 200:
+                results[name] = {"status": "LIVE", "code": 200, "ms": elapsed}
+                live_count += 1
+            else:
+                results[name] = {"status": "ERROR", "code": r.status_code, "ms": elapsed, "detail": r.text[:100]}
+                dead_count += 1
+        except Exception as e:
+            results[name] = {"status": "FAIL", "error": str(e)[:50], "ms": None}
+            dead_count += 1
+    
+    return {
+        "timestamp": datetime.now().isoformat(),
+        "version": "8.0.0",
+        "summary": {"live": live_count, "dead": dead_count, "total": live_count + dead_count},
+        "results": results
+    }
 # ═══════════════════════════════════════════════════════
 # 🦁 FASTAPI APP
 # ═══════════════════════════════════════════════════════
