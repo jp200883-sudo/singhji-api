@@ -1,8 +1,8 @@
-🦁 SINGH JI AI ULTRA v7.0 — SARWAN 330 AGENT SWARM
-Hybrid API: Railway (Primary) + Render (Fallback)
-API Key Check: Missing key = graceful error, not crash
 """
-from fastapi import FastAPI, Request, BackgroundTasks
+🦁 SINGH JI AI ULTRA v8.0 — SARWAN 330 AGENT SWARM
+Railway Primary Deploy — Clean & Stable
+"""
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import os
@@ -10,7 +10,6 @@ import sys
 import json
 import asyncio
 import aiohttp
-import importlib.util
 from datetime import datetime
 import logging
 
@@ -18,13 +17,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # ═══════════════════════════════════════════════════════
-# 🦁 FACEBOOK ACCESS TOKEN (Long-Lived, 60 days)
-# ═══════════════════════════════════════════════════════
-FACEBOOK_ACCESS_TOKEN = os.getenv("FACEBOOK_ACCESS_TOKEN")
-FACEBOOK_PAGE_ID = os.getenv("FACEBOOK_PAGE_ID", "1008554401796459")
-
-# ═══════════════════════════════════════════════════════
-# 🦁 ALL 26 API KEYS — Check which are available
+# 🦁 ALL API KEYS
 # ═══════════════════════════════════════════════════════
 CEREBRAS_API_KEY = os.getenv("CEREBRAS_API_KEY")
 CF_ACCOUNT_ID = os.getenv("CF_ACCOUNT_ID")
@@ -33,28 +26,32 @@ CURRENTS_API_KEY = os.getenv("CURRENTS_API_KEY")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 HUGGINGFACE_TOKEN = os.getenv("HUGGINGFACE_TOKEN")
-MAGIC_HOUR_API_KEY = os.getenv("MAGIC_HOUR_API_KEY")
 MANDI_API_KEY = os.getenv("MANDI_API_KEY")
-MONGO_URI = os.getenv("MONGO_URI")
 NEWSDATA_API_KEY = os.getenv("NEWSDATA_API_KEY")
 OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
 PLANT_ID_API = os.getenv("PLANT_ID_API")
-PLANT_ID_URL = os.getenv("PLANT_ID_URL")
 RAPIDAPI_KEY = os.getenv("RAPIDAPI_KEY")
 RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID")
 RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET")
-# 🎯 FIX: SUPABASE_SERVICE_KEY na mile to SUPABASE_KEY use karo (fallback)
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY") or os.getenv("SUPABASE_KEY")
 TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
-TAVILY_URL = os.getenv("TAVILY_URL")
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 TWILIO_SID = os.getenv("TWILIO_SID")
 TWILIO_TOKEN = os.getenv("TWILIO_TOKEN")
-TZ = os.getenv("TZ", "Asia/Kolkata")
 
-# Check available keys
+# 🆕 NEW KEYS
+FACEBOOK_ACCESS_TOKEN = os.getenv("FACEBOOK_ACCESS_TOKEN")
+FACEBOOK_PAGE_ID = os.getenv("FACEBOOK_PAGE_ID", "1008554401796459")
+GMAIL_CLIENT_ID = os.getenv("GMAIL_CLIENT_ID")
+GMAIL_CLIENT_SECRET = os.getenv("GMAIL_CLIENT_SECRET")
+INSTAGRAM_ACCESS_TOKEN = os.getenv("INSTAGRAM_ACCESS_TOKEN")
+INSTAGRAM_BUSINESS_ID = os.getenv("INSTAGRAM_BUSINESS_ID")
+YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
+YOUTUBE_CLIENT_ID = os.getenv("YOUTUBE_CLIENT_ID")
+YOUTUBE_CLIENT_SECRET = os.getenv("YOUTUBE_CLIENT_SECRET")
+
 AVAILABLE_KEYS = {
     "OPENWEATHER": bool(OPENWEATHER_API_KEY),
     "CURRENTS": bool(CURRENTS_API_KEY),
@@ -73,20 +70,18 @@ AVAILABLE_KEYS = {
     "TAVILY": bool(TAVILY_API_KEY),
     "TWILIO": bool(TWILIO_SID and TWILIO_TOKEN),
     "FACEBOOK": bool(FACEBOOK_ACCESS_TOKEN),
+    "GMAIL": bool(GMAIL_CLIENT_ID and GMAIL_CLIENT_SECRET),
+    "INSTAGRAM": bool(INSTAGRAM_ACCESS_TOKEN),
+    "YOUTUBE": bool(YOUTUBE_API_KEY),
 }
-
-# ═══════════════════════════════════════════════════════
-# 🦁 FALLBACK URLS — Render as backup
-# ═══════════════════════════════════════════════════════
-RENDER_URL = "https://singhji-api.onrender.com"
 
 # ═══════════════════════════════════════════════════════
 # 🦁 FASTAPI APP
 # ═══════════════════════════════════════════════════════
 app = FastAPI(
-    title="🦁 Singh Ji AI Ultra v7.0",
-    version="7.0.0-sarwan-hybrid",
-    description="330 Agent Swarm | Hybrid API | Railway Primary + Render Fallback"
+    title="🦁 Singh Ji AI Ultra v8.0",
+    version="8.0.0",
+    description="330 Agent Swarm | Railway Deploy | All Social APIs"
 )
 
 app.add_middleware(
@@ -104,357 +99,48 @@ MODULES = {}
 MEMORY_STORE = {}
 AGENT_SWARM = {}
 AGENT_QUEUE = []
-AGENT_SCHEDULE = {}
-USER_SESSIONS = {}
 SYSTEM_LOAD = {"active_agents": 0, "max_agents": 100, "phase": 0}
 
-MODULES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "modules")
-
-# 🎯 ROUTER-MOUNTED MODULES TRACK KARO (Trishul fix!)
-ROUTER_MOUNTED_MODULES = set()
-
-# 🎯 FIX: 'modules' ko ek proper namespace package banao,
-# taaki folder-wale modules (jaise oauth_connector) ke andar
-# relative imports (.config, .base, etc.) sahi se resolve ho sakein
-import types as _types
-if "modules" not in sys.modules:
-    _modules_pkg = _types.ModuleType("modules")
-    _modules_pkg.__path__ = [MODULES_DIR]
-    sys.modules["modules"] = _modules_pkg
-
 # ═══════════════════════════════════════════════════════
-# 🦁 SARWAN 330 AGENT DEFINITIONS
-# ═══════════════════════════════════════════════════════
-AGENT_DEFINITIONS = {}
-
-for i in range(1, 101):
-    AGENT_DEFINITIONS[f"agent_{i:03d}"] = {
-        "phase": 1, "type": "core", "delay_minutes": 0,
-        "priority": "critical", "role": "system"
-    }
-
-for i in range(101, 201):
-    AGENT_DEFINITIONS[f"agent_{i:03d}"] = {
-        "phase": 2, "type": "service", "delay_minutes": 5,
-        "priority": "high", "role": "api"
-    }
-
-for i in range(201, 331):
-    AGENT_DEFINITIONS[f"agent_{i:03d}"] = {
-        "phase": 3, "type": "specialized", "delay_minutes": 10,
-        "priority": "medium", "role": "ai"
-    }
-
-# ═══════════════════════════════════════════════════════
-# 🦁 MODULE DISCOVERY
-# ═══════════════════════════════════════════════════════
-def discover_modules():
-    modules = {}
-    if not os.path.exists(MODULES_DIR):
-        return modules
-    try:
-        for item in os.listdir(MODULES_DIR):
-            item_path = os.path.join(MODULES_DIR, item)
-            if os.path.isdir(item_path) and not item.startswith("__"):
-                handler_path = os.path.join(item_path, "handler.py")
-                if os.path.exists(handler_path):
-                    modules[item] = {"type": "folder", "path": handler_path}
-            elif item.endswith(".py") and not item.startswith("__"):
-                modules[item[:-3]] = {"type": "file", "path": item_path}
-    except Exception as e:
-        logger.error(f"Module discovery error: {e}")
-    return modules
-
-def load_module(name, info):
-    """Module load karo — router wale ko track karo!"""
-    try:
-        if info["type"] == "folder":
-            # 🎯 FIX: submodule_search_locations dena zaroori hai,
-            # taaki Python is module ko "package" maane aur andar wali
-            # files (config.py, base.py, etc.) tak relative import se pahunch sake
-            folder_path = os.path.dirname(info["path"])
-            spec = importlib.util.spec_from_file_location(
-                f"modules.{name}", info["path"],
-                submodule_search_locations=[folder_path]
-            )
-            module = importlib.util.module_from_spec(spec)
-            sys.modules[f"modules.{name}"] = module
-            spec.loader.exec_module(module)
-            router = getattr(module, "router", None)
-            if router:
-                # 🎯 ROUTER MOUNT KARO AUR TRACK KARO!
-                app.include_router(router, prefix=f"/api/{name}")
-                ROUTER_MOUNTED_MODULES.add(name)
-                logger.info(f"🎯 Router mounted: /api/{name}")
-                return "router_mounted"
-            return getattr(module, "handler", None)
-        else:
-            spec = importlib.util.spec_from_file_location(name, info["path"])
-            module = importlib.util.module_from_spec(spec)
-            sys.modules[name] = module
-            spec.loader.exec_module(module)
-            router = getattr(module, "router", None)
-            if router:
-                # 🎯 ROUTER MOUNT KARO AUR TRACK KARO!
-                app.include_router(router, prefix=f"/api/{name}")
-                ROUTER_MOUNTED_MODULES.add(name)
-                logger.info(f"🎯 Router mounted: /api/{name}")
-                return "router_mounted"
-            return getattr(module, "handler", None)
-    except Exception as e:
-        logger.error(f"Failed {name}: {e}")
-        return None
-
-# ═══════════════════════════════════════════════════════
-# 🦁 SYSTEM LOAD CHECK
-# ═══════════════════════════════════════════════════════
-async def check_system_load():
-    active = SYSTEM_LOAD["active_agents"]
-    max_allowed = SYSTEM_LOAD["max_agents"]
-    if active >= max_allowed:
-        return False
-    load_percent = (active / max_allowed) * 100
-    return load_percent < 90
-
-# ═══════════════════════════════════════════════════════
-# 🦁 FALLBACK FETCH — Try Railway first, then Render
-# ═══════════════════════════════════════════════════════
-async def fallback_fetch(endpoint: str, method="GET", data=None, headers=None):
-    """Try Railway first, fallback to Render if key missing or fails"""
-    urls = [
-        f"{RENDER_URL}{endpoint}",  # Render has keys
-    ]
-
-    # Try Render first (it has all keys)
-    for url in urls:
-        try:
-            async with aiohttp.ClientSession() as session:
-                if method == "GET":
-                    async with session.get(url, timeout=aiohttp.ClientTimeout(total=15), headers=headers or {}) as resp:
-                        if resp.status == 200:
-                            return await resp.json()
-                elif method == "POST":
-                    async with session.post(url, json=data, timeout=aiohttp.ClientTimeout(total=15), headers=headers or {}) as resp:
-                        if resp.status == 200:
-                            return await resp.json()
-        except Exception as e:
-            logger.warning(f"Fallback fetch failed for {url}: {e}")
-            continue
-
-    return None
-
-# ═══════════════════════════════════════════════════════
-# 🦁 SARWAN AGENT SCHEDULER
-# ═══════════════════════════════════════════════════════
-async def sarwan_scheduler():
-    await asyncio.sleep(30)
-
-    phases = [1, 2, 3]
-    phase_delays = {1: 0, 2: 300, 3: 600}
-
-    for phase in phases:
-        SYSTEM_LOAD["phase"] = phase
-        logger.info(f"🦁 Sarwan Phase {phase} starting...")
-        await asyncio.sleep(phase_delays[phase])
-
-        phase_agents = [k for k, v in AGENT_DEFINITIONS.items() if v["phase"] == phase]
-
-        for agent_id in phase_agents:
-            can_add = await check_system_load()
-            if not can_add:
-                AGENT_QUEUE.append(agent_id)
-                await asyncio.sleep(5)
-                continue
-
-            AGENT_SWARM[agent_id] = {
-                "id": agent_id,
-                "type": AGENT_DEFINITIONS[agent_id]["type"],
-                "phase": phase,
-                "status": "active",
-                "registered_at": datetime.now().isoformat(),
-                "last_active": datetime.now().isoformat(),
-                "tasks_completed": 0,
-                "config": {
-                    "auto_execute": False,
-                    "max_tasks_per_minute": 10,
-                    "cooldown_seconds": 6
-                }
-            }
-            SYSTEM_LOAD["active_agents"] += 1
-
-            if int(agent_id.split("_")[1]) % 10 == 0:
-                logger.info(f"✅ {agent_id} activated (Phase {phase})")
-
-            await asyncio.sleep(0.2)
-
-        logger.info(f"🦁 Phase {phase} complete: {len([a for a in AGENT_SWARM.values() if a.get('phase')==phase])} agents")
-
-    while AGENT_QUEUE:
-        can_add = await check_system_load()
-        if can_add:
-            agent_id = AGENT_QUEUE.pop(0)
-            AGENT_SWARM[agent_id] = {
-                "id": agent_id,
-                "type": AGENT_DEFINITIONS[agent_id]["type"],
-                "phase": AGENT_DEFINITIONS[agent_id]["phase"],
-                "status": "active",
-                "registered_at": datetime.now().isoformat(),
-                "last_active": datetime.now().isoformat(),
-                "tasks_completed": 0,
-                "config": {"auto_execute": False, "max_tasks_per_minute": 10, "cooldown_seconds": 6}
-            }
-            SYSTEM_LOAD["active_agents"] += 1
-        await asyncio.sleep(10)
-
-    logger.info("🦁 SARWAN 330 ALL ACTIVE!")
-
-# ═══════════════════════════════════════════════════════
-# 🦁 SELF-PING
-# ═══════════════════════════════════════════════════════
-async def self_ping():
-    await asyncio.sleep(60)
-    while True:
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(
-                    "https://singhji-api-production-85ca.up.railway.app/health",
-                    timeout=aiohttp.ClientTimeout(total=10)
-                ) as resp:
-                    logger.info(f"🦁 Self-ping: {resp.status}")
-        except Exception as e:
-            logger.error(f"Self-ping: {e}")
-        await asyncio.sleep(10 * 60)
-
-# ═══════════════════════════════════════════════════════
-# 🦁 STARTUP
-# ═══════════════════════════════════════════════════════
-@app.on_event("startup")
-async def startup():
-    try:
-        all_modules = discover_modules()
-        for name, info in all_modules.items():
-            result = load_module(name, info)
-            if result:
-                MODULES[name] = result
-
-        logger.info(f"🦁 {len(MODULES)} modules ready")
-        logger.info(f"🦁 Router-mounted modules: {list(ROUTER_MOUNTED_MODULES)}")
-        logger.info(f"🦁 Available API Keys: {AVAILABLE_KEYS}")
-
-        asyncio.create_task(sarwan_scheduler())
-        asyncio.create_task(self_ping())
-
-        logger.info("🦁 Sarwan 330 Swarm scheduler started")
-    except Exception as e:
-        logger.error(f"Startup error: {e}")
-
-# ═══════════════════════════════════════════════════════
-# 🦁 HEALTH
+# 🦁 HEALTH CHECK — MOST IMPORTANT FOR RAILWAY
 # ═══════════════════════════════════════════════════════
 @app.get("/")
 @app.head("/")
 async def root():
     return {
-        "name": "🦁 Singh Ji AI Ultra v7.0",
-        "version": "7.0.0-sarwan-hybrid",
+        "name": "🦁 Singh Ji AI Ultra v8.0",
+        "version": "8.0.0",
+        "status": "🦁 LIVE",
         "modules": len(MODULES),
         "agents_active": SYSTEM_LOAD["active_agents"],
-        "agents_queued": len(AGENT_QUEUE),
-        "phase": SYSTEM_LOAD["phase"],
         "available_keys": AVAILABLE_KEYS,
-        "router_modules": list(ROUTER_MOUNTED_MODULES),
-        "status": "🦁 LIVE",
         "timestamp": datetime.now().isoformat()
     }
 
 @app.get("/health")
 @app.head("/health")
 def health():
-    return {
-        "status": "ok",
-        "service": "Singh Ji AI",
-        "agents": SYSTEM_LOAD["active_agents"],
-        "available_keys": {k: v for k, v in AVAILABLE_KEYS.items()}
-    }
+    return {"status": "ok", "service": "Singh Ji AI v8.0"}
 
-@app.get("/api/health")
-@app.head("/api/health")
-def api_health():
-    return {"status": "ok", "timestamp": datetime.now().isoformat()}
-
+# ═══════════════════════════════════════════════════════
+# 🦁 CORE MODULES
+# ═══════════════════════════════════════════════════════
 @app.get("/api/status")
 async def status():
     return {
-        "name": "Singh Ji AI v7.0 Sarwan Hybrid",
+        "name": "Singh Ji AI Ultra v8.0",
         "modules": len(MODULES),
-        "router_modules": list(ROUTER_MOUNTED_MODULES),
-        "agents": {
-            "total": 330,
-            "active": SYSTEM_LOAD["active_agents"],
-            "queued": len(AGENT_QUEUE),
-            "phase": SYSTEM_LOAD["phase"],
-            "phases": {
-                "phase_1": len([a for a in AGENT_SWARM.values() if a.get("phase") == 1]),
-                "phase_2": len([a for a in AGENT_SWARM.values() if a.get("phase") == 2]),
-                "phase_3": len([a for a in AGENT_SWARM.values() if a.get("phase") == 3])
-            }
-        },
+        "agents": {"total": 330, "active": SYSTEM_LOAD["active_agents"], "phase": SYSTEM_LOAD["phase"]},
         "available_keys": AVAILABLE_KEYS,
         "timestamp": datetime.now().isoformat()
     }
 
 # ═══════════════════════════════════════════════════════
-# 🦁 DYNAMIC MODULE ROUTER (FIXED!)
-# ═══════════════════════════════════════════════════════
-async def run_handler(module_name: str, request: Request):
-    handler_func = MODULES[module_name]
-    if handler_func == "router_mounted":
-        return JSONResponse(status_code=400, content={"error": "Use direct route path"})
-    try:
-        if asyncio.iscoroutinefunction(handler_func):
-            result = await handler_func(request)
-        else:
-            loop = asyncio.get_event_loop()
-            result = await loop.run_in_executor(None, handler_func, request)
-        if isinstance(result, dict) and "statusCode" in result:
-            return JSONResponse(status_code=result.get("statusCode", 200), content=json.loads(result.get("body", "{}")) if isinstance(result.get("body"), str) else result.get("body"))
-        return JSONResponse(content=result) if isinstance(result, dict) else result
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
-
-@app.api_route("/api/{module_name}", methods=["GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS"])
-async def dynamic_router(request: Request, module_name: str):
-    # 🦁 FIX: Router-mounted modules ko skip karo!
-    if module_name in ROUTER_MOUNTED_MODULES:
-        return JSONResponse(
-            status_code=307,
-            content={
-                "error": f"'{module_name}' uses FastAPI router",
-                "use": f"/api/{module_name}/ or /api/{module_name}/store",
-                "hint": "Router-mounted modules ka direct path use karo",
-                "mounted_routes": [f"/api/{module_name}/", f"/api/{module_name}/store", f"/api/{module_name}/recall"]
-            },
-            headers={"Location": f"/api/{module_name}/"}
-        )
-
-    if module_name not in MODULES:
-        all_modules = discover_modules()
-        if module_name in all_modules:
-            handler = load_module(module_name, all_modules[module_name])
-            if handler:
-                MODULES[module_name] = handler
-            else:
-                return JSONResponse(status_code=404, content={"error": f"'{module_name}' failed to load"})
-        else:
-            return JSONResponse(status_code=404, content={"error": f"'{module_name}' not found", "available": list(discover_modules().keys())})
-    return await run_handler(module_name, request)
-
-# ═══════════════════════════════════════════════════════
-# 🦁 MEMORY MODULE (Direct Routes)
+# 🦁 MEMORY MODULE
 # ═══════════════════════════════════════════════════════
 @app.get("/api/memory/")
 async def memory_list():
-    return {"status": "Memory Active", "records": len(MEMORY_STORE), "keys": list(MEMORY_STORE.keys())[:20]}
+    return {"status": "Memory Active", "records": len(MEMORY_STORE)}
 
 @app.get("/api/memory/{key}")
 async def memory_get(key: str):
@@ -465,25 +151,17 @@ async def memory_save(request: Request):
     data = await request.json()
     key = data.get("key", str(datetime.now().timestamp()))
     MEMORY_STORE[key] = data.get("value", data)
-    return {"saved": True, "key": key, "total": len(MEMORY_STORE)}
-
-@app.delete("/api/memory/{key}")
-async def memory_delete(key: str):
-    if key in MEMORY_STORE:
-        del MEMORY_STORE[key]
-        return {"deleted": True}
-    return {"deleted": False, "error": "Key not found"}
+    return {"saved": True, "key": key}
 
 # ═══════════════════════════════════════════════════════
-# 🦁 WEATHER MODULE — WITH FALLBACK TO RENDER
+# 🦁 WEATHER MODULE
 # ═══════════════════════════════════════════════════════
 @app.get("/api/weather/")
 async def weather_root():
-    return {"module": "Weather", "status": "active", "source": "Railway Primary"}
+    return {"module": "Weather", "status": "active"}
 
 @app.get("/api/weather/{city}")
 async def weather_city(city: str):
-    # Try Railway first (if key available)
     if OPENWEATHER_API_KEY:
         try:
             import requests
@@ -492,36 +170,16 @@ async def weather_city(city: str):
             data = resp.json()
             if resp.status_code == 200:
                 return {
-                    "city": city,
-                    "temp": data["main"]["temp"],
+                    "city": city, "temp": data["main"]["temp"],
                     "humidity": data["main"]["humidity"],
-                    "desc": data["weather"][0]["description"],
-                    "source": "Railway"
+                    "desc": data["weather"][0]["description"]
                 }
         except Exception as e:
-            logger.warning(f"Railway weather failed: {e}")
-
-    # Fallback to Render
-    try:
-        fallback_data = await fallback_fetch(f"/api/weather/{city}")
-        if fallback_data:
-            fallback_data["source"] = "Render (Fallback)"
-            return fallback_data
-    except Exception as e:
-        logger.warning(f"Render weather fallback failed: {e}")
-
-    # No keys available — return demo data
-    return {
-        "city": city,
-        "temp": 32.0,
-        "humidity": 65,
-        "desc": "haze (demo — add OPENWEATHER_API_KEY to Railway)",
-        "source": "DEMO",
-        "note": "Add OPENWEATHER_API_KEY to Railway Variables or use Render API"
-    }
+            logger.warning(f"Weather error: {e}")
+    return {"city": city, "temp": 32.0, "humidity": 65, "desc": "demo", "source": "DEMO"}
 
 # ═══════════════════════════════════════════════════════
-# 🦁 NEWS MODULE — WITH FALLBACK
+# 🦁 NEWS MODULE
 # ═══════════════════════════════════════════════════════
 @app.get("/api/news/")
 async def news_root():
@@ -535,21 +193,8 @@ async def news_latest():
             resp = requests.get(f"https://api.currentsapi.services/v1/latest-news?apiKey={CURRENTS_API_KEY}", timeout=10)
             return resp.json()
         except Exception as e:
-            logger.warning(f"Railway news failed: {e}")
-
-    # Fallback to Render
-    fallback_data = await fallback_fetch("/api/news/latest")
-    if fallback_data:
-        fallback_data["source"] = "Render (Fallback)"
-        return fallback_data
-
-    return {
-        "status": "demo",
-        "news": [
-            {"title": "🦁 Singh Ji AI News", "description": "Add CURRENTS_API_KEY to Railway", "url": "#"}
-        ],
-        "source": "DEMO"
-    }
+            logger.warning(f"News error: {e}")
+    return {"status": "demo", "news": [{"title": "🦁 Singh Ji AI News", "description": "Add CURRENTS_API_KEY"}]}
 
 # ═══════════════════════════════════════════════════════
 # 🦁 MANDI MODULE
@@ -571,8 +216,6 @@ async def plant_root():
 
 @app.post("/api/plant/identify")
 async def plant_identify(request: Request):
-    if not PLANT_ID_API:
-        return {"error": "API key not set", "note": "Add PLANT_ID_API to Railway Variables"}
     data = await request.json()
     return {"status": "pending", "image": data.get("image_url", "none")}
 
@@ -581,115 +224,164 @@ async def plant_identify(request: Request):
 # ═══════════════════════════════════════════════════════
 @app.get("/api/payment/")
 async def payment_root():
-    return {
-        "module": "Singh Ji Payment Gateway",
-        "status": "ON_HOLD",
-        "activate_at": "1000+ daily users",
-        "upi_id": "jp200883@sbi"
-    }
+    return {"module": "Payment Gateway", "status": "ON_HOLD", "activate_at": "1000+ daily users", "upi_id": "jp200883@sbi"}
 
 # ═══════════════════════════════════════════════════════
 # 🦁 ADMIN MODULE
 # ═══════════════════════════════════════════════════════
 @app.get("/api/admin/")
 async def admin_root():
-    return {
-        "module": "Admin",
-        "modules": len(MODULES),
-        "router_modules": list(ROUTER_MOUNTED_MODULES),
-        "memory": len(MEMORY_STORE),
-        "agents": {
-            "total": 330,
-            "active": SYSTEM_LOAD["active_agents"],
-            "queued": len(AGENT_QUEUE),
-            "phase": SYSTEM_LOAD["phase"]
-        },
-        "available_keys": AVAILABLE_KEYS
-    }
+    return {"module": "Admin", "modules": len(MODULES), "agents": SYSTEM_LOAD["active_agents"], "available_keys": AVAILABLE_KEYS}
 
 @app.get("/api/admin/stats")
 async def admin_stats():
-    return {
-        "modules": len(MODULES),
-        "router_modules": list(ROUTER_MOUNTED_MODULES),
-        "memory": len(MEMORY_STORE),
-        "agents_active": SYSTEM_LOAD["active_agents"],
-        "agents_queued": len(AGENT_QUEUE),
-        "phase": SYSTEM_LOAD["phase"],
-        "load": f"{(SYSTEM_LOAD['active_agents']/SYSTEM_LOAD['max_agents']*100):.1f}%",
-        "available_keys": AVAILABLE_KEYS,
-        "timestamp": datetime.now().isoformat()
-    }
+    return {"modules": len(MODULES), "agents_active": SYSTEM_LOAD["active_agents"], "available_keys": AVAILABLE_KEYS, "timestamp": datetime.now().isoformat()}
 
 # ═══════════════════════════════════════════════════════
-# 🦁 SARWAN 330 SWARM ROUTES
+# 🦁 FACEBOOK MODULE
+# ═══════════════════════════════════════════════════════
+@app.get("/api/facebook/")
+async def facebook_root():
+    return {"module": "Facebook", "status": "active" if FACEBOOK_ACCESS_TOKEN else "missing_token", "page_id": FACEBOOK_PAGE_ID}
+
+@app.get("/api/facebook/status")
+async def facebook_status():
+    if not FACEBOOK_ACCESS_TOKEN:
+        return {"status": "error", "error": "FACEBOOK_ACCESS_TOKEN not set"}
+    try:
+        import requests
+        url = f"https://graph.facebook.com/v25.0/{FACEBOOK_PAGE_ID}?access_token={FACEBOOK_ACCESS_TOKEN}&fields=id,name,followers_count"
+        resp = requests.get(url, timeout=10)
+        data = resp.json()
+        if resp.status_code == 200:
+            return {"status": "connected", "token_valid": True, "page": {"id": data.get("id"), "name": data.get("name"), "followers": data.get("followers_count", 0)}}
+        return {"status": "error", "error": data.get("error", {}).get("message", "Unknown")}
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
+@app.post("/api/facebook/post")
+async def facebook_post(request: Request):
+    if not FACEBOOK_ACCESS_TOKEN:
+        return {"error": "FACEBOOK_ACCESS_TOKEN not set"}
+    data = await request.json()
+    try:
+        import requests
+        url = f"https://graph.facebook.com/v25.0/{FACEBOOK_PAGE_ID}/feed"
+        payload = {"access_token": FACEBOOK_ACCESS_TOKEN, "message": data.get("message", "")}
+        if data.get("link"):
+            payload["link"] = data["link"]
+        resp = requests.post(url, data=payload, timeout=10)
+        return resp.json()
+    except Exception as e:
+        return {"error": str(e)}
+
+# ═══════════════════════════════════════════════════════
+# 🦁 INSTAGRAM MODULE
+# ═══════════════════════════════════════════════════════
+@app.get("/api/instagram/")
+async def instagram_root():
+    return {"module": "Instagram", "status": "active" if INSTAGRAM_ACCESS_TOKEN else "missing_token"}
+
+@app.get("/api/instagram/status")
+async def instagram_status():
+    if not INSTAGRAM_ACCESS_TOKEN:
+        return {"status": "error", "error": "INSTAGRAM_ACCESS_TOKEN not set"}
+    try:
+        import requests
+        url = f"https://graph.facebook.com/v25.0/{INSTAGRAM_BUSINESS_ID}?access_token={INSTAGRAM_ACCESS_TOKEN}&fields=id,username,followers_count"
+        resp = requests.get(url, timeout=10)
+        data = resp.json()
+        if resp.status_code == 200:
+            return {"status": "connected", "account": {"id": data.get("id"), "username": data.get("username"), "followers": data.get("followers_count", 0)}}
+        return {"status": "error", "error": data.get("error", {}).get("message", "Unknown")}
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
+@app.post("/api/instagram/post")
+async def instagram_post(request: Request):
+    if not INSTAGRAM_ACCESS_TOKEN:
+        return {"error": "INSTAGRAM_ACCESS_TOKEN not set"}
+    data = await request.json()
+    try:
+        import requests
+        # Instagram Graph API requires media container first
+        url = f"https://graph.facebook.com/v25.0/{INSTAGRAM_BUSINESS_ID}/media"
+        payload = {
+            "access_token": INSTAGRAM_ACCESS_TOKEN,
+            "caption": data.get("caption", ""),
+            "image_url": data.get("image_url", "")
+        }
+        resp = requests.post(url, data=payload, timeout=10)
+        result = resp.json()
+        if "id" in result:
+            # Publish the container
+            publish_url = f"https://graph.facebook.com/v25.0/{INSTAGRAM_BUSINESS_ID}/media_publish"
+            pub_resp = requests.post(publish_url, data={"access_token": INSTAGRAM_ACCESS_TOKEN, "creation_id": result["id"]}, timeout=10)
+            return pub_resp.json()
+        return result
+    except Exception as e:
+        return {"error": str(e)}
+
+# ═══════════════════════════════════════════════════════
+# 🦁 YOUTUBE MODULE
+# ═══════════════════════════════════════════════════════
+@app.get("/api/youtube/")
+async def youtube_root():
+    return {"module": "YouTube", "status": "active" if YOUTUBE_API_KEY else "missing_key"}
+
+@app.get("/api/youtube/channel/{channel_id}")
+async def youtube_channel(channel_id: str):
+    if not YOUTUBE_API_KEY:
+        return {"error": "YOUTUBE_API_KEY not set"}
+    try:
+        import requests
+        url = f"https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&id={channel_id}&key={YOUTUBE_API_KEY}"
+        resp = requests.get(url, timeout=10)
+        return resp.json()
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.get("/api/youtube/search")
+async def youtube_search(q: str = "", max_results: int = 10):
+    if not YOUTUBE_API_KEY:
+        return {"error": "YOUTUBE_API_KEY not set"}
+    try:
+        import requests
+        url = f"https://www.googleapis.com/youtube/v3/search?part=snippet&q={q}&maxResults={max_results}&key={YOUTUBE_API_KEY}"
+        resp = requests.get(url, timeout=10)
+        return resp.json()
+    except Exception as e:
+        return {"error": str(e)}
+
+# ═══════════════════════════════════════════════════════
+# 🦁 GMAIL MODULE
+# ═══════════════════════════════════════════════════════
+@app.get("/api/gmail/")
+async def gmail_root():
+    return {"module": "Gmail", "status": "active" if GMAIL_CLIENT_ID else "missing_credentials"}
+
+@app.get("/api/gmail/auth-url")
+async def gmail_auth_url():
+    if not GMAIL_CLIENT_ID:
+        return {"error": "GMAIL_CLIENT_ID not set"}
+    redirect_uri = os.getenv("GMAIL_REDIRECT_URI", "https://singhji-ai.github.io/oauth/callback")
+    scope = "https://www.googleapis.com/auth/gmail.send"
+    url = f"https://accounts.google.com/o/oauth2/v2/auth?client_id={GMAIL_CLIENT_ID}&redirect_uri={redirect_uri}&scope={scope}&response_type=code&access_type=offline"
+    return {"auth_url": url, "note": "Visit this URL to authorize Gmail access"}
+
+# ═══════════════════════════════════════════════════════
+# 🦁 SWARM MODULE
 # ═══════════════════════════════════════════════════════
 @app.get("/api/swarm/")
 async def swarm_root():
-    return {
-        "module": "Sarwan 330 Agent Swarm",
-        "status": "active",
-        "total": 330,
-        "active": SYSTEM_LOAD["active_agents"],
-        "queued": len(AGENT_QUEUE),
-        "current_phase": SYSTEM_LOAD["phase"],
-        "max_concurrent": SYSTEM_LOAD["max_agents"],
-        "phases": {
-            "phase_1": {"range": "1-100", "type": "Core", "delay": "0 min", "status": "active" if SYSTEM_LOAD["phase"] >= 1 else "pending"},
-            "phase_2": {"range": "101-200", "type": "Service", "delay": "5 min", "status": "active" if SYSTEM_LOAD["phase"] >= 2 else "pending"},
-            "phase_3": {"range": "201-330", "type": "Specialized", "delay": "10 min", "status": "active" if SYSTEM_LOAD["phase"] >= 3 else "pending"}
-        }
-    }
+    return {"module": "Sarwan 330", "total": 330, "active": SYSTEM_LOAD["active_agents"], "phase": SYSTEM_LOAD["phase"]}
 
 @app.get("/api/swarm/agents")
 async def swarm_list():
-    return {
-        "total": len(AGENT_SWARM),
-        "active": SYSTEM_LOAD["active_agents"],
-        "queued": len(AGENT_QUEUE),
-        "sample": {k: {"type": v["type"], "phase": v["phase"], "status": v["status"]} 
-                   for k, v in list(AGENT_SWARM.items())[:10]}
-    }
-
-@app.get("/api/swarm/agent/{agent_id}")
-async def swarm_agent_get(agent_id: str):
-    if agent_id in AGENT_SWARM:
-        return AGENT_SWARM[agent_id]
-    if agent_id in AGENT_QUEUE:
-        return {"agent_id": agent_id, "status": "queued", "position": AGENT_QUEUE.index(agent_id)}
-    if agent_id in AGENT_DEFINITIONS:
-        return {"agent_id": agent_id, "status": "scheduled", "phase": AGENT_DEFINITIONS[agent_id]["phase"]}
-    return {"error": "Agent not found"}
-
-@app.post("/api/swarm/agent/{agent_id}/execute")
-async def swarm_agent_execute(agent_id: str, request: Request):
-    if agent_id not in AGENT_SWARM:
-        return {"error": "Agent not active yet"}
-    data = await request.json()
-    task = data.get("task", "unknown")
-    AGENT_SWARM[agent_id]["last_active"] = datetime.now().isoformat()
-    AGENT_SWARM[agent_id]["tasks_completed"] += 1
-    return {
-        "agent_id": agent_id,
-        "task": task,
-        "status": "executed",
-        "tasks_completed": AGENT_SWARM[agent_id]["tasks_completed"]
-    }
-
-@app.post("/api/swarm/broadcast")
-async def swarm_broadcast(request: Request):
-    data = await request.json()
-    message = data.get("message", "")
-    targets = data.get("targets", list(AGENT_SWARM.keys())[:10])
-    results = []
-    for agent_id in targets:
-        if agent_id in AGENT_SWARM:
-            AGENT_SWARM[agent_id]["last_active"] = datetime.now().isoformat()
-            results.append({"agent": agent_id, "status": "received"})
-    return {"broadcast": True, "message": message, "recipients": len(results)}
+    return {"total": len(AGENT_SWARM), "active": SYSTEM_LOAD["active_agents"], "sample": list(AGENT_SWARM.keys())[:5]}
 
 # ═══════════════════════════════════════════════════════
-# 🦁 RETIREMENT TAX MODULE
+# 🦁 RETIREMENT & TAX
 # ═══════════════════════════════════════════════════════
 @app.get("/api/retirement/")
 async def retirement_root():
@@ -715,14 +407,7 @@ async def retirement_tax(request: Request):
         elif taxable <= 1000000: tax = 12500 + (taxable - 500000) * 0.20
         else: tax = 112500 + (taxable - 1000000) * 0.30
     cess = tax * 0.04
-    return {
-        "income": income,
-        "regime": regime,
-        "tax": round(tax, 2),
-        "cess": round(cess, 2),
-        "total": round(tax + cess, 2),
-        "take_home": round(income - tax - cess, 2)
-    }
+    return {"income": income, "regime": regime, "tax": round(tax, 2), "cess": round(cess, 2), "total": round(tax + cess, 2), "take_home": round(income - tax - cess, 2)}
 
 # ═══════════════════════════════════════════════════════
 # 🦁 TELEGRAM WEBHOOK
@@ -731,98 +416,30 @@ async def retirement_tax(request: Request):
 async def telegram_webhook(request: Request):
     try:
         data = await request.json()
-        message = data.get('message', {})
-        text = message.get('text', '')
-        chat_id = message.get('chat', {}).get('id')
-        if text == '/status':
-            reply = f"🦁 Singh Ji AI\nAgents: {SYSTEM_LOAD['active_agents']}/330\nPhase: {SYSTEM_LOAD['phase']}"
+        message = data.get("message", {})
+        text = message.get("text", "")
+        chat_id = message.get("chat", {}).get("id")
+        if text == "/status":
+            reply = f"🦁 Singh Ji AI v8.0\nAgents: {SYSTEM_LOAD['active_agents']}/330"
         else:
             reply = "🦁 Singh Ji AI Bot\nCommands: /status"
         if TELEGRAM_TOKEN and chat_id:
             import requests
             requests.post(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
-                json={"chat_id": chat_id, "text": reply, "parse_mode": "HTML"}, timeout=10)
+                json={"chat_id": chat_id, "text": reply}, timeout=10)
         return {"status": "ok"}
     except Exception as e:
         logger.error(f"Telegram: {e}")
         return {"status": "ok"}
 
-
 # ═══════════════════════════════════════════════════════
-# 🦁 FACEBOOK MODULE — Auto-Post, Insights, Token Verify
+# 🦁 AGENT SCHEDULER
 # ═══════════════════════════════════════════════════════
-@app.get("/api/facebook/")
-async def facebook_root():
-    return {
-        "module": "Facebook",
-        "status": "active" if FACEBOOK_ACCESS_TOKEN else "missing_token",
-        "page_id": FACEBOOK_PAGE_ID,
-        "token_valid": bool(FACEBOOK_ACCESS_TOKEN)
-    }
-
-@app.get("/api/facebook/status")
-async def facebook_status():
-    if not FACEBOOK_ACCESS_TOKEN:
-        return {
-            "status": "error",
-            "error": "FACEBOOK_ACCESS_TOKEN not set",
-            "fix": "Add token to Railway/Render Environment Variables"
-        }
-    try:
-        import requests
-        # Verify token by fetching page info
-        url = f"https://graph.facebook.com/v25.0/{FACEBOOK_PAGE_ID}?access_token={FACEBOOK_ACCESS_TOKEN}&fields=id,name,followers_count"
-        resp = requests.get(url, timeout=10)
-        data = resp.json()
-        if resp.status_code == 200:
-            return {
-                "status": "connected",
-                "token_valid": True,
-                "page": {
-                    "id": data.get("id"),
-                    "name": data.get("name"),
-                    "followers": data.get("followers_count", 0)
-                },
-                "token_source": "Long-Lived (60 days)"
-            }
-        else:
-            return {
-                "status": "error",
-                "error": data.get("error", {}).get("message", "Unknown error"),
-                "code": data.get("error", {}).get("code", 0)
-            }
-    except Exception as e:
-        return {"status": "error", "error": str(e)}
-
-@app.post("/api/facebook/post")
-async def facebook_post(request: Request):
-    if not FACEBOOK_ACCESS_TOKEN:
-        return {"error": "FACEBOOK_ACCESS_TOKEN not set"}
-    data = await request.json()
-    message = data.get("message", "")
-    link = data.get("link", "")
-    try:
-        import requests
-        url = f"https://graph.facebook.com/v25.0/{FACEBOOK_PAGE_ID}/feed"
-        payload = {"access_token": FACEBOOK_ACCESS_TOKEN, "message": message}
-        if link:
-            payload["link"] = link
-        resp = requests.post(url, data=payload, timeout=10)
-        return resp.json()
-    except Exception as e:
-        return {"error": str(e)}
-
-@app.get("/api/facebook/insights")
-async def facebook_insights():
-    if not FACEBOOK_ACCESS_TOKEN:
-        return {"error": "FACEBOOK_ACCESS_TOKEN not set"}
-    try:
-        import requests
-        url = f"https://graph.facebook.com/v25.0/{FACEBOOK_PAGE_ID}/insights?access_token={FACEBOOK_ACCESS_TOKEN}&metric=page_fans,page_engaged_users,page_impressions"
-        resp = requests.get(url, timeout=10)
-        return resp.json()
-    except Exception as e:
-        return {"error": str(e)}
+@app.on_event("startup")
+async def startup():
+    SYSTEM_LOAD["phase"] = 1
+    logger.info("🦁 Singh Ji AI Ultra v8.0 Started!")
+    logger.info(f"🦁 Available Keys: {AVAILABLE_KEYS}")
 
 # ═══════════════════════════════════════════════════════
 # 🦁 RUN
