@@ -1,4 +1,4 @@
-cat > miniprogram/payment.py << 'EOF'
+
 """🦁 Mini-Program Payment — 0% UPI, 2% Card"""
 import uuid
 from datetime import datetime
