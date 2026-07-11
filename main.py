@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, Session
 from contextlib import asynccontextmanager
+from urllib.parse import quote_plus, urlparse, urlunparse
 import os
 import logging
 from datetime import datetime
@@ -20,7 +21,6 @@ logger = logging.getLogger(__name__)
 # 🦁 GLOBAL VARIABLES
 # ============================================================
 MINIPROGRAM_AVAILABLE = False
-VOICE_AVAILABLE = False
 
 # ============================================================
 # 🦁 API KEYS CHECK
@@ -51,11 +51,30 @@ API_KEYS = {
 logger.info(f"🦁 Available Keys: {API_KEYS}")
 
 # ============================================================
-# 🦁 DATABASE SETUP
+# 🦁 DATABASE SETUP — URL ENCODE PASSWORD FIX
 # ============================================================
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./singhji.db")
+
+# Fix: postgres:// → postgresql://
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
+# Fix: Password mein special characters (#, @, :, /) encode karo
+if "postgresql" in DATABASE_URL:
+    try:
+        parsed = urlparse(DATABASE_URL)
+        if parsed.password and any(c in parsed.password for c in ['#', '@', ':', '/']):
+            encoded_password = quote_plus(parsed.password)
+            netloc = f"{parsed.username}:{encoded_password}@{parsed.hostname}"
+            if parsed.port:
+                netloc += f":{parsed.port}"
+            DATABASE_URL = urlunparse((
+                parsed.scheme, netloc, parsed.path,
+                parsed.params, parsed.query, parsed.fragment
+            ))
+            logger.info("✅ Database URL password encoded!")
+    except Exception as e:
+        logger.warning(f"⚠️ URL encode error: {e}")
 
 engine = create_engine(
     DATABASE_URL,
@@ -71,7 +90,7 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """🚀 App lifespan — startup aur shutdown"""
-    global MINIPROGRAM_AVAILABLE, VOICE_AVAILABLE
+    global MINIPROGRAM_AVAILABLE
 
     logger.info("🚀 === STARTUP BEGIN ===")
 
@@ -85,7 +104,7 @@ async def lifespan(app: FastAPI):
 
     # Mini-Program modules load
     try:
-        from miniprogram.auth import MiniAuth, AuthManager, get_current_developer
+        from miniprogram.auth import MiniAuth, AuthManager
         from miniprogram.models import Base, Developer, MiniApp, Payment, AppReview, SandboxLog
         from miniprogram.portal import router as miniprogram_router
         from miniprogram.storage import storage
@@ -158,7 +177,7 @@ async def root():
         "message": "🦁 Singh Ji AI Ultra v8.0",
         "status": "live",
         "mini_program": MINIPROGRAM_AVAILABLE,
-        "api_keys": sum(1 for v in API_KEYS.values() if v),
+        "api_keys_active": sum(1 for v in API_KEYS.values() if v),
         "total_keys": len(API_KEYS)
     }
 
@@ -172,7 +191,10 @@ async def get_keys():
 @app.post("/api/miniprogram/auth/register")
 async def register_developer(request: Request):
     if not MINIPROGRAM_AVAILABLE:
-        return JSONResponse({"error": "Mini-Program module not available"}, status_code=503)
+        return JSONResponse(
+            {"error": "Mini-Program module not available"},
+            status_code=503
+        )
 
     from miniprogram.auth import MiniAuth
     data = await request.json()
@@ -189,7 +211,10 @@ async def register_developer(request: Request):
 @app.post("/api/miniprogram/auth/login")
 async def login_developer(request: Request):
     if not MINIPROGRAM_AVAILABLE:
-        return JSONResponse({"error": "Mini-Program module not available"}, status_code=503)
+        return JSONResponse(
+            {"error": "Mini-Program module not available"},
+            status_code=503
+        )
 
     from miniprogram.auth import MiniAuth
     data = await request.json()
