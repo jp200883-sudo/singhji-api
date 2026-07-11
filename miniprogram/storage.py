@@ -1,4 +1,4 @@
-cat > miniprogram/storage.py << 'EOF'
+
 """🦁 Mini-Program Storage — 10MB/user"""
 import json
 from datetime import datetime
