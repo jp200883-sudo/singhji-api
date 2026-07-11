@@ -6,24 +6,35 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# DIRECT os.getenv - no dependency on main.py
+# ═══════════════════════════════════════════════════════
+# 🔱 TRISHUL: FORCE SUPABASE_SERVICE_KEY ONLY
+# Public SUPABASE_KEY ko IGNORE karo
+# ═══════════════════════════════════════════════════════
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
-SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_KEY", "") or os.getenv("SUPABASE_KEY", "")
+# SIRF service_role key use karo - public/anon key nahi
+SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_KEY", "")
+
+# Agar service key nahi mili toh warning do, public key mat lo
+if not SUPABASE_KEY:
+    logger.warning("⚠️ Trishul: SUPABASE_SERVICE_KEY nahi mila! Supabase OFF.")
+
 DATABASE_URL = os.getenv("DATABASE_URL", "")
 POOLER_URL = os.getenv("POOLER_URL", "")
 
 USE_SUPABASE = False
 supabase = None
 
-# Try Supabase client
+# Try Supabase client - SIRF service_role key se
 try:
     from supabase import create_client
     if SUPABASE_URL and SUPABASE_KEY:
         supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
         USE_SUPABASE = True
-        logger.info("🧠 Trishul: Supabase direct connected!")
+        logger.info("🧠 Trishul: Supabase SERVICE_ROLE se connected!")
+    else:
+        logger.warning("⚠️ Trishul: Supabase URL ya SERVICE_KEY missing")
 except Exception as e:
-    logger.warning(f"⚠️ Trishul: Supabase direct fail — {e}")
+    logger.warning(f"⚠️ Trishul: Supabase client fail — {e}")
 
 # Try Pooler
 USE_POOLER = False
@@ -74,7 +85,7 @@ class TrishulMemory:
 
     def store(self, user_id, message, agent_id="general", metadata=None):
         meta_json = json.dumps(metadata) if metadata else "{}"
-        if USE_SUPABASE:
+        if USE_SUPABASE and supabase:
             try:
                 supabase.table("memories").insert({
                     "user_id": user_id, "agent_id": agent_id, "message": message,
@@ -105,7 +116,7 @@ class TrishulMemory:
             return False
 
     def recall(self, user_id, limit=10):
-        if USE_SUPABASE:
+        if USE_SUPABASE and supabase:
             try:
                 resp = supabase.table("memories").select("*").eq("user_id", user_id).order("created_at", desc=True).limit(limit).execute()
                 return resp.data
@@ -128,7 +139,7 @@ class TrishulMemory:
         return [dict(row) for row in rows]
 
     def search(self, user_id, query, limit=5):
-        if USE_SUPABASE:
+        if USE_SUPABASE and supabase:
             try:
                 resp = supabase.table("memories").select("*").eq("user_id", user_id).ilike("message", f"%{query}%").limit(limit).execute()
                 return resp.data
@@ -152,7 +163,7 @@ class TrishulMemory:
         return [dict(row) for row in rows]
 
     def get_agent_context(self, user_id, agent_id, limit=5):
-        if USE_SUPABASE:
+        if USE_SUPABASE and supabase:
             try:
                 resp = supabase.table("memories").select("*").eq("user_id", user_id).eq("agent_id", agent_id).order("created_at", desc=True).limit(limit).execute()
                 return resp.data
@@ -176,7 +187,7 @@ class TrishulMemory:
         return [dict(row) for row in rows]
 
     def forget_user(self, user_id):
-        if USE_SUPABASE:
+        if USE_SUPABASE and supabase:
             try:
                 supabase.table("memories").delete().eq("user_id", user_id).execute()
                 return True
