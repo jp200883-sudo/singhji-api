@@ -192,9 +192,8 @@ async def root():
 
 @app.get("/health")
 @app.head("/health")
-def health():
+async def health():
     return {"status": "ok", "service": "Singh Ji AI v8.0"}
-
 # ═══════════════════════════════════════════════════════
 # 🦁 CORE MODULES
 # ═══════════════════════════════════════════════════════
