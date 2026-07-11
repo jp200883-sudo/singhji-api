@@ -1,5 +1,5 @@
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware  # ✅ YEH ADD KARO!
+from fastapi import FastAPI, Request  # ✅ YEH ADD KARO!
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from contextlib import asynccontextmanager
