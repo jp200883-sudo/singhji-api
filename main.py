@@ -1,5 +1,4 @@
-
-main_py_content = '''"""
+"""
 🦁 Singh Ji AI Ultra v8.0 — MASTER MAIN.PY
 Sab kuch ek jagah, sab kuch auto-load, sab kuch active!
 Last Updated: 11 July 2026
@@ -104,12 +103,12 @@ def load_module(module_name: str) -> bool:
             logger.warning(f"⚠️ Module '{module_name}' ka handler.py nahi mila!")
             MODULE_STATUS[module_name] = {"status": "missing", "error": "handler.py not found"}
             return False
-        
+
         spec = importlib.util.spec_from_file_location(f"modules.{module_name}", module_path)
         module = importlib.util.module_from_spec(spec)
         sys.modules[f"modules.{module_name}"] = module
         spec.loader.exec_module(module)
-        
+
         ACTIVE_MODULES[module_name] = module
         MODULE_STATUS[module_name] = {
             "status": "active",
@@ -119,7 +118,7 @@ def load_module(module_name: str) -> bool:
         }
         logger.info(f"✅ Module '{module_name}' loaded successfully!")
         return True
-        
+
     except Exception as e:
         logger.error(f"❌ Module '{module_name}' load fail: {str(e)}")
         MODULE_STATUS[module_name] = {"status": "error", "error": str(e)}
@@ -128,22 +127,22 @@ def load_module(module_name: str) -> bool:
 def load_all_modules():
     """Load all modules from /modules/ directory"""
     logger.info("🚀 Loading all Singh Ji AI Modules...")
-    
+
     if not MODULES_DIR.exists():
         logger.error(f"❌ Modules directory nahi mila: {MODULES_DIR}")
         return
-    
+
     found_modules = [d.name for d in MODULES_DIR.iterdir() if d.is_dir() and not d.name.startswith(".")]
     logger.info(f"📁 Found {len(found_modules)} modules: {found_modules}")
-    
+
     for module_name in EXPECTED_MODULES:
         load_module(module_name)
-    
+
     # Also load any unexpected modules
     for module_name in found_modules:
         if module_name not in EXPECTED_MODULES:
             load_module(module_name)
-    
+
     active_count = sum(1 for m in MODULE_STATUS.values() if m["status"] == "active")
     logger.info(f"🎯 {active_count}/{len(EXPECTED_MODULES)} modules ACTIVE!")
 
@@ -153,13 +152,13 @@ async def lifespan(app: FastAPI):
     """Startup & Shutdown events"""
     logger.info("🦁 Singh Ji AI Ultra v8.0 Starting...")
     load_all_modules()
-    
+
     # Initialize agent swarm if available
     if "supreme_agent" in ACTIVE_MODULES:
         logger.info("🤖 Supreme Agent initialized!")
-    
+
     yield
-    
+
     logger.info("👋 Singh Ji AI shutting down...")
 
 # ========== FASTAPI APP ==========
@@ -225,9 +224,9 @@ async def call_module(module_name: str, request: ModuleRequest):
     """Kisi bhi module ko call karo"""
     if module_name not in ACTIVE_MODULES:
         raise HTTPException(status_code=404, detail=f"Module '{module_name}' active nahi hai!")
-    
+
     module = ACTIVE_MODULES[module_name]
-    
+
     try:
         if hasattr(module, 'handler'):
             result = await module.handler(request.action, request.data)
@@ -262,7 +261,7 @@ async def chat(request: ChatRequest):
                     "language": request.language
                 })
                 return {"status": "success", "response": result}
-        
+
         # Fallback to Groq/Gemini
         return {
             "status": "success",
@@ -277,18 +276,18 @@ async def chat(request: ChatRequest):
 async def auto_post(request: AutoPostRequest, background_tasks: BackgroundTasks):
     """YouTube, Facebook, Instagram auto-post"""
     platform = request.platform.lower()
-    
+
     platform_modules = {
         "youtube": "youtube_auto_upload",
         "facebook": "facebook_long_token",
         "instagram": "instagram_auto_post"
     }
-    
+
     if platform not in platform_modules:
         raise HTTPException(status_code=400, detail=f"Platform '{platform}' supported nahi hai!")
-    
+
     module_name = platform_modules[platform]
-    
+
     if module_name not in ACTIVE_MODULES:
         # Fallback direct execution
         background_tasks.add_task(_direct_post, platform, request.content)
@@ -298,7 +297,7 @@ async def auto_post(request: AutoPostRequest, background_tasks: BackgroundTasks)
             "message": f"{platform.upper()} post queue mein daal diya!",
             "note": "Module fallback used"
         }
-    
+
     module = ACTIVE_MODULES[module_name]
     try:
         if hasattr(module, 'handler'):
@@ -323,7 +322,7 @@ async def agent_swarm(request: AgentSwarmRequest):
             "priority": request.priority,
             "message": "🤖 Agent Swarm task deploy ho gaya!"
         }
-    
+
     return {
         "status": "fallback",
         "task": request.task,
@@ -351,13 +350,13 @@ async def telegram_webhook(request: Request):
     """Telegram Bot webhook"""
     try:
         data = await request.json()
-        
+
         if "telegram_bot" in ACTIVE_MODULES:
             module = ACTIVE_MODULES["telegram_bot"]
             if hasattr(module, 'handler'):
                 result = await module.handler("webhook", data)
                 return result
-        
+
         # Fallback
         return {"status": "received", "update_id": data.get("update_id")}
     except Exception as e:
@@ -418,12 +417,3 @@ if __name__ == "__main__":
     import uvicorn
     logger.info(f"🚀 Starting Singh Ji AI on {HOST}:{PORT}")
     uvicorn.run(app, host=HOST, port=PORT, log_level="info")
-'''
-
-# Save to output
-output_path = "/mnt/agents/output/main.py"
-with open(output_path, "w", encoding="utf-8") as f:
-    f.write(main_py_content)
-
-print(f"✅ main.py saved! Size: {len(main_py_content)} characters")
-print(f"📍 Location: {output_path}")
