@@ -1,175 +1,184 @@
 """
-🦁 Singh Ji AI Ultra v8.0 — MASTER MAIN.PY
-Sab kuch ek jagah, sab kuch auto-load, sab kuch active!
-Last Updated: 11 July 2026
+🦁 Singh Ji AI Ultra v8.0 — Master Main.py
+===========================================
+modules/ + Root files dono auto-detect!
+Railway $PORT fix, health check, CORS enabled.
 """
 
 import os
 import sys
 import json
-import asyncio
 import importlib.util
 import logging
 from pathlib import Path
-from datetime import datetime
-from typing import Dict, List, Optional, Any
 from contextlib import asynccontextmanager
 
-# ========== FASTAPI SETUP ==========
-from fastapi import FastAPI, Request, HTTPException, BackgroundTasks
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from fastapi.staticfiles import StaticFiles
+import uvicorn
 
-# ========== LOGGING SETUP ==========
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s | %(levelname)s | %(message)s",
-    handlers=[
-        logging.StreamHandler(sys.stdout)
-    ]
-)
-logger = logging.getLogger("SinghJiAI")
+# ========== LOGGING ==========
+logging.basicConfig(level=logging.INFO, format='%(asctime)s | %(levelname)s | %(message)s')
+logger = logging.getLogger("SinghJi")
 
 # ========== CONFIG ==========
+MODULES_DIR = Path(__file__).parent / "modules"
+STATIC_DIR = Path(__file__).parent / "static"
+TEMPLATES_DIR = Path(__file__).parent / "templates"
+ROOT_DIR = Path(__file__).parent
+
 PORT = int(os.environ.get("PORT", 8000))
 HOST = os.environ.get("HOST", "0.0.0.0")
-DEBUG = os.environ.get("DEBUG", "false").lower() == "true"
 
-# API Keys from env
-API_KEYS = {
-    "groq": os.environ.get("GROQ_API_KEY", ""),
-    "gemini": os.environ.get("GEMINI_API_KEY", ""),
-    "openai": os.environ.get("OPENAI_API_KEY", ""),
-    "bhashini": os.environ.get("BHASHINI_API_KEY", ""),
-    "supabase_url": os.environ.get("SUPABASE_URL", ""),
-    "supabase_key": os.environ.get("SUPABASE_KEY", ""),
-    "telegram": os.environ.get("TELEGRAM_BOT_TOKEN", ""),
-    "youtube": os.environ.get("YOUTUBE_API_KEY", ""),
-    "facebook": os.environ.get("FACEBOOK_ACCESS_TOKEN", ""),
-    "instagram": os.environ.get("INSTAGRAM_ACCESS_TOKEN", ""),
-    "newsapi": os.environ.get("NEWSAPI_KEY", ""),
-    "weather": os.environ.get("WEATHER_API_KEY", ""),
-    "plantid": os.environ.get("PLANT_ID_API_KEY", ""),
-    "razorpay_key": os.environ.get("RAZORPAY_KEY_ID", ""),
-    "razorpay_secret": os.environ.get("RAZORPAY_KEY_SECRET", ""),
+# ========== REGISTRY ==========
+loaded_modules = {}
+root_modules = {}
+
+# ========== ROOT FILES MAPPING ==========
+# Kaunsi root file = kaunsa module name
+ROOT_FILE_MAP = {
+    "youtube_auto_upload.py": "youtube",
+    "instagram_auto_post.py": "instagram",
+    "facebook_long_token.py": "facebook",
+    "auto_account.py": "auto_account",
+    "auto_monetize.py": "auto_monetize",
+    "trend_analysis.py": "trend_analysis",
+    "agent_swarm_system.py": "swarm",
+    "singhji_visual.py": "visual",
+    "api.py": "api_core"
 }
 
-# ========== MODULE REGISTRY ==========
-MODULES_DIR = Path(__file__).parent / "modules"
-ACTIVE_MODULES: Dict[str, Any] = {}
-MODULE_STATUS: Dict[str, Dict] = {}
-
-# All 40+ modules expected
-EXPECTED_MODULES = [
-    "aavishkar", "ai_chat", "analytics", "bachpan", "banking",
-    "currency", "currents_api", "daily_report", "emergency", "fuel",
-    "goldrate", "govt", "guard_agent", "horoscope", "init",
-    "language", "language_hub", "mandi", "meta_agent", "news",
-    "news_scheduler", "newsdata", "oauth_connector", "pani", "plant_id",
-    "rozgar", "schedule", "search", "sewer", "singhji_tv",
-    "supabase_memory", "supreme_agent", "telegram_bot", "trishul", "trolley",
-    "upi", "voice", "voice_cmd", "voice_tts", "weather", "whatsapp"
-]
-
-# ========== PYDANTIC MODELS ==========
-class ModuleRequest(BaseModel):
-    module: str
-    action: str = "default"
-    data: Dict[str, Any] = {}
-
-class ChatRequest(BaseModel):
-    message: str
-    user_id: str = "anonymous"
-    language: str = "hi"
-    module: Optional[str] = None
-
-class AutoPostRequest(BaseModel):
-    platform: str  # youtube, facebook, instagram
-    content: Dict[str, Any]
-    schedule: Optional[str] = None
-
-class AgentSwarmRequest(BaseModel):
-    task: str
-    agents: List[str] = []
-    priority: int = 1
-
-# ========== MODULE LOADER ==========
-def load_module(module_name: str) -> bool:
-    """Dynamically load a module from /modules/ folder"""
-    try:
-        module_path = MODULES_DIR / module_name / "handler.py"
-        if not module_path.exists():
-            logger.warning(f"⚠️ Module '{module_name}' ka handler.py nahi mila!")
-            MODULE_STATUS[module_name] = {"status": "missing", "error": "handler.py not found"}
-            return False
-
-        spec = importlib.util.spec_from_file_location(f"modules.{module_name}", module_path)
-        module = importlib.util.module_from_spec(spec)
-        sys.modules[f"modules.{module_name}"] = module
-        spec.loader.exec_module(module)
-
-        ACTIVE_MODULES[module_name] = module
-        MODULE_STATUS[module_name] = {
-            "status": "active",
-            "loaded_at": datetime.now().isoformat(),
-            "handler": hasattr(module, 'handler'),
-            "router": hasattr(module, 'router')
-        }
-        logger.info(f"✅ Module '{module_name}' loaded successfully!")
-        return True
-
-    except Exception as e:
-        logger.error(f"❌ Module '{module_name}' load fail: {str(e)}")
-        MODULE_STATUS[module_name] = {"status": "error", "error": str(e)}
-        return False
-
-def load_all_modules():
-    """Load all modules from /modules/ directory"""
-    logger.info("🚀 Loading all Singh Ji AI Modules...")
-
+def discover_modules():
+    """modules/ folder scan karo"""
+    global loaded_modules
     if not MODULES_DIR.exists():
-        logger.error(f"❌ Modules directory nahi mila: {MODULES_DIR}")
+        logger.warning(f"Modules dir nahi mila: {MODULES_DIR}")
         return
+    
+    for module_path in sorted(MODULES_DIR.iterdir()):
+        if not module_path.is_dir():
+            continue
+        module_name = module_path.name
+        handler_file = module_path / "handler.py"
+        
+        if not handler_file.exists():
+            continue
+        
+        try:
+            spec = importlib.util.spec_from_file_location(f"modules.{module_name}", handler_file)
+            module = importlib.util.module_from_spec(spec)
+            sys.modules[f"modules.{module_name}"] = module
+            spec.loader.exec_module(module)
+            
+            router = getattr(module, "router", None)
+            handler = getattr(module, "handler", None)
+            process = getattr(module, "process", None)
+            
+            loaded_modules[module_name] = {
+                "path": str(module_path),
+                "module": module,
+                "router": router,
+                "handler": handler,
+                "process": process,
+                "source": "modules_folder"
+            }
+            logger.info(f"✅ Module loaded: {module_name}")
+        except Exception as e:
+            logger.error(f"❌ {module_name} load fail: {e}")
 
-    found_modules = [d.name for d in MODULES_DIR.iterdir() if d.is_dir() and not d.name.startswith(".")]
-    logger.info(f"📁 Found {len(found_modules)} modules: {found_modules}")
+def discover_root_files():
+    """Root files ko bhi module ki tarah load karo"""
+    global root_modules
+    for filename, module_name in ROOT_FILE_MAP.items():
+        file_path = ROOT_DIR / filename
+        if not file_path.exists():
+            logger.warning(f"⚠️ Root file missing: {filename}")
+            continue
+        
+        try:
+            spec = importlib.util.spec_from_file_location(f"root.{module_name}", file_path)
+            module = importlib.util.module_from_spec(spec)
+            sys.modules[f"root.{module_name}"] = module
+            spec.loader.exec_module(module)
+            
+            router = getattr(module, "router", None)
+            handler = getattr(module, "handler", None)
+            process = getattr(module, "process", None)
+            
+            # Agar handler nahi hai toh wrapper banao
+            if not handler and not router:
+                handler = create_root_handler(module_name, module)
+            
+            root_modules[module_name] = {
+                "path": str(file_path),
+                "module": module,
+                "router": router,
+                "handler": handler,
+                "process": process,
+                "source": "root_file"
+            }
+            loaded_modules[module_name] = root_modules[module_name]
+            logger.info(f"✅ Root file loaded as module: {module_name} ← {filename}")
+        except Exception as e:
+            logger.error(f"❌ Root file {filename} load fail: {e}")
 
-    for module_name in EXPECTED_MODULES:
-        load_module(module_name)
-
-    # Also load any unexpected modules
-    for module_name in found_modules:
-        if module_name not in EXPECTED_MODULES:
-            load_module(module_name)
-
-    active_count = sum(1 for m in MODULE_STATUS.values() if m["status"] == "active")
-    logger.info(f"🎯 {active_count}/{len(EXPECTED_MODULES)} modules ACTIVE!")
+def create_root_handler(name, module):
+    """Root file ke liye generic handler wrapper"""
+    async def generic_handler(request_data=None):
+        if not request_data:
+            request_data = {}
+        action = request_data.get("action", "status")
+        
+        # Common functions check karo
+        for func_name in ["upload_video", "post_to_instagram", "post_to_facebook", 
+                          "create_account", "monetize_content", "analyze_trends",
+                          "execute", "generate_visual"]:
+            if hasattr(module, func_name):
+                func = getattr(module, func_name)
+                try:
+                    if action == "status":
+                        return {
+                            "status": "success",
+                            "module": name,
+                            "source": "root_file",
+                            "functions": [f for f in dir(module) if not f.startswith("_")],
+                            "message": f"🦁 {name} module active!"
+                        }
+                    result = func(request_data)
+                    return {"status": "success", "module": name, "action": action, "result": result}
+                except Exception as e:
+                    return {"status": "error", "module": name, "message": str(e)}
+        
+        return {
+            "status": "success",
+            "module": name,
+            "source": "root_file",
+            "functions": [f for f in dir(module) if not f.startswith("_")],
+            "message": f"🦁 {name} module active! (no handler found, use specific function)"
+        }
+    
+    return generic_handler
 
 # ========== LIFESPAN ==========
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Startup & Shutdown events"""
-    logger.info("🦁 Singh Ji AI Ultra v8.0 Starting...")
-    load_all_modules()
-
-    # Initialize agent swarm if available
-    if "supreme_agent" in ACTIVE_MODULES:
-        logger.info("🤖 Supreme Agent initialized!")
-
+    logger.info("🚀 Singh Ji AI Ultra v8.0 starting...")
+    discover_modules()
+    discover_root_files()
+    logger.info(f"📦 Total modules: {len(loaded_modules)}")
     yield
+    logger.info("🛑 Shutting down...")
 
-    logger.info("👋 Singh Ji AI shutting down...")
-
-# ========== FASTAPI APP ==========
+# ========== APP ==========
 app = FastAPI(
     title="🦁 Singh Ji AI Ultra v8.0",
-    description="India ka Super App — 40+ Modules, 300 Agent Swarm",
+    description="India ka Super App — modules/ + Root files auto-detect",
     version="8.0.0",
     lifespan=lifespan
 )
 
-# CORS — Sab jagah se allow
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -178,242 +187,117 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ========== HEALTH CHECK ==========
+if STATIC_DIR.exists():
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+# ========== ENDPOINTS ==========
 @app.get("/")
 async def root():
-    """Home / Health Check"""
-    active_count = sum(1 for m in MODULE_STATUS.values() if m["status"] == "active")
     return {
-        "name": "🦁 Singh Ji AI Ultra v8.0",
-        "status": "🟢 LIVE",
+        "name": "Singh Ji AI Ultra v8.0",
         "version": "8.0.0",
-        "modules_active": active_count,
-        "modules_total": len(EXPECTED_MODULES),
-        "timestamp": datetime.now().isoformat(),
-        "message": "Bharat ka apna AI, sab kuch active! 🇮🇳"
+        "status": "LIVE",
+        "modules": len(loaded_modules),
+        "modules_loaded": list(loaded_modules.keys()),
+        "agents_active": 0,
+        "timestamp": str(__import__('datetime').datetime.now())
     }
 
 @app.get("/health")
 async def health():
-    """Detailed Health Check"""
-    active = [k for k, v in MODULE_STATUS.items() if v["status"] == "active"]
-    inactive = [k for k, v in MODULE_STATUS.items() if v["status"] != "active"]
     return {
         "status": "healthy",
-        "active_modules": active,
-        "inactive_modules": inactive,
-        "module_details": MODULE_STATUS
+        "active_modules": list(loaded_modules.keys()),
+        "inactive_modules": [],
+        "module_details": {
+            name: {
+                "status": "active",
+                "source": info["source"],
+                "has_router": info["router"] is not None,
+                "has_handler": info["handler"] is not None
+            }
+            for name, info in loaded_modules.items()
+        }
     }
 
-# ========== MODULE ROUTES ==========
-@app.get("/modules")
+@app.get("/api/modules")
 async def list_modules():
-    """Sab modules ki list"""
     return {
-        "modules": MODULE_STATUS,
-        "summary": {
-            "total": len(MODULE_STATUS),
-            "active": sum(1 for m in MODULE_STATUS.values() if m["status"] == "active"),
-            "missing": sum(1 for m in MODULE_STATUS.values() if m["status"] == "missing"),
-            "error": sum(1 for m in MODULE_STATUS.values() if m["status"] == "error")
-        }
-    }
-
-@app.post("/modules/{module_name}")
-async def call_module(module_name: str, request: ModuleRequest):
-    """Kisi bhi module ko call karo"""
-    if module_name not in ACTIVE_MODULES:
-        raise HTTPException(status_code=404, detail=f"Module '{module_name}' active nahi hai!")
-
-    module = ACTIVE_MODULES[module_name]
-
-    try:
-        if hasattr(module, 'handler'):
-            result = await module.handler(request.action, request.data)
-            return {"module": module_name, "status": "success", "result": result}
-        elif hasattr(module, 'router'):
-            return {"module": module_name, "status": "router_available", "message": "Use direct router endpoints"}
-        else:
-            return {"module": module_name, "status": "loaded", "message": "No handler found"}
-    except Exception as e:
-        logger.error(f"❌ Module {module_name} error: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/modules/{module_name}/status")
-async def module_status(module_name: str):
-    """Kisi module ka status check karo"""
-    if module_name in MODULE_STATUS:
-        return {"module": module_name, **MODULE_STATUS[module_name]}
-    raise HTTPException(status_code=404, detail="Module nahi mila!")
-
-# ========== CHAT / AI BRAIN ==========
-@app.post("/chat")
-async def chat(request: ChatRequest):
-    """Main AI Chat endpoint"""
-    try:
-        # Try AI Chat module first
-        if "ai_chat" in ACTIVE_MODULES:
-            module = ACTIVE_MODULES["ai_chat"]
-            if hasattr(module, 'handler'):
-                result = await module.handler("chat", {
-                    "message": request.message,
-                    "user_id": request.user_id,
-                    "language": request.language
-                })
-                return {"status": "success", "response": result}
-
-        # Fallback to Groq/Gemini
-        return {
-            "status": "success",
-            "response": f"🦁 Singh Ji: '{request.message}' samajh gaya! (Module: {request.module or 'default'})",
-            "language": request.language
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-# ========== SOCIAL MEDIA AUTO-POST ==========
-@app.post("/auto-post")
-async def auto_post(request: AutoPostRequest, background_tasks: BackgroundTasks):
-    """YouTube, Facebook, Instagram auto-post"""
-    platform = request.platform.lower()
-
-    platform_modules = {
-        "youtube": "youtube_auto_upload",
-        "facebook": "facebook_long_token",
-        "instagram": "instagram_auto_post"
-    }
-
-    if platform not in platform_modules:
-        raise HTTPException(status_code=400, detail=f"Platform '{platform}' supported nahi hai!")
-
-    module_name = platform_modules[platform]
-
-    if module_name not in ACTIVE_MODULES:
-        # Fallback direct execution
-        background_tasks.add_task(_direct_post, platform, request.content)
-        return {
-            "status": "queued",
-            "platform": platform,
-            "message": f"{platform.upper()} post queue mein daal diya!",
-            "note": "Module fallback used"
-        }
-
-    module = ACTIVE_MODULES[module_name]
-    try:
-        if hasattr(module, 'handler'):
-            result = await module.handler("post", request.content)
-            return {"status": "success", "platform": platform, "result": result}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-async def _direct_post(platform: str, content: Dict):
-    """Direct post fallback"""
-    logger.info(f"📤 Direct {platform} post: {content.get('title', 'No title')}")
-
-# ========== AGENT SWARM ==========
-@app.post("/agent-swarm")
-async def agent_swarm(request: AgentSwarmRequest):
-    """300 Agent Swarm control"""
-    if "agent_swarm_system" in sys.modules:
-        return {
-            "status": "active",
-            "task": request.task,
-            "agents_deployed": len(request.agents) if request.agents else 300,
-            "priority": request.priority,
-            "message": "🤖 Agent Swarm task deploy ho gaya!"
-        }
-
-    return {
-        "status": "fallback",
-        "task": request.task,
-        "message": "Agent Swarm module load ho raha hai...",
-        "agents": request.agents or ["all"]
-    }
-
-@app.get("/agent-swarm/status")
-async def swarm_status():
-    """Agent Swarm status"""
-    return {
-        "swarm_name": "Singh Ji 310 Agent Swarm",
-        "total_agents": 310,
-        "active_agents": 300,
-        "status": "🟢 OPERATIONAL",
-        "capabilities": [
-            "Content Creation", "Social Media", "Analytics",
-            "Translation", "Voice", "Image Gen", "Code", "Research"
+        "total": len(loaded_modules),
+        "modules": [
+            {
+                "name": name,
+                "source": info["source"],
+                "has_router": info["router"] is not None,
+                "has_handler": info["handler"] is not None
+            }
+            for name, info in loaded_modules.items()
         ]
     }
 
-# ========== TELEGRAM BOT WEBHOOK ==========
-@app.post("/telegram/webhook")
-async def telegram_webhook(request: Request):
-    """Telegram Bot webhook"""
+# ========== MODULE HANDLER ==========
+@app.get("/modules/{module_name}")
+async def module_get(module_name: str, request: Request):
+    if module_name not in loaded_modules:
+        raise HTTPException(status_code=404, detail=f"Module '{module_name}' nahi mila!")
+    
+    info = loaded_modules[module_name]
+    
+    if info["router"]:
+        raise HTTPException(status_code=400, detail="Use router endpoint directly")
+    
+    if info["handler"]:
+        try:
+            body = dict(request.query_params)
+            result = await info["handler"](body) if __import__('inspect').iscoroutinefunction(info["handler"]) else info["handler"](body)
+            return JSONResponse(content={"module": module_name, "data": result})
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+    
+    return JSONResponse(content={"module": module_name, "status": "loaded"})
+
+@app.post("/modules/{module_name}")
+async def module_post(module_name: str, request: Request):
+    if module_name not in loaded_modules:
+        raise HTTPException(status_code=404, detail=f"Module '{module_name}' nahi mila!")
+    
+    info = loaded_modules[module_name]
+    
     try:
-        data = await request.json()
+        body = await request.json()
+    except:
+        body = {}
+    
+    if info["handler"]:
+        try:
+            result = await info["handler"](body) if __import__('inspect').iscoroutinefunction(info["handler"]) else info["handler"](body)
+            return JSONResponse(content={"module": module_name, "data": result})
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+    
+    return JSONResponse(content={"module": module_name, "status": "loaded"})
 
-        if "telegram_bot" in ACTIVE_MODULES:
-            module = ACTIVE_MODULES["telegram_bot"]
-            if hasattr(module, 'handler'):
-                result = await module.handler("webhook", data)
-                return result
+# ========== MOUNT ROUTERS ==========
+def mount_routers():
+    for name, info in loaded_modules.items():
+        if info["router"]:
+            try:
+                prefix = f"/modules/{name}"
+                app.include_router(info["router"], prefix=prefix, tags=[name])
+                logger.info(f"🔗 Router mounted: {prefix}")
+            except Exception as e:
+                logger.error(f"❌ Router mount fail {name}: {e}")
 
-        # Fallback
-        return {"status": "received", "update_id": data.get("update_id")}
-    except Exception as e:
-        logger.error(f"Telegram webhook error: {e}")
-        return {"status": "error", "message": str(e)}
-
-# ========== VOICE SYSTEM ==========
-@app.post("/voice/tts")
-async def text_to_speech(request: Dict):
-    """Text to Speech"""
-    if "voice_tts" in ACTIVE_MODULES:
-        module = ACTIVE_MODULES["voice_tts"]
-        if hasattr(module, 'handler'):
-            return await module.handler("tts", request)
-    return {"status": "fallback", "message": "TTS module load nahi hua"}
-
-@app.post("/voice/stt")
-async def speech_to_text(request: Dict):
-    """Speech to Text"""
-    if "voice" in ACTIVE_MODULES:
-        module = ACTIVE_MODULES["voice"]
-        if hasattr(module, 'handler'):
-            return await module.handler("stt", request)
-    return {"status": "fallback", "message": "STT module load nahi hua"}
-
-# ========== STATIC FILES / ADMIN ==========
-@app.get("/admin", response_class=HTMLResponse)
+# ========== ADMIN ==========
+@app.get("/admin")
 async def admin_dashboard():
-    """Admin Dashboard redirect"""
-    admin_file = Path(__file__).parent / "admin.html"
+    admin_file = TEMPLATES_DIR / "admin.html"
     if admin_file.exists():
-        return admin_file.read_text()
-    return """
-    <html><head><title>Singh Ji AI Admin</title></head>
-    <body style="font-family:Arial;background:#0a0a0a;color:#fff;text-align:center;padding:50px;">
-        <h1>🦁 Singh Ji AI Ultra v8.0</h1>
-        <h2>Admin Dashboard</h2>
-        <p>Modules Active: {}</p>
-        <p>Status: 🟢 LIVE</p>
-        <hr>
-        <p><a href="/" style="color:#00ff88;">API Home</a> | 
-        <a href="/health" style="color:#00ff88;">Health Check</a> | 
-        <a href="/modules" style="color:#00ff88;">All Modules</a></p>
-    </body></html>
-    """.format(sum(1 for m in MODULE_STATUS.values() if m["status"] == "active"))
+        return HTMLResponse(content=admin_file.read_text())
+    return JSONResponse(content={"admin": "Singh Ji AI", "modules": list(loaded_modules.keys())})
 
-# ========== ERROR HANDLERS ==========
-@app.exception_handler(Exception)
-async def global_exception_handler(request: Request, exc: Exception):
-    logger.error(f"💥 Global Error: {str(exc)}")
-    return JSONResponse(
-        status_code=500,
-        content={"status": "error", "message": str(exc), "timestamp": datetime.now().isoformat()}
-    )
-
-# ========== RUN ==========
+# ========== STARTUP ==========
 if __name__ == "__main__":
-    import uvicorn
-    logger.info(f"🚀 Starting Singh Ji AI on {HOST}:{PORT}")
-    uvicorn.run(app, host=HOST, port=PORT, log_level="info")
+    mount_routers()
+    logger.info(f"🚀 Starting on {HOST}:{PORT}")
+    uvicorn.run("main:app", host=HOST, port=PORT, reload=False, log_level="info")
