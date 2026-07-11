@@ -10,7 +10,8 @@ import json
 import requests
 from datetime import datetime
 from typing import Optional, Dict, Any, List
-
+from fastapi import APIRouter
+router = APIRouter()
 # FastAPI imports (for webhook mode)
 try:
     from fastapi import Request
