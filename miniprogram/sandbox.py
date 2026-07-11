@@ -1,4 +1,4 @@
-cat > miniprogram/sandbox.py << 'EOF'
+
 """🦁 Mini-Program Sandbox — 5s, 128MB"""
 import resource, signal
 from contextlib import redirect_stdout, redirect_stderr
