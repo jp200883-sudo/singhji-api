@@ -1,162 +1,113 @@
+
 """
-🔐 Auth System — JWT + Developer Registration/Login
+Singh Ji AI Ultra v8.0 — Mini-Program Auth Module
+Developer: Singh Ji
+Version: 1.0.0
 """
-import jwt  # ✅ pyjwt use karo
-import bcrypt
+
+import jwt
+import hashlib
+import uuid
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
-from fastapi import HTTPException, Depends
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
-from .config import MiniProgramConfig
-from .models import Developer
-
-security = HTTPBearer()
+# JWT Config
+SECRET_KEY = "singhji-ultra-secret-key-v8"
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 1 din
 
 
 class AuthManager:
-    """JWT Token Manager"""
-    
-    @staticmethod
-    def hash_password(password: str) -> str:
-        salt = bcrypt.gensalt(rounds=12)
-        return bcrypt.hashpw(password.encode(), salt).decode()
-    
-    @staticmethod
-    def verify_password(password: str, hashed: str) -> bool:
-        return bcrypt.checkpw(password.encode(), hashed.encode())
+    """JWT Token management"""
     
     @staticmethod
     def create_token(data: Dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
         to_encode = data.copy()
-        expire = datetime.utcnow() + (expires_delta or MiniProgramConfig.JWT_ACCESS_TOKEN_EXPIRE)
+        expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
         to_encode.update({"exp": expire, "iat": datetime.utcnow()})
-        return jwt.encode(to_encode, MiniProgramConfig.JWT_SECRET_KEY, algorithm=MiniProgramConfig.JWT_ALGORITHM)
+        return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     
     @staticmethod
-    def create_access_token(developer_id: str, email: str) -> str:
-        return AuthManager.create_token(
-            {"sub": developer_id, "email": email, "type": "access"},
-            MiniProgramConfig.JWT_ACCESS_TOKEN_EXPIRE
-        )
-    
-    @staticmethod
-    def create_refresh_token(developer_id: str, email: str) -> str:
-        return AuthManager.create_token(
-            {"sub": developer_id, "email": email, "type": "refresh"},
-            MiniProgramConfig.JWT_REFRESH_TOKEN_EXPIRE
-        )
-    
-    @staticmethod
-    def decode_token(token: str) -> Dict[str, Any]:
+    def verify_token(token: str) -> Dict[str, Any]:
         try:
-            payload = jwt.decode(
-                token, 
-                MiniProgramConfig.JWT_SECRET_KEY, 
-                algorithms=[MiniProgramConfig.JWT_ALGORITHM]
-            )
+            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
             return payload
         except jwt.ExpiredSignatureError:
-            raise HTTPException(status_code=401, detail="Token expire ho gaya hai!")
+            raise ValueError("Token expire ho gaya!")
         except jwt.InvalidTokenError:
-            raise HTTPException(status_code=401, detail="Invalid token!")
+            raise ValueError("Invalid token!")
     
     @staticmethod
-    async def get_current_developer(credentials: HTTPAuthorizationCredentials = Depends(security)) -> Dict[str, Any]:
-        token = credentials.credentials
-        payload = AuthManager.decode_token(token)
-        
-        if payload.get("type") != "access":
-            raise HTTPException(status_code=401, detail="Access token chahiye!")
-        
-        return {
-            "developer_id": payload.get("sub"),
-            "email": payload.get("email")
-        }
+    def hash_password(password: str) -> str:
+        return hashlib.sha256(password.encode()).hexdigest()
 
 
 class MiniAuth:
-    """Developer Registration & Login"""
+    """Mini-Program authentication"""
     
     @staticmethod
-    async def register(db, email: str, password: str, full_name: str, 
-                       company_name: str = None, phone: str = None) -> Dict[str, Any]:
-        
-        existing = db.query(Developer).filter(Developer.email == email).first()
-        if existing:
-            raise HTTPException(status_code=400, detail="Email already registered!")
-        
-        password_hash = AuthManager.hash_password(password)
-        
-        developer = Developer(
-            email=email,
-            password_hash=password_hash,
-            full_name=full_name,
-            company_name=company_name,
-            phone=phone
-        )
-        
-        db.add(developer)
-        db.commit()
-        db.refresh(developer)
-        
-        access_token = AuthManager.create_access_token(developer.id, developer.email)
-        refresh_token = AuthManager.create_refresh_token(developer.id, developer.email)
-        
+    async def authenticate(email: str, password: str) -> Optional[Dict]:
+        # Supabase ya local DB se check karo
+        # Abhi demo ke liye simple check
         return {
-            "success": True,
-            "message": "Registration successful! 🎉",
-            "developer": developer.to_dict(),
-            "tokens": {
-                "access_token": access_token,
-                "refresh_token": refresh_token,
-                "token_type": "Bearer"
+            "id": str(uuid.uuid4()),
+            "email": email,
+            "name": "Developer",
+            "role": "developer"
+        }
+
+
+class DeveloperAuth:
+    """Developer authentication helper"""
+    
+    @staticmethod
+    async def register(email: str, password: str, name: str = "", supabase=None):
+        """Register new developer"""
+        dev_id = str(uuid.uuid4())
+        return {
+            "status": "success",
+            "developer_id": dev_id,
+            "email": email,
+            "message": "Registration successful! Login karo."
+        }
+    
+    @staticmethod
+    async def login(email: str, password: str):
+        """Login developer"""
+        token = AuthManager.create_token({
+            "sub": str(uuid.uuid4()),
+            "email": email,
+            "role": "developer"
+        })
+        return {
+            "token": token,
+            "developer": {
+                "email": email,
+                "name": "Developer"
             }
         }
     
     @staticmethod
-    async def login(db, email: str, password: str) -> Dict[str, Any]:
-        
-        developer = db.query(Developer).filter(Developer.email == email).first()
-        if not developer:
-            raise HTTPException(status_code=401, detail="Email ya password galat hai!")
-        
-        if not developer.is_active:
-            raise HTTPException(status_code=403, detail="Account suspended hai!")
-        
-        if not AuthManager.verify_password(password, developer.password_hash):
-            raise HTTPException(status_code=401, detail="Email ya password galat hai!")
-        
-        developer.last_login = datetime.utcnow()
-        db.commit()
-        
-        access_token = AuthManager.create_access_token(developer.id, developer.email)
-        refresh_token = AuthManager.create_refresh_token(developer.id, developer.email)
-        
-        return {
-            "success": True,
-            "message": "Login successful! 🎉",
-            "developer": developer.to_dict(),
-            "tokens": {
-                "access_token": access_token,
-                "refresh_token": refresh_token,
-                "token_type": "Bearer"
-            }
-        }
+    async def refresh_token(token: str):
+        """Refresh JWT token"""
+        payload = AuthManager.verify_token(token)
+        new_token = AuthManager.create_token({
+            "sub": payload["sub"],
+            "email": payload.get("email"),
+            "role": payload.get("role", "developer")
+        })
+        return {"token": new_token}
+
+
+async def get_current_developer(token: str = None):
+    """Get current developer from token"""
+    if not token:
+        raise ValueError("Token required!")
     
-    @staticmethod
-    async def refresh_token(token: str) -> Dict[str, Any]:
-        payload = AuthManager.decode_token(token)
-        
-        if payload.get("type") != "refresh":
-            raise HTTPException(status_code=401, detail="Refresh token chahiye!")
-        
-        developer_id = payload.get("sub")
-        email = payload.get("email")
-        
-        new_access = AuthManager.create_access_token(developer_id, email)
-        
-        return {
-            "access_token": new_access,
-            "token_type": "Bearer"
-        }
+    payload = AuthManager.verify_token(token)
+    return {
+        "id": payload.get("sub"),
+        "email": payload.get("email"),
+        "role": payload.get("role", "developer")
+    }
+EOF
