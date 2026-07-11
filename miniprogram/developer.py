@@ -1,4 +1,4 @@
-cat > miniprogram/developer.py << 'EOF'
+
 """🦁 Developer Portal & Analytics"""
 from datetime import datetime
 
