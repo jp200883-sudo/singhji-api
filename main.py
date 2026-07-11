@@ -12,7 +12,6 @@ import sys
 import json
 import time
 import asyncio
-import aiohttp
 import requests
 from datetime import datetime
 import logging
