@@ -167,10 +167,10 @@ async def lifespan(app: FastAPI):
     logger.info("🚀 Singh Ji AI Ultra v8.0 starting...")
     discover_modules()
     discover_root_files()
+    mount_routers() 
     logger.info(f"📦 Total modules: {len(loaded_modules)}")
     yield
     logger.info("🛑 Shutting down...")
-
 # ========== APP ==========
 app = FastAPI(
     title="🦁 Singh Ji AI Ultra v8.0",
