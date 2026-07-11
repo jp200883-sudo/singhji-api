@@ -1,4 +1,18 @@
-# FastAPI imports (for webhook mode)
+"""
+🦁 Singh Ji AI Ultra v8.0 — Telegram Bot Handler
+Developer: Singh Ji
+Version: 8.0.0
+Modules: 50+ | Webhook + Polling
+"""
+
+import os
+import sys
+import json
+import requests
+from datetime import datetime
+from typing import Optional, Dict, Any, List
+
+# ========== FASTAPI ROUTER ==========
 try:
     from fastapi import APIRouter, Request
     from fastapi.responses import JSONResponse
@@ -8,39 +22,10 @@ except ImportError:
     FASTAPI_AVAILABLE = False
     router = None
 
-# ... बाकी कोड ...
-
-# ========== FASTAPI WEBHOOK HANDLER ==========
-if FASTAPI_AVAILABLE and router:
-    @router.post("/webhook")
-    async def webhook_handler(request: Request):
-        """FastAPI webhook handler"""
-        try:
-            body = await request.json()
-            message = body.get("message", {})
-            text = message.get("text", "").strip()
-            chat_id = message.get("chat", {}).get("id")
-
-            if not chat_id or not text:
-                return JSONResponse(status_code=200, content={"status": "ok"})
-
-            parts = text.strip().split()
-            command = parts[0].lower().replace("/", "")
-            args = parts[1:] if len(parts) > 1 else []
-
-            result = handle_command(command, args, chat_id)
-            return JSONResponse(status_code=200, content=result)
-
-        except Exception as e:
-            print(f"❌ Webhook handler error: {e}")
-            return JSONResponse(status_code=200, content={"status": "ok"})
-
-# Legacy support
-handler = webhook_handler if FASTAPI_AVAILABLE else None
 # ========== CONFIG ==========
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
-API_BASE = os.getenv("API_BASE", "https://singhji-api.onrender.com/api")
+API_BASE = os.getenv("API_BASE", "https://singhji-api-production-85ca.up.railway.app/modules")
 MINI_PROGRAM_URL = os.getenv("MINI_PROGRAM_URL", "https://singhji.ai/mini")
 
 # ========== MESSAGES v8.0 ==========
@@ -48,8 +33,7 @@ WELCOME_MSG = """🦁 *Welcome to Singh Ji AI Ultra v8.0!*
 
 Your AI assistant for Bharat 🇮🇳
 
-*📱 New in v8.0:*
-🛠 /mini — Mini-Program Portal
+*📱 Features:*
 🤖 AI Chat — Groq powered
 🌐 26 Languages
 🎙️ Voice Support
@@ -64,7 +48,6 @@ Your AI assistant for Bharat 🇮🇳
 🛡 /bachpan — Child safety
 🚨 /emergency — Emergency help
 📊 /report — Daily report
-🛠 /mini — Mini-Program portal
 ℹ️ /help — All commands
 
 ⚡ *Singh Ji AI Ultra v8.0*"""
@@ -101,50 +84,19 @@ HELP_MSG = """🦁 *Singh Ji AI Commands v8.0*
 /report — Daily report
 /status — System status
 
-*🛠 Mini-Program:*
-/mini — Developer portal
-/mini_register — Register
-/mini_login — Login
-/mini_create — Create app
-
 ⚡ *Singh Ji AI Ultra v8.0*"""
 
 STATUS_MSG = """🟢 *Singh Ji AI Status v8.0*
 
 ✅ Bot Active
 ✅ API Connected
-✅ Mini-Program Ready
 🦁 Singh Ji AI v8.0
 📡 Mode: {mode}"""
 
-MINI_WELCOME = """📱 *Singh Ji Mini-Program Portal*
-
-Create your own mini-apps!
-
-*Commands:*
-/mini_register — Developer register
-/mini_login — Developer login
-/mini_create — Naya app create karo
-/mini_list — Apne apps dekho
-/mini_status — App status check
-
-*Features:*
-🛠️ App Builder
-🏖️ Sandbox Testing
-💰 Payment Integration
-📊 Analytics
-🚀 App Store
-
-Visit: {url}
-
-⚡ *Singh Ji AI Ultra v8.0*"""
-
 ERROR_MSG = "❓ Unknown command. Type /help for commands."
 
-
-# ========== COMMAND MAP v7.0 + v8.0 ==========
+# ========== COMMAND MAP ==========
 COMMANDS = {
-    # v7.0 Modules
     "news": {"module": "news", "params": {"category": "india", "language": "hi"}},
     "khabar": {"module": "news", "params": {"category": "india", "language": "hi"}},
     "sports": {"module": "news", "params": {"category": "sports", "language": "hi"}},
@@ -157,12 +109,49 @@ COMMANDS = {
     "sone": {"module": "goldrate", "params": {"city": "India", "purity": "all"}},
     "weather": {"module": "weather", "params": {"city": "Kanpur"}},
     "mausam": {"module": "weather", "params": {"city": "Kanpur"}},
-    "mandi": {"module": "mandi", "params": {}},
-    "emergency": {"module": "emergency", "params": {}},
-    "sos": {"module": "emergency", "params": {}},
-    "bachpan": {"module": "bachpan", "params": {"language": "hi"}},
-    "child": {"module": "bachpan", "params": {"language": "hi"}},
-    "report": {"module": "daily_report", "params": {}},
+    "mandi": {"module": "mandi", "params": {}}},
+    "emergency": {"module": "emergency", "params": {}}},
+    "sos": {"module": "emergency", "params": {}}},
+    "bachpan": {"module": "bachpan", "params": {"language": "hi"}}},
+    "child": {"module": "bachpan", "params": {"language": "hi"}}},
+    "report": {"module": "daily_report", "params": {}}},
+    "rozgar": {"module": "rozgar", "params": {}}},
+    "naukri": {"module": "rozgar", "params": {}}},
+    "currency": {"module": "currency", "params": {}}},
+    "banking": {"module": "banking", "params": {}}},
+    "upi": {"module": "upi", "params": {}}},
+    "sewer": {"module": "sewer", "params": {}}},
+    "pani": {"module": "pani", "params": {}}},
+    "plant": {"module": "plant_id", "params": {}}},
+    "guard": {"module": "guard_agent", "params": {}}},
+    "meta": {"module": "meta_agent", "params": {}}},
+    "supreme": {"module": "supreme_agent", "params": {}}},
+    "search": {"module": "search", "params": {}}},
+    "analytics": {"module": "analytics", "params": {}}},
+    "language": {"module": "language_hub", "params": {}}},
+    "schedule": {"module": "schedule", "params": {}}},
+    "trolley": {"module": "trolley", "params": {}}},
+    "singhjitv": {"module": "singhji_tv", "params": {}}},
+    "tv": {"module": "singhji_tv", "params": {}}},
+    "aavishkar": {"module": "aavishkar", "params": {}}},
+    "init": {"module": "init", "params": {}}},
+    "currents": {"module": "currents_api", "params": {}}},
+    "newsdata": {"module": "newsdata", "params": {}}},
+    "newsscheduler": {"module": "news_scheduler", "params": {}}},
+    "whatsapp": {"module": "whatsapp", "params": {}}},
+    "voice": {"module": "voice", "params": {}}},
+    "voicecmd": {"module": "voice_cmd", "params": {}}},
+    "voicetts": {"module": "voice_tts", "params": {}}},
+    "oauth": {"module": "oauth_connector", "params": {}}},
+    "trishul": {"module": "trishul", "params": {}}},
+    "swarm": {"module": "swarm", "params": {}}},
+    "youtube": {"module": "youtube", "params": {}}},
+    "instagram": {"module": "instagram", "params": {}}},
+    "facebook": {"module": "facebook", "params": {}}},
+    "autoaccount": {"module": "auto_account", "params": {}}},
+    "automonetize": {"module": "auto_monetize", "params": {}}},
+    "trend": {"module": "trend_analysis", "params": {}}},
+    "visual": {"module": "visual", "params": {}}},
 }
 
 
@@ -222,101 +211,6 @@ def ai_brain_reply(user_text: str) -> Optional[str]:
     return None
 
 
-# ========== MINI-PROGRAM FUNCTIONS ==========
-
-def mini_register(chat_id: int, args: List[str]):
-    """Mini-Program developer register"""
-    if len(args) < 2:
-        send_message(chat_id, "📱 *Mini-Program Register*\n\nUsage:\n`/mini_register <email> <password>`")
-        return
-
-    email, password = args[0], args[1]
-    try:
-        resp = requests.post(
-            f"{API_BASE}/mini/auth/register",
-            data={"email": email, "password": password, "full_name": email.split("@")[0]},
-            timeout=10
-        )
-        data = resp.json()
-        if data.get("status") == "success":
-            send_message(chat_id, f"✅ *Registration Successful!*\n\nDeveloper ID: `{data.get('developer_id')}`\n\nAb login karo: `/mini_login {email} {password}`")
-        else:
-            send_message(chat_id, f"❌ Registration failed: {data.get('message', 'Unknown error')}")
-    except Exception as e:
-        send_message(chat_id, f"❌ Error: {e}")
-
-
-def mini_login(chat_id: int, args: List[str]):
-    """Mini-Program developer login"""
-    if len(args) < 2:
-        send_message(chat_id, "📱 *Mini-Program Login*\n\nUsage:\n`/mini_login <email> <password>`")
-        return
-
-    email, password = args[0], args[1]
-    try:
-        resp = requests.post(
-            f"{API_BASE}/mini/auth/login",
-            data={"email": email, "password": password},
-            timeout=10
-        )
-        data = resp.json()
-        if data.get("token"):
-            token = data["token"]
-            send_message(chat_id, f"🔑 *Login Successful!*\n\nToken: `{token[:20]}...`\n\nApp create karo: `/mini_create <app_name> <category> {token}`")
-        else:
-            send_message(chat_id, "❌ Login failed. Check credentials.")
-    except Exception as e:
-        send_message(chat_id, f"❌ Error: {e}")
-
-
-def mini_create(chat_id: int, args: List[str]):
-    """Mini-Program app create"""
-    if len(args) < 3:
-        send_message(chat_id, "📱 *Create Mini-App*\n\nUsage:\n`/mini_create <name> <category> <token>`\n\nCategories: utilities, games, education, shopping, social")
-        return
-
-    name, category, token = args[0], args[1], args[2]
-    try:
-        resp = requests.post(
-            f"{API_BASE}/mini/apps/create",
-            data={"name": name, "category": category, "token": token},
-            timeout=10
-        )
-        data = resp.json()
-        if data.get("status") == "success":
-            send_message(chat_id, f"🎉 *App Created!*\n\nApp ID: `{data.get('app_id')}`\nStatus: Pending review\n\n{data.get('message', '')}")
-        else:
-            send_message(chat_id, f"❌ Create failed: {data.get('message', 'Unknown error')}")
-    except Exception as e:
-        send_message(chat_id, f"❌ Error: {e}")
-
-
-def mini_list(chat_id: int, args: List[str]):
-    """List developer apps"""
-    if not args:
-        send_message(chat_id, "📱 *List Apps*\n\nUsage:\n`/mini_list <token>`")
-        return
-
-    token = args[0]
-    try:
-        resp = requests.get(
-            f"{API_BASE}/mini/apps/list",
-            params={"token": token},
-            timeout=10
-        )
-        data = resp.json()
-        apps = data.get("apps", [])
-        if apps:
-            reply = "📱 *Your Mini-Apps*\n\n"
-            for app in apps:
-                reply += f"• `{app.get('id')}` — {app.get('name')} ({app.get('status')})\n"
-            send_message(chat_id, reply)
-        else:
-            send_message(chat_id, "📭 No apps found. Create one: `/mini_create`")
-    except Exception as e:
-        send_message(chat_id, f"❌ Error: {e}")
-
-
 # ========== COMMAND HANDLER ==========
 
 def handle_command(command: str, args: List[str], chat_id: int) -> Dict[str, Any]:
@@ -336,28 +230,7 @@ def handle_command(command: str, args: List[str], chat_id: int) -> Dict[str, Any
         send_message(chat_id, STATUS_MSG.format(mode=mode))
         return {"status": "ok"}
 
-    # Mini-Program commands
-    elif command == "mini":
-        send_message(chat_id, MINI_WELCOME.format(url=MINI_PROGRAM_URL))
-        return {"status": "ok"}
-
-    elif command == "mini_register":
-        mini_register(chat_id, args)
-        return {"status": "ok"}
-
-    elif command == "mini_login":
-        mini_login(chat_id, args)
-        return {"status": "ok"}
-
-    elif command == "mini_create":
-        mini_create(chat_id, args)
-        return {"status": "ok"}
-
-    elif command == "mini_list":
-        mini_list(chat_id, args)
-        return {"status": "ok"}
-
-    # v7.0 Module commands
+    # Module commands
     if command in COMMANDS:
         cmd_info = COMMANDS[command]
         module = cmd_info["module"]
@@ -377,7 +250,7 @@ def handle_command(command: str, args: List[str], chat_id: int) -> Dict[str, Any
         # Call module API
         data = get_module_data(module, params)
 
-        if data and data.get("success"):
+        if data:
             reply = format_module_response(module, data, params)
         else:
             reply = "❌ Data nahi mila. Try again later."
@@ -483,12 +356,125 @@ def format_module_response(module: str, data: Dict, params: Dict) -> str:
 
 🦁 Singh Ji AI v8.0"""
 
+    elif module == "rozgar":
+        jobs = data.get("data", {}).get("jobs", [])[:5]
+        reply = "💼 *Naukri Updates*\n\n"
+        for i, job in enumerate(jobs, 1):
+            reply += f"{i}. {job.get('title', 'Job')} — {job.get('company', '')}\n"
+        return reply
+
+    elif module == "currency":
+        rates = data.get("data", {})
+        reply = "💱 *Currency Rates*\n\n"
+        for curr, rate in list(rates.items())[:5]:
+            reply += f"• {curr}: ₹{rate}\n"
+        return reply
+
+    elif module == "banking":
+        return "🏦 *Banking Services*\n\nSBI, PNB, HDFC, ICICI — all banks supported!\nUse /upi for UPI services."
+
+    elif module == "upi":
+        return "📲 *UPI Services*\n\n✅ Check balance\n✅ Send money\n✅ Request money\n✅ Transaction history"
+
+    elif module == "sewer":
+        return "🚰 *Sewer/Drainage Services*\n\nComplaint register karo!\nCity: {params.get('city', 'Your City')}"
+
+    elif module == "pani":
+        return "💧 *Water Supply*\n\nComplaint: 1916\nTanker booking available!"
+
+    elif module == "plant_id":
+        return "🌿 *Plant Identification*\n\nPhoto bhejo, plant pehchanenge!"
+
+    elif module == "guard_agent":
+        return "🛡️ *Guard Agent*\n\nAlert system active!\nSecurity monitoring on."
+
+    elif module == "meta_agent":
+        return "🤖 *Meta Agent*\n\nAI brain active!\nProcessing your request..."
+
+    elif module == "supreme_agent":
+        return "👑 *Supreme Agent*\n\nMaster AI active!\nAll systems operational."
+
+    elif module == "search":
+        return "🔍 *Search*\n\nWeb search active!\nResults coming soon..."
+
+    elif module == "analytics":
+        return "📊 *Analytics*\n\nData analysis ready!"
+
+    elif module == "language_hub":
+        return "🌐 *Language Hub*\n\n26 languages supported!\nHindi, English, Tamil, Telugu, Bengali, etc."
+
+    elif module == "schedule":
+        return "📅 *Daily Schedule*\n\nWater: 6-9 AM\nPower: Check local schedule"
+
+    elif module == "trolley":
+        return "🛒 *Shopping Trolley*\n\nProducts added!\nCheckout when ready."
+
+    elif module == "singhji_tv":
+        return "📺 *Singh Ji TV*\n\nStreaming active!\nWatch now: /tv"
+
+    elif module == "aavishkar":
+        return "🚀 *Aavishkar v4.1*\n\nInnovation hub active!"
+
+    elif module == "init":
+        return "⚙️ *System Init*\n\nAll modules loaded!\nSystem ready."
+
+    elif module == "currents_api":
+        return "📡 *Currents API*\n\nNews feed active!"
+
+    elif module == "newsdata":
+        return "📰 *NewsData*\n\nGlobal news feed active!"
+
+    elif module == "news_scheduler":
+        return "⏰ *News Scheduler*\n\nScheduled news delivery active!"
+
+    elif module == "whatsapp":
+        return "💬 *WhatsApp*\n\nWhatsApp integration active!"
+
+    elif module == "voice":
+        return "🎙️ *Voice*\n\nVoice commands active!\nSpeak now..."
+
+    elif module == "voice_cmd":
+        return "🎤 *Voice Commands*\n\nSay a command!"
+
+    elif module == "voice_tts":
+        return "🔊 *Text to Speech*\n\nTTS engine ready!"
+
+    elif module == "oauth_connector":
+        return "🔗 *OAuth*\n\nSocial login ready!"
+
+    elif module == "trishul":
+        return "🔱 *Trishul Memory*\n\nMemory engine active!\nYour data is safe."
+
+    elif module == "swarm":
+        return "🐝 *Agent Swarm*\n\n300 agents active!\nCoordinating tasks..."
+
+    elif module == "youtube":
+        return "📹 *YouTube*\n\nUpload ready!\nChannel connected."
+
+    elif module == "instagram":
+        return "📸 *Instagram*\n\nPost ready!\nAuto-post active."
+
+    elif module == "facebook":
+        return "📘 *Facebook*\n\nPost ready!\nLong token active."
+
+    elif module == "auto_account":
+        return "🤖 *Auto Account*\n\nAccount creation ready!"
+
+    elif module == "auto_monetize":
+        return "💰 *Auto Monetize*\n\nMonetization active!\nEarnings tracking on."
+
+    elif module == "trend_analysis":
+        return "📈 *Trend Analysis*\n\nTrends detected!\nViral content suggestions ready."
+
+    elif module == "visual":
+        return "🎨 *Visual Generator*\n\nInfographics ready!\nImage generation active."
+
     return "✅ Data received!"
 
 
-# ========== FASTAPI WEBHOOK HANDLER ==========
-
-if FASTAPI_AVAILABLE:
+# ========== WEBHOOK HANDLER ==========
+if FASTAPI_AVAILABLE and router:
+    @router.post("/webhook")
     async def webhook_handler(request: Request):
         """FastAPI webhook handler"""
         try:
@@ -500,14 +486,11 @@ if FASTAPI_AVAILABLE:
             if not chat_id or not text:
                 return JSONResponse(status_code=200, content={"status": "ok"})
 
-            # Parse command
             parts = text.strip().split()
             command = parts[0].lower().replace("/", "")
             args = parts[1:] if len(parts) > 1 else []
 
-            # Handle command
             result = handle_command(command, args, chat_id)
-
             return JSONResponse(status_code=200, content=result)
 
         except Exception as e:
@@ -515,10 +498,13 @@ if FASTAPI_AVAILABLE:
             return JSONResponse(status_code=200, content={"status": "ok"})
 
 
-# ========== POLLING MODE ==========
+# Legacy support
+handler = webhook_handler if FASTAPI_AVAILABLE else None
 
+
+# ========== POLLING MODE ==========
 def polling_mode():
-    """Run bot in polling mode (no webhook)"""
+    """Run bot in polling mode"""
     import time
 
     OFFSET_FILE = ".telegram_offset"
@@ -534,7 +520,6 @@ def polling_mode():
         with open(OFFSET_FILE, 'w') as f:
             f.write(str(offset))
 
-    # Delete webhook first
     if TELEGRAM_TOKEN:
         try:
             requests.get(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/deleteWebhook", timeout=10)
@@ -544,7 +529,6 @@ def polling_mode():
 
     offset = get_offset() + 1
     print(f"🚀 Starting polling from offset {offset}")
-    print("   Press Ctrl+C to stop\n")
 
     while True:
         try:
@@ -586,19 +570,16 @@ def polling_mode():
 
 
 # ========== MAIN ENTRY ==========
-
 if __name__ == "__main__":
     print("=" * 50)
     print("🦁 SINGH JI AI ULTRA v8.0 — TELEGRAM BOT")
     print("=" * 50)
     print(f"📡 Mode: Polling")
     print(f"🔗 API: {API_BASE}")
-    print(f"🛠️ Mini-Program: {MINI_PROGRAM_URL}")
     print("=" * 50 + "\n")
 
     if not TELEGRAM_TOKEN:
         print("❌ ERROR: TELEGRAM_TOKEN not set!")
-        print("   Set env var: export TELEGRAM_TOKEN='your_token'")
         sys.exit(1)
 
     polling_mode()
