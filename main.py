@@ -1,75 +1,62 @@
-"""
-🦁 SINGH JI AI ULTRA v8.0 — SARWAN 330 AGENT SWARM
-Railway Primary Deploy — Clean & Stable
-"""
-
-from fastapi import FastAPI, Request
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from contextlib import asynccontextmanager
+from fastapi import FastAPI
+from sqlalchemy import create_engine, text
+from sqlalchemy.orm import sessionmaker
 import os
-import sys
-import json
-import time
-import asyncio
-import requests
-from datetime import datetime
 import logging
+from datetime import datetime
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# ═══════════════════════════════════════════════════════
-# 🦁 MINI-PROGRAM IMPORTS
-# ═══════════════════════════════════════════════════════
-try:
-    from miniprogram.auth import MiniAuth
-    from miniprogram.payment import MiniPayment
-    from miniprogram.storage import MiniStorage
-    from miniprogram.developer import DeveloperPortal
-    MINIPROGRAM_AVAILABLE = True
-except ImportError as e:
-    logger.warning(f"Mini-Program modules not available: {e}")
-    MINIPROGRAM_AVAILABLE = False
-    # Fallback classes
-    class MiniAuth:
-        @staticmethod
-        def register_developer(*args, **kwargs):
-            return {"status": "demo", "message": "Mini-Program auth not available"}
-        @staticmethod
-        def submit_app(*args, **kwargs):
-            return {"status": "demo", "message": "Mini-Program auth not available"}
-        @staticmethod
-        def generate_token(*args, **kwargs):
-            return "demo-token"
-        @staticmethod
-        def validate_token(*args, **kwargs):
-            return {"user_id": "demo", "app_id": "demo"}
-        @staticmethod
-        def approve_app(*args, **kwargs):
-            return {"status": "approved"}
-        APPROVED_APPS = {}
+app = FastAPI(title="Singh Ji AI Ultra v8.0")
 
-    class MiniPayment:
-        @staticmethod
-        def process(*args, **kwargs):
-            return {"status": "demo", "message": "Payment gateway on hold"}
+# Database
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./singhji.db")
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
-    class MiniStorage:
-        @staticmethod
-        def put(*args, **kwargs):
-            return {"status": "saved"}
-        @staticmethod
-        def get(*args, **kwargs):
-            return {"status": "demo", "value": None}
+engine = create_engine(
+    DATABASE_URL,
+    pool_pre_ping=True,
+    pool_recycle=300,
+    connect_args={"connect_timeout": 10} if "postgresql" in DATABASE_URL else {}
+)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-    class DeveloperPortal:
-        @staticmethod
-        def get_dashboard(*args, **kwargs):
-            return {"status": "demo"}
-        @staticmethod
-        def get_all_apps(*args, **kwargs):
-            return []
+@app.on_event("startup")
+async def startup():
+    logger.info("🚀 Startup begin...")
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        logger.info("✅ Database connected!")
+    except Exception as e:
+        logger.error(f"❌ Database failed: {e}")
+        return
+    
+    try:
+        from miniprogram.models import Base
+        Base.metadata.create_all(bind=engine)
+        logger.info("✅ Mini-Program tables created!")
+    except Exception as e:
+        logger.warning(f"⚠️ Tables error: {e}")
+    
+    try:
+        from miniprogram.portal import router as miniprogram_router
+        app.include_router(miniprogram_router)
+        logger.info("✅ Mini-Program router loaded!")
+    except Exception as e:
+        logger.warning(f"⚠️ Router error: {e}")
+    
+    logger.info("🚀 Startup complete!")
+
+@app.get("/health")
+async def health():
+    return {"status": "ok", "version": "8.0", "timestamp": datetime.utcnow().isoformat()}
+
+@app.get("/")
+async def root():
+    return {"message": "Singh Ji AI Ultra v8.0 🔥", "status": "live"}
 
 # ═══════════════════════════════════════════════════════
 # 🦁 ALL API KEYS
