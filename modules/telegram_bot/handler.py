@@ -2,7 +2,7 @@
 🦁 Singh Ji AI Ultra v8.0 — Telegram Bot Handler
 Developer: Singh Ji
 Version: 8.0.0
-Modules: 50+ | Webhook + Polling
+Modules: 50+
 """
 
 import os
@@ -26,17 +26,11 @@ except ImportError:
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 API_BASE = os.getenv("API_BASE", "https://singhji-api-production-85ca.up.railway.app/modules")
-MINI_PROGRAM_URL = os.getenv("MINI_PROGRAM_URL", "https://singhji.ai/mini")
 
-# ========== MESSAGES v8.0 ==========
+# ========== MESSAGES ==========
 WELCOME_MSG = """🦁 *Welcome to Singh Ji AI Ultra v8.0!*
 
 Your AI assistant for Bharat 🇮🇳
-
-*📱 Features:*
-🤖 AI Chat — Groq powered
-🌐 26 Languages
-🎙️ Voice Support
 
 *Commands:*
 📰 /news — Latest news
@@ -52,41 +46,22 @@ Your AI assistant for Bharat 🇮🇳
 
 ⚡ *Singh Ji AI Ultra v8.0*"""
 
-HELP_MSG = """🦁 *Singh Ji AI Commands v8.0*
+HELP_MSG = """🦁 *Singh Ji AI Commands*
 
-*📰 News:*
-/news — India news
-/sports — Sports news
-/business — Business news
+*📰 News:* /news /sports /business
+*🔮 Horoscope:* /rashifal [rashi]
+*⛽ Fuel:* /fuel [city]
+*🪙 Gold:* /gold [city]
+*🌤 Weather:* /weather [city]
+*🌾 Mandi:* /mandi
+*🛡 Bachpan:* /bachpan
+*🚨 Emergency:* /emergency
+*📊 Report:* /report
+*ℹ️ Status:* /status
 
-*🔮 Horoscope:*
-/rashifal [rashi] — Daily horoscope
+⚡ *Singh Ji AI v8.0*"""
 
-*⛽ Fuel:*
-/fuel [city] — Fuel prices
-
-*🪙 Gold:*
-/gold [city] — Gold/Silver rates
-
-*🌤 Weather:*
-/weather [city] — Weather update
-
-*🌾 Agriculture:*
-/mandi — Mandi rates
-
-*🛡 Child Safety:*
-/bachpan — Safety tips
-
-*🚨 Emergency:*
-/emergency — Emergency numbers
-
-*📊 Reports:*
-/report — Daily report
-/status — System status
-
-⚡ *Singh Ji AI Ultra v8.0*"""
-
-STATUS_MSG = """🟢 *Singh Ji AI Status v8.0*
+STATUS_MSG = """🟢 *Singh Ji AI Status*
 
 ✅ Bot Active
 ✅ API Connected
@@ -109,58 +84,57 @@ COMMANDS = {
     "sone": {"module": "goldrate", "params": {"city": "India", "purity": "all"}},
     "weather": {"module": "weather", "params": {"city": "Kanpur"}},
     "mausam": {"module": "weather", "params": {"city": "Kanpur"}},
+    "mandi": {"module": "mandi", "params": {}},
     "emergency": {"module": "emergency", "params": {}},
     "sos": {"module": "emergency", "params": {}},
-    "sos": {"module": "emergency", "params": {}},
-    "bachpan": {"module": "bachpan", "params": {"language": "hi"}}},
-    "child": {"module": "bachpan", "params": {"language": "hi"}}},
-    "report": {"module": "daily_report", "params": {}}},
-    "rozgar": {"module": "rozgar", "params": {}}},
-    "naukri": {"module": "rozgar", "params": {}}},
-    "currency": {"module": "currency", "params": {}}},
-    "banking": {"module": "banking", "params": {}}},
-    "upi": {"module": "upi", "params": {}}},
-    "sewer": {"module": "sewer", "params": {}}},
-    "pani": {"module": "pani", "params": {}}},
-    "plant": {"module": "plant_id", "params": {}}},
-    "guard": {"module": "guard_agent", "params": {}}},
-    "meta": {"module": "meta_agent", "params": {}}},
-    "supreme": {"module": "supreme_agent", "params": {}}},
-    "search": {"module": "search", "params": {}}},
-    "analytics": {"module": "analytics", "params": {}}},
-    "language": {"module": "language_hub", "params": {}}},
-    "schedule": {"module": "schedule", "params": {}}},
-    "trolley": {"module": "trolley", "params": {}}},
-    "singhjitv": {"module": "singhji_tv", "params": {}}},
-    "tv": {"module": "singhji_tv", "params": {}}},
-    "aavishkar": {"module": "aavishkar", "params": {}}},
-    "init": {"module": "init", "params": {}}},
-    "currents": {"module": "currents_api", "params": {}}},
-    "newsdata": {"module": "newsdata", "params": {}}},
-    "newsscheduler": {"module": "news_scheduler", "params": {}}},
-    "whatsapp": {"module": "whatsapp", "params": {}}},
-    "voice": {"module": "voice", "params": {}}},
-    "voicecmd": {"module": "voice_cmd", "params": {}}},
-    "voicetts": {"module": "voice_tts", "params": {}}},
-    "oauth": {"module": "oauth_connector", "params": {}}},
-    "trishul": {"module": "trishul", "params": {}}},
-    "swarm": {"module": "swarm", "params": {}}},
-    "youtube": {"module": "youtube", "params": {}}},
-    "instagram": {"module": "instagram", "params": {}}},
-    "facebook": {"module": "facebook", "params": {}}},
-    "autoaccount": {"module": "auto_account", "params": {}}},
-    "automonetize": {"module": "auto_monetize", "params": {}}},
-    "trend": {"module": "trend_analysis", "params": {}}},
-    "visual": {"module": "visual", "params": {}}},
+    "bachpan": {"module": "bachpan", "params": {"language": "hi"}},
+    "child": {"module": "bachpan", "params": {"language": "hi"}},
+    "report": {"module": "daily_report", "params": {}},
+    "rozgar": {"module": "rozgar", "params": {}},
+    "naukri": {"module": "rozgar", "params": {}},
+    "currency": {"module": "currency", "params": {}},
+    "banking": {"module": "banking", "params": {}},
+    "upi": {"module": "upi", "params": {}},
+    "sewer": {"module": "sewer", "params": {}},
+    "pani": {"module": "pani", "params": {}},
+    "plant": {"module": "plant_id", "params": {}},
+    "guard": {"module": "guard_agent", "params": {}},
+    "meta": {"module": "meta_agent", "params": {}},
+    "supreme": {"module": "supreme_agent", "params": {}},
+    "search": {"module": "search", "params": {}},
+    "analytics": {"module": "analytics", "params": {}},
+    "language": {"module": "language_hub", "params": {}},
+    "schedule": {"module": "schedule", "params": {}},
+    "trolley": {"module": "trolley", "params": {}},
+    "singhjitv": {"module": "singhji_tv", "params": {}},
+    "tv": {"module": "singhji_tv", "params": {}},
+    "aavishkar": {"module": "aavishkar", "params": {}},
+    "init": {"module": "init", "params": {}},
+    "currents": {"module": "currents_api", "params": {}},
+    "newsdata": {"module": "newsdata", "params": {}},
+    "newsscheduler": {"module": "news_scheduler", "params": {}},
+    "whatsapp": {"module": "whatsapp", "params": {}},
+    "voice": {"module": "voice", "params": {}},
+    "voicecmd": {"module": "voice_cmd", "params": {}},
+    "voicetts": {"module": "voice_tts", "params": {}},
+    "oauth": {"module": "oauth_connector", "params": {}},
+    "trishul": {"module": "trishul", "params": {}},
+    "swarm": {"module": "swarm", "params": {}},
+    "youtube": {"module": "youtube", "params": {}},
+    "instagram": {"module": "instagram", "params": {}},
+    "facebook": {"module": "facebook", "params": {}},
+    "autoaccount": {"module": "auto_account", "params": {}},
+    "automonetize": {"module": "auto_monetize", "params": {}},
+    "trend": {"module": "trend_analysis", "params": {}},
+    "visual": {"module": "visual", "params": {}},
 }
 
 
 # ========== TELEGRAM FUNCTIONS ==========
 
 def send_message(chat_id: int, text: str, parse_mode: str = "Markdown") -> bool:
-    """Send message to Telegram"""
     if not TELEGRAM_TOKEN:
-        print("❌ TELEGRAM_TOKEN not set!")
+        print("TELEGRAM_TOKEN not set!")
         return False
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
     try:
@@ -171,12 +145,11 @@ def send_message(chat_id: int, text: str, parse_mode: str = "Markdown") -> bool:
         }, timeout=10)
         return resp.json().get("ok", False)
     except Exception as e:
-        print(f"❌ send_message error: {e}")
+        print(f"send_message error: {e}")
         return False
 
 
 def get_module_data(module_name: str, params: Optional[Dict] = None) -> Optional[Dict]:
-    """Get data from any module via API"""
     try:
         url = f"{API_BASE}/{module_name}"
         if params:
@@ -186,12 +159,11 @@ def get_module_data(module_name: str, params: Optional[Dict] = None) -> Optional
         if resp.status_code == 200:
             return resp.json()
     except Exception as e:
-        print(f"❌ Module {module_name} error: {e}")
+        print(f"Module {module_name} error: {e}")
     return None
 
 
 def ai_brain_reply(user_text: str) -> Optional[str]:
-    """Get AI reply from Groq"""
     try:
         if GROQ_API_KEY:
             resp = requests.post(
@@ -207,16 +179,13 @@ def ai_brain_reply(user_text: str) -> Optional[str]:
             if resp.status_code == 200:
                 return resp.json()["choices"][0]["message"]["content"]
     except Exception as e:
-        print(f"❌ AI brain error: {e}")
+        print(f"AI brain error: {e}")
     return None
 
 
 # ========== COMMAND HANDLER ==========
 
 def handle_command(command: str, args: List[str], chat_id: int) -> Dict[str, Any]:
-    """Handle any command and send reply"""
-
-    # Basic commands
     if command == "start":
         send_message(chat_id, WELCOME_MSG)
         return {"status": "ok"}
@@ -230,13 +199,11 @@ def handle_command(command: str, args: List[str], chat_id: int) -> Dict[str, Any
         send_message(chat_id, STATUS_MSG.format(mode=mode))
         return {"status": "ok"}
 
-    # Module commands
     if command in COMMANDS:
         cmd_info = COMMANDS[command]
         module = cmd_info["module"]
         params = cmd_info["params"].copy()
 
-        # Update params with user args
         if args:
             if command in ["rashifal", "horoscope"]:
                 params["rashi"] = args[0]
@@ -247,18 +214,16 @@ def handle_command(command: str, args: List[str], chat_id: int) -> Dict[str, Any
             elif command in ["weather", "mausam"]:
                 params["city"] = args[0]
 
-        # Call module API
         data = get_module_data(module, params)
 
         if data:
             reply = format_module_response(module, data, params)
         else:
-            reply = "❌ Data nahi mila. Try again later."
+            reply = "Data nahi mila. Try again later."
 
         send_message(chat_id, reply)
         return {"status": "ok"}
 
-    # AI Chat for unknown commands
     ai_reply = ai_brain_reply(command + " " + " ".join(args))
     if ai_reply:
         reply = f"🦁 *Singh Ji AI:*\n\n{ai_reply}"
@@ -270,8 +235,6 @@ def handle_command(command: str, args: List[str], chat_id: int) -> Dict[str, Any
 
 
 def format_module_response(module: str, data: Dict, params: Dict) -> str:
-    """Format module data for Telegram"""
-
     if module == "goldrate":
         d = data.get("data", {}).get("rates", {})
         city = params.get("city", "India")
@@ -377,7 +340,7 @@ def format_module_response(module: str, data: Dict, params: Dict) -> str:
         return "📲 *UPI Services*\n\n✅ Check balance\n✅ Send money\n✅ Request money\n✅ Transaction history"
 
     elif module == "sewer":
-        return "🚰 *Sewer/Drainage Services*\n\nComplaint register karo!\nCity: {params.get('city', 'Your City')}"
+        return "🚰 *Sewer/Drainage Services*\n\nComplaint register karo!\nCity: " + params.get('city', 'Your City')
 
     elif module == "pani":
         return "💧 *Water Supply*\n\nComplaint: 1916\nTanker booking available!"
@@ -476,7 +439,6 @@ def format_module_response(module: str, data: Dict, params: Dict) -> str:
 if FASTAPI_AVAILABLE and router:
     @router.post("/webhook")
     async def webhook_handler(request: Request):
-        """FastAPI webhook handler"""
         try:
             body = await request.json()
             message = body.get("message", {})
@@ -494,7 +456,7 @@ if FASTAPI_AVAILABLE and router:
             return JSONResponse(status_code=200, content=result)
 
         except Exception as e:
-            print(f"❌ Webhook handler error: {e}")
+            print(f"Webhook handler error: {e}")
             return JSONResponse(status_code=200, content={"status": "ok"})
 
 
@@ -504,7 +466,6 @@ handler = webhook_handler if FASTAPI_AVAILABLE else None
 
 # ========== POLLING MODE ==========
 def polling_mode():
-    """Run bot in polling mode"""
     import time
 
     OFFSET_FILE = ".telegram_offset"
@@ -523,12 +484,12 @@ def polling_mode():
     if TELEGRAM_TOKEN:
         try:
             requests.get(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/deleteWebhook", timeout=10)
-            print("✅ Webhook deleted for polling")
+            print("Webhook deleted for polling")
         except Exception as e:
-            print(f"⚠️ Webhook delete: {e}")
+            print(f"Webhook delete: {e}")
 
     offset = get_offset() + 1
-    print(f"🚀 Starting polling from offset {offset}")
+    print(f"Starting polling from offset {offset}")
 
     while True:
         try:
@@ -547,7 +508,7 @@ def polling_mode():
 
                 if chat_id and text:
                     user = msg.get("from", {}).get("username", "unknown")
-                    print(f"📩 @{user}: {text[:50]}")
+                    print(f"@{user}: {text[:50]}")
 
                     parts = text.strip().split()
                     command = parts[0].lower().replace("/", "")
@@ -562,24 +523,24 @@ def polling_mode():
                 time.sleep(1)
 
         except KeyboardInterrupt:
-            print("\n👋 Bot stopped. Bye!")
+            print("\nBot stopped. Bye!")
             break
         except Exception as e:
-            print(f"❌ Polling error: {e}")
+            print(f"Polling error: {e}")
             time.sleep(5)
 
 
 # ========== MAIN ENTRY ==========
 if __name__ == "__main__":
     print("=" * 50)
-    print("🦁 SINGH JI AI ULTRA v8.0 — TELEGRAM BOT")
+    print("SINGH JI AI ULTRA v8.0 — TELEGRAM BOT")
     print("=" * 50)
-    print(f"📡 Mode: Polling")
-    print(f"🔗 API: {API_BASE}")
+    print(f"Mode: Polling")
+    print(f"API: {API_BASE}")
     print("=" * 50 + "\n")
 
     if not TELEGRAM_TOKEN:
-        print("❌ ERROR: TELEGRAM_TOKEN not set!")
+        print("ERROR: TELEGRAM_TOKEN not set!")
         sys.exit(1)
 
     polling_mode()
