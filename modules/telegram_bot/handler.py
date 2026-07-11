@@ -1,25 +1,42 @@
-"""
-Singh Ji AI Ultra v8.0 — Telegram Bot Handler
-Developer: Singh Ji
-Version: 8.0.0
-Modules: 15 (v7.0) + Mini-Program (v8.0)
-"""
-
-import os
-import json
-import requests
-from datetime import datetime
-from typing import Optional, Dict, Any, List
-from fastapi import APIRouter
-router = APIRouter()
 # FastAPI imports (for webhook mode)
 try:
-    from fastapi import Request
+    from fastapi import APIRouter, Request
     from fastapi.responses import JSONResponse
     FASTAPI_AVAILABLE = True
+    router = APIRouter()
 except ImportError:
     FASTAPI_AVAILABLE = False
+    router = None
 
+# ... बाकी कोड ...
+
+# ========== FASTAPI WEBHOOK HANDLER ==========
+if FASTAPI_AVAILABLE and router:
+    @router.post("/webhook")
+    async def webhook_handler(request: Request):
+        """FastAPI webhook handler"""
+        try:
+            body = await request.json()
+            message = body.get("message", {})
+            text = message.get("text", "").strip()
+            chat_id = message.get("chat", {}).get("id")
+
+            if not chat_id or not text:
+                return JSONResponse(status_code=200, content={"status": "ok"})
+
+            parts = text.strip().split()
+            command = parts[0].lower().replace("/", "")
+            args = parts[1:] if len(parts) > 1 else []
+
+            result = handle_command(command, args, chat_id)
+            return JSONResponse(status_code=200, content=result)
+
+        except Exception as e:
+            print(f"❌ Webhook handler error: {e}")
+            return JSONResponse(status_code=200, content={"status": "ok"})
+
+# Legacy support
+handler = webhook_handler if FASTAPI_AVAILABLE else None
 # ========== CONFIG ==========
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
