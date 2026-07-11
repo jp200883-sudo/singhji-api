@@ -10,19 +10,12 @@ from sqlalchemy.orm import sessionmaker, Session
 from contextlib import asynccontextmanager
 from urllib.parse import quote_plus, urlparse, urlunparse
 import os
-import sys
 import logging
 from datetime import datetime
 
 # Logging setup
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-# ============================================================
-# 🦁 PORT FIX — Railway $PORT handle karo
-# ============================================================
-PORT = int(os.environ.get("PORT", 8000))
-logger.info(f"🚀 Port set to: {PORT}")
 
 # ============================================================
 # 🦁 GLOBAL VARIABLES
@@ -83,24 +76,12 @@ if "postgresql" in DATABASE_URL:
     except Exception as e:
         logger.warning(f"⚠️ URL encode error: {e}")
 
-# Fallback: Agar DB connect nahi hota, SQLite use karo
-try:
-    engine = create_engine(
-        DATABASE_URL,
-        pool_pre_ping=True,
-        pool_recycle=300,
-        connect_args={"connect_timeout": 10} if "postgresql" in DATABASE_URL else {}
-    )
-    # Test connection
-    with engine.connect() as conn:
-        conn.execute(text("SELECT 1"))
-    logger.info("✅ Database connected!")
-except Exception as e:
-    logger.error(f"❌ Database failed: {e}")
-    logger.warning("⚠️ Falling back to SQLite...")
-    DATABASE_URL = "sqlite:///./singhji.db"
-    engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
-
+engine = create_engine(
+    DATABASE_URL,
+    pool_pre_ping=True,
+    pool_recycle=300,
+    connect_args={"connect_timeout": 10} if "postgresql" in DATABASE_URL else {}
+)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 # ============================================================
@@ -113,19 +94,24 @@ async def lifespan(app: FastAPI):
 
     logger.info("🚀 === STARTUP BEGIN ===")
 
-    # Mini-Program modules load — SAFE import
+    # Database check
     try:
-        import miniprogram
-        from miniprogram.auth import MiniAuth, AuthManager, DeveloperAuth, get_current_developer
-        from miniprogram.portal import router as miniprogram_router
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        logger.info("✅ Database connected!")
+    except Exception as e:
+        logger.error(f"❌ Database failed: {e}")
 
-        # Try to create tables (SQLite compatible)
-        try:
-            from miniprogram.models import Base
-            Base.metadata.create_all(bind=engine)
-            logger.info("✅ Mini-Program tables created!")
-        except Exception as e:
-            logger.warning(f"⚠️ Tables error (SQLite may not support all): {e}")
+    # Mini-Program modules load — SAFE (isolated)
+    try:
+        from miniprogram.auth import MiniAuth, AuthManager
+        from miniprogram.models import Base, Developer, MiniApp, Payment, AppReview, SandboxLog
+        from miniprogram.portal import router as miniprogram_router
+        from miniprogram.storage import storage
+        from miniprogram.payment import payment
+
+        Base.metadata.create_all(bind=engine)
+        logger.info("✅ Mini-Program tables created!")
 
         app.include_router(miniprogram_router)
         logger.info("✅ Mini-Program router loaded!")
@@ -133,7 +119,6 @@ async def lifespan(app: FastAPI):
         MINIPROGRAM_AVAILABLE = True
     except Exception as e:
         logger.warning(f"⚠️ Mini-Program modules not available: {e}")
-        MINIPROGRAM_AVAILABLE = False
 
     logger.info(f"🦁 Mini-Program Available: {MINIPROGRAM_AVAILABLE}")
     logger.info("🚀 === STARTUP COMPLETE ===")
@@ -201,7 +186,7 @@ async def get_keys():
     return {"keys": API_KEYS}
 
 # ============================================================
-# 🦁 MINI-PROGRAM AUTH ENDPOINTS (Safe)
+# 🦁 MINI-PROGRAM AUTH ENDPOINTS
 # ============================================================
 @app.post("/api/miniprogram/auth/register")
 async def register_developer(request: Request):
@@ -211,17 +196,17 @@ async def register_developer(request: Request):
             status_code=503
         )
 
-    try:
-        from miniprogram.auth import DeveloperAuth
-        data = await request.json()
-        return await DeveloperAuth.register(
-            email=data.get("email"),
-            password=data.get("password"),
-            name=data.get("full_name", "")
-        )
-    except Exception as e:
-        logger.error(f"❌ Register error: {e}")
-        return JSONResponse({"error": str(e)}, status_code=500)
+    from miniprogram.auth import MiniAuth
+    data = await request.json()
+    db = next(get_db())
+    return await MiniAuth.register(
+        db,
+        email=data.get("email"),
+        password=data.get("password"),
+        full_name=data.get("full_name"),
+        company_name=data.get("company_name"),
+        phone=data.get("phone")
+    )
 
 @app.post("/api/miniprogram/auth/login")
 async def login_developer(request: Request):
@@ -231,16 +216,14 @@ async def login_developer(request: Request):
             status_code=503
         )
 
-    try:
-        from miniprogram.auth import DeveloperAuth
-        data = await request.json()
-        return await DeveloperAuth.login(
-            email=data.get("email"),
-            password=data.get("password")
-        )
-    except Exception as e:
-        logger.error(f"❌ Login error: {e}")
-        return JSONResponse({"error": str(e)}, status_code=500)
+    from miniprogram.auth import MiniAuth
+    data = await request.json()
+    db = next(get_db())
+    return await MiniAuth.login(
+        db,
+        email=data.get("email"),
+        password=data.get("password")
+    )
 
 # ============================================================
 # 🦁 MEMORY ENDPOINTS
@@ -258,11 +241,3 @@ async def memory_get():
 # 🦁 STARTUP LOG
 # ============================================================
 logger.info("🦁 Singh Ji AI Ultra v8.0 Started!")
-
-# ============================================================
-# 🦁 RAILWAY START — Port handle karo
-# ============================================================
-if __name__ == "__main__":
-    import uvicorn
-    logger.info(f"🚀 Starting Uvicorn on port {PORT}")
-    uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=False)
