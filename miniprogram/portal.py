@@ -1,386 +1,244 @@
+cat > /app/miniprogram/portal.py << 'EOF'
 """
-🏗️ Developer Portal API — FastAPI endpoints
+Singh Ji AI Ultra v8.0 — Mini-Program Portal API
+Developer: Singh Ji
+Version: 1.0.0
 """
-from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Form
-from fastapi.responses import JSONResponse
-from sqlalchemy.orm import Session
-from typing import List, Optional
+
+from fastapi import APIRouter, HTTPException, Form, Depends, Request
+from typing import Optional, Dict, Any
+import json
+import uuid
+from datetime import datetime
 
 from .auth import AuthManager, DeveloperAuth, get_current_developer
-from .models import Developer, MiniApp, Payment, AppReview
 from .config import MiniProgramConfig
+from .models import Developer, MiniApp, Payment, AppReview, SandboxLog
 from .storage import storage
 from .payment import payment
-from .sandbox import sandbox
+from .utils import generate_app_id, validate_app_code
 
-router = APIRouter(prefix=MiniProgramConfig.PORTAL_API_PREFIX)
+router = APIRouter(prefix="/mini", tags=["Mini-Program"])
 
 
-# ============== 🔐 AUTH ENDPOINTS ==============
+# ========== AUTH ROUTES ==========
 
-@router.post("/auth/register")
+@router.post("/auth/register", response_model=None)
 async def register_developer(
     email: str = Form(...),
     password: str = Form(...),
     full_name: str = Form(...),
     company_name: Optional[str] = Form(None),
-    phone: Optional[str] = Form(None),
-    db: Session = None  # Inject karna hoga main app se
+    phone: Optional[str] = Form(None)
 ):
     """👤 Developer register karo"""
     if not MiniProgramConfig.DEVELOPER_REGISTRATION_OPEN:
         raise HTTPException(status_code=403, detail="Registration temporarily closed!")
     
     return await DeveloperAuth.register(
-        db, email, password, full_name, company_name, phone
+        email=email, 
+        password=password, 
+        name=full_name
     )
 
 
-@router.post("/auth/login")
+@router.post("/auth/login", response_model=None)
 async def login_developer(
     email: str = Form(...),
-    password: str = Form(...),
-    db: Session = None
+    password: str = Form(...)
 ):
     """🔑 Developer login karo"""
-    return await DeveloperAuth.login(db, email, password)
+    return await DeveloperAuth.login(email=email, password=password)
 
 
-@router.post("/auth/refresh")
+@router.post("/auth/refresh", response_model=None)
 async def refresh_token(token: str = Form(...)):
     """🔄 Token refresh karo"""
-    return await DeveloperAuth.refresh_token(token)
+    return await DeveloperAuth.refresh_token(token=token)
 
 
-@router.get("/auth/me")
-async def get_profile(current: dict = Depends(get_current_developer), db: Session = None):
-    """👤 Apna profile dekho"""
-    developer = db.query(Developer).filter(Developer.id == current["developer_id"]).first()
-    if not developer:
-        raise HTTPException(status_code=404, detail="Developer nahi mila!")
-    return developer.to_dict()
+# ========== APP MANAGEMENT ==========
 
-
-# ============== 📱 APP MANAGEMENT ==============
-
-@router.post("/apps/create")
+@router.post("/apps/create", response_model=None)
 async def create_app(
     name: str = Form(...),
     description: Optional[str] = Form(None),
-    category: Optional[str] = Form(None),
-    source_code: Optional[str] = Form(None),
-    manifest: Optional[str] = Form(None),
-    current: dict = Depends(get_current_developer),
-    db: Session = None
+    category: str = Form(...),
+    token: str = Form(...)
 ):
-    """📱 Naya Mini-App banayo"""
-    developer = db.query(Developer).filter(Developer.id == current["developer_id"]).first()
+    """📱 Naya Mini-App create karo"""
+    developer = await get_current_developer(token)
+    app_id = generate_app_id()
     
-    # Check karo max apps limit
-    if len(developer.apps) >= MiniProgramConfig.MAX_APPS_PER_DEVELOPER:
-        raise HTTPException(status_code=400, detail=f"Max {MiniProgramConfig.MAX_APPS_PER_DEVELOPER} apps allowed!")
+    app_data = {
+        "id": app_id,
+        "name": name,
+        "description": description,
+        "category": category,
+        "developer_id": developer.get("id"),
+        "status": "pending",
+        "created_at": datetime.utcnow().isoformat(),
+        "version": "1.0.0"
+    }
     
-    import json
-    app = MiniApp(
-        developer_id=current["developer_id"],
-        name=name,
-        description=description,
-        category=category,
-        source_code=source_code,
-        manifest=json.loads(manifest) if manifest else None
-    )
-    
-    db.add(app)
-    db.commit()
-    db.refresh(app)
+    # Storage mein save karo
+    await storage.save_app(app_id, app_data)
     
     return {
-        "success": True,
-        "message": "App created! 🎉",
-        "app": app.to_dict()
+        "status": "success",
+        "app_id": app_id,
+        "message": "App created! Review ke liye bheja gaya."
     }
 
 
-@router.get("/apps/list")
-async def list_my_apps(
-    current: dict = Depends(get_current_developer),
-    db: Session = None
-):
-    """📋 Apni apps ki list"""
-    apps = db.query(MiniApp).filter(
-        MiniApp.developer_id == current["developer_id"]
-    ).all()
-    
-    return {
-        "apps": [app.to_dict() for app in apps],
-        "total": len(apps)
-    }
+@router.get("/apps/list", response_model=None)
+async def list_apps(token: str):
+    """📋 Developer ke saare apps dikhao"""
+    developer = await get_current_developer(token)
+    apps = await storage.get_developer_apps(developer.get("id"))
+    return {"apps": apps}
 
 
-@router.get("/apps/{app_id}")
-async def get_app(
-    app_id: str,
-    current: dict = Depends(get_current_developer),
-    db: Session = None
-):
-    """📱 Ek app ki details"""
-    app = db.query(MiniApp).filter(
-        MiniApp.id == app_id,
-        MiniApp.developer_id == current["developer_id"]
-    ).first()
+@router.get("/apps/{app_id}", response_model=None)
+async def get_app(app_id: str, token: str):
+    """🔍 Specific app details"""
+    developer = await get_current_developer(token)
+    app = await storage.get_app(app_id)
     
-    if not app:
-        raise HTTPException(status_code=404, detail="App nahi mila!")
+    if not app or app.get("developer_id") != developer.get("id"):
+        raise HTTPException(status_code=404, detail="App not found!")
     
-    return app.to_dict(include_code=True)
+    return {"app": app}
 
 
-@router.put("/apps/{app_id}")
-async def update_app(
-    app_id: str,
-    name: Optional[str] = Form(None),
-    description: Optional[str] = Form(None),
-    source_code: Optional[str] = Form(None),
-    manifest: Optional[str] = Form(None),
-    current: dict = Depends(get_current_developer),
-    db: Session = None
-):
-    """✏️ App update karo"""
-    app = db.query(MiniApp).filter(
-        MiniApp.id == app_id,
-        MiniApp.developer_id == current["developer_id"]
-    ).first()
-    
-    if not app:
-        raise HTTPException(status_code=404, detail="App nahi mila!")
-    
-    if name:
-        app.name = name
-    if description:
-        app.description = description
-    if source_code:
-        app.source_code = source_code
-    if manifest:
-        import json
-        app.manifest = json.loads(manifest)
-    
-    db.commit()
-    db.refresh(app)
-    
-    return {
-        "success": True,
-        "message": "App updated! ✅",
-        "app": app.to_dict()
-    }
+# ========== SANDBOX ==========
 
-
-@router.post("/apps/{app_id}/upload-icon")
-async def upload_app_icon(
-    app_id: str,
-    file: UploadFile = File(...),
-    current: dict = Depends(get_current_developer),
-    db: Session = None
-):
-    """🖼️ App icon upload karo"""
-    app = db.query(MiniApp).filter(
-        MiniApp.id == app_id,
-        MiniApp.developer_id == current["developer_id"]
-    ).first()
-    
-    if not app:
-        raise HTTPException(status_code=404, detail="App nahi mila!")
-    
-    contents = await file.read()
-    
-    # Supabase pe upload karo
-    url = storage.upload_app_icon(app_id, contents)
-    
-    if url:
-        app.icon_url = url
-        db.commit()
-        return {
-            "success": True,
-            "message": "Icon uploaded! 🎉",
-            "url": url
-        }
-    
-    raise HTTPException(status_code=500, detail="Upload failed!")
-
-
-@router.delete("/apps/{app_id}")
-async def delete_app(
-    app_id: str,
-    current: dict = Depends(get_current_developer),
-    db: Session = None
-):
-    """🗑️ App delete karo"""
-    app = db.query(MiniApp).filter(
-        MiniApp.id == app_id,
-        MiniApp.developer_id == current["developer_id"]
-    ).first()
-    
-    if not app:
-        raise HTTPException(status_code=404, detail="App nahi mila!")
-    
-    # Icon delete karo agar hai
-    if app.icon_url:
-        storage.delete_file(f"app-icons/{app_id}/icon.png")
-    
-    db.delete(app)
-    db.commit()
-    
-    return {
-        "success": True,
-        "message": "App deleted! 🗑️"
-    }
-
-
-# ============== 🧪 SANDBOX ==============
-
-@router.post("/sandbox/test")
-async def test_code(
+@router.post("/sandbox/run", response_model=None)
+async def run_sandbox(
+    app_id: str = Form(...),
     code: str = Form(...),
-    input_data: Optional[str] = Form(None),
-    current: dict = Depends(get_current_developer)
+    token: str = Form(...)
 ):
-    """🧪 Code test karo sandbox mein"""
-    import json
+    """🏖️ Code sandbox mein run karo"""
+    developer = await get_current_developer(token)
     
-    data = json.loads(input_data) if input_data else None
-    result = sandbox.execute(code, data)
+    # Security check
+    if not validate_app_code(code):
+        raise HTTPException(status_code=400, detail="Code mein restricted functions hain!")
+    
+    # Sandbox execution
+    result = await SandboxLog.run_code(app_id, code)
     
     return {
-        "success": result["success"],
+        "status": "success",
         "output": result.get("output"),
-        "result": result.get("result"),
-        "error": result.get("error"),
-        "execution_time": result.get("execution_time"),
-        "memory_used": result.get("memory_used")
+        "execution_time": result.get("time"),
+        "memory_used": result.get("memory")
     }
 
 
-# ============== 💰 PAYMENT ==============
+# ========== PAYMENT ==========
 
-@router.post("/payments/create-order")
-async def create_payment_order(
+@router.post("/payment/create", response_model=None)
+async def create_payment(
     amount: float = Form(...),
-    payment_type: str = Form(...),
-    description: Optional[str] = Form(None),
-    current: dict = Depends(get_current_developer),
-    db: Session = None
+    currency: str = Form("INR"),
+    app_id: Optional[str] = Form(None),
+    token: str = Form(...)
 ):
-    """💰 Payment order banayo"""
-    order = payment.create_order(
+    """💰 Payment order create karo"""
+    developer = await get_current_developer(token)
+    
+    order = await payment.create_order(
         amount=amount,
-        notes={
-            "developer_id": current["developer_id"],
-            "payment_type": payment_type,
-            "description": description
-        }
+        currency=currency,
+        developer_id=developer.get("id"),
+        app_id=app_id
     )
     
-    if not order:
-        raise HTTPException(status_code=500, detail="Order create failed!")
-    
-    # Database mein save karo
-    pay = Payment(
-        developer_id=current["developer_id"],
-        razorpay_order_id=order["order_id"],
-        amount=amount,
-        payment_type=payment_type,
-        description=description
-    )
-    db.add(pay)
-    db.commit()
-    
     return {
-        "success": True,
-        "order": order
+        "status": "success",
+        "order_id": order.get("id"),
+        "amount": amount,
+        "currency": currency
     }
 
 
-@router.post("/payments/verify")
-async def verify_payment(
-    order_id: str = Form(...),
-    payment_id: str = Form(...),
-    signature: str = Form(...),
-    current: dict = Depends(get_current_developer),
-    db: Session = None
-):
-    """✅ Payment verify karo"""
-    is_valid = payment.verify_payment(order_id, payment_id, signature)
-    
-    if is_valid:
-        # Database update karo
-        pay = db.query(Payment).filter(
-            Payment.razorpay_order_id == order_id,
-            Payment.developer_id == current["developer_id"]
-        ).first()
-        
-        if pay:
-            pay.razorpay_payment_id = payment_id
-            pay.status = "completed"
-            pay.completed_at = datetime.utcnow()
-            db.commit()
-        
-        return {
-            "success": True,
-            "message": "Payment verified! ✅"
-        }
-    
-    raise HTTPException(status_code=400, detail="Payment verification failed!")
+@router.get("/payment/status/{order_id}", response_model=None)
+async def payment_status(order_id: str, token: str):
+    """💳 Payment status check karo"""
+    await get_current_developer(token)
+    status = await payment.get_status(order_id)
+    return {"order_id": order_id, "status": status}
 
 
-@router.get("/payments/history")
-async def payment_history(
-    current: dict = Depends(get_current_developer),
-    db: Session = None
+# ========== REVIEWS ==========
+
+@router.post("/reviews/submit", response_model=None)
+async def submit_review(
+    app_id: str = Form(...),
+    rating: int = Form(...),
+    comment: Optional[str] = Form(None),
+    token: str = Form(...)
 ):
-    """📜 Payment history dekho"""
-    payments = db.query(Payment).filter(
-        Payment.developer_id == current["developer_id"]
-    ).order_by(Payment.created_at.desc()).all()
+    """⭐ App review karo"""
+    await get_current_developer(token)
     
-    return {
-        "payments": [p.to_dict() for p in payments],
-        "total": len(payments)
+    review = {
+        "id": str(uuid.uuid4()),
+        "app_id": app_id,
+        "rating": rating,
+        "comment": comment,
+        "created_at": datetime.utcnow().isoformat()
     }
+    
+    await storage.save_review(review)
+    return {"status": "success", "review_id": review["id"]}
 
 
-# ============== 📊 PUBLIC ENDPOINTS (No Auth) ==============
+# ========== ANALYTICS ==========
 
-@router.get("/public/apps")
-async def list_public_apps(
-    category: Optional[str] = None,
-    db: Session = None
-):
-    """🌍 Public apps ki list"""
-    query = db.query(MiniApp).filter(MiniApp.status == "published")
+@router.get("/analytics/{app_id}", response_model=None)
+async def app_analytics(app_id: str, token: str):
+    """📊 App analytics dikhao"""
+    developer = await get_current_developer(token)
+    app = await storage.get_app(app_id)
     
-    if category:
-        query = query.filter(MiniApp.category == category)
+    if not app or app.get("developer_id") != developer.get("id"):
+        raise HTTPException(status_code=404, detail="App not found!")
     
-    apps = query.order_by(MiniApp.downloads.desc()).all()
-    
-    return {
-        "apps": [app.to_dict() for app in apps],
-        "total": len(apps)
-    }
+    analytics = await storage.get_analytics(app_id)
+    return {"app_id": app_id, "analytics": analytics}
 
 
-@router.get("/public/apps/{app_id}")
-async def get_public_app(app_id: str, db: Session = None):
-    """🌍 Public app details"""
-    app = db.query(MiniApp).filter(
-        MiniApp.id == app_id,
-        MiniApp.status == "published"
-    ).first()
+# ========== ADMIN ROUTES ==========
+
+@router.get("/admin/pending-apps", response_model=None)
+async def pending_apps(admin_token: str):
+    """🔒 Admin — pending apps dikhao"""
+    if admin_token != MiniProgramConfig.ADMIN_SECRET:
+        raise HTTPException(status_code=403, detail="Admin access denied!")
     
-    if not app:
-        raise HTTPException(status_code=404, detail="App nahi mila!")
+    apps = await storage.get_pending_apps()
+    return {"pending_apps": apps}
+
+
+@router.post("/admin/approve/{app_id}", response_model=None)
+async def approve_app(app_id: str, admin_token: str):
+    """✅ Admin — app approve karo"""
+    if admin_token != MiniProgramConfig.ADMIN_SECRET:
+        raise HTTPException(status_code=403, detail="Admin access denied!")
     
-    # Download count badhao
-    app.downloads += 1
-    db.commit()
+    await storage.update_app_status(app_id, "approved")
+    return {"status": "success", "app_id": app_id, "message": "App approved!"}
+
+
+@router.post("/admin/reject/{app_id}", response_model=None)
+async def reject_app(app_id: str, admin_token: str, reason: Optional[str] = Form(None)):
+    """❌ Admin — app reject karo"""
+    if admin_token != MiniProgramConfig.ADMIN_SECRET:
+        raise HTTPException(status_code=403, detail="Admin access denied!")
     
-    return app.to_dict(include_code=True)
+    await storage.update_app_status(app_id, "rejected", reason)
+    return {"status": "success", "app_id": app_id, "reason": reason}
+EOF
