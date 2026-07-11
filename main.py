@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from sqlalchemy import create_engine, tex
+from sqlalchemy import create_engine, text
 from contextlib import asynccontextmanager 
 from sqlalchemy.orm import sessionmaker
 import os
