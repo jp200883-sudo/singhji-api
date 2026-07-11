@@ -12,10 +12,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy app
 COPY . .
 
-# Entrypoint script for proper port handling
-COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
-
+# Expose port
 EXPOSE 8000
 
-ENTRYPOINT ["/entrypoint.sh"]
+# Start command - Railway $PORT handle karega
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]
