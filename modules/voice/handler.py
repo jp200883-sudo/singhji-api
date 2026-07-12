@@ -18,8 +18,8 @@ pip install pocket-tts
 """
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Optional
-from typing import List, Dict
+from pydantic import BaseModel
+from typing import Optional, List, Dict
 import os
 import requests
 import base64
