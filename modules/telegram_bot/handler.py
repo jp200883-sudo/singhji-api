@@ -4,61 +4,17 @@ modules/telegram_bot/handler.py
 """
 
 from fastapi import APIRouter, Request
-from telegram import Update
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
+import requests
+import json
 import os
 
 router = APIRouter()
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
-WEBHOOK_URL = "https://singhji-api-production-85ca.up.railway.app/modules/telegram_bot/webhook"
-
-# Application global
-application = None
-
-async def start(update, context):
-    await update.message.reply_text("🦁 Singh Ji AI Bot Ready! /start")
-
-async def status(update, context):
-    await update.message.reply_text("✅ System Online!")
-
-def init_bot():
-    global application
-    if not TELEGRAM_BOT_TOKEN:
-        print("❌ TELEGRAM_BOT_TOKEN missing!")
-        return None
-    
-    application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("status", status))
-    return application
-
-@router.post("/webhook")
-async def telegram_webhook(request: Request):
-    """Telegram webhook handler"""
-    global application
-    if not application:
-        application = init_bot()
-        if application:
-            await application.initialize()
-            await application.start()
-    
-    data = await request.json()
-    update = Update.de_json(data, application.bot)
-    await application.process_update(update)
-    return {"ok": True}
-
-@router.get("/health")
-async def bot_health():
-    return {"status": "alive", "bot": "Singh Ji AI"}
-
-# ═══════════════════════════════════════════════════════
-# CONFIG
-# ═══════════════════════════════════════════════════════
-
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 API_BASE_URL = "https://singhji-api-production-85ca.up.railway.app"
-WEBHOOK_URL = "https://singhji-api-production-85ca.up.railway.app/telegram/webhook"
+WEBHOOK_URL = "https://singhji-api-production-85ca.up.railway.app/modules/telegram_bot/webhook"
 
 # ═══════════════════════════════════════════════════════
 # 95 ACTIVE MODULES LIST
@@ -324,90 +280,66 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 # ═══════════════════════════════════════════════════════
-# WEBHOOK SETUP
+# WEBHOOK HANDLER
 # ═══════════════════════════════════════════════════════
 
-# FastAPI app
-app = FastAPI(title="Singh Ji Telegram Bot")
-
-# Telegram Application
+# Application global
 application = None
 
-@app.on_event("startup")
-async def startup():
+def get_application():
+    """Lazy init application"""
     global application
-    if not TELEGRAM_BOT_TOKEN:
-        print("❌ TELEGRAM_BOT_TOKEN set nahi hai!")
-        return
-    
-    application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
-    
-    # Handlers add karo
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("modules", list_modules))
-    application.add_handler(CommandHandler("use", use_module))
-    application.add_handler(CommandHandler("news", news_scheduler))
-    application.add_handler(CommandHandler("voice", voice_commands))
-    application.add_handler(CommandHandler("status", system_status))
-    application.add_handler(CallbackQueryHandler(button_callback))
-    
-    # Webhook set karo
-    await application.initialize()
-    await application.start()
-    await application.bot.set_webhook(url=WEBHOOK_URL, drop_pending_updates=True)
-    print(f"🦁 Webhook set: {WEBHOOK_URL}")
+    if application is None:
+        application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
+        application.add_handler(CommandHandler("start", start))
+        application.add_handler(CommandHandler("modules", list_modules))
+        application.add_handler(CommandHandler("use", use_module))
+        application.add_handler(CommandHandler("news", news_scheduler))
+        application.add_handler(CommandHandler("voice", voice_commands))
+        application.add_handler(CommandHandler("status", system_status))
+        application.add_handler(CallbackQueryHandler(button_callback))
+    return application
 
-@app.on_event("shutdown")
-async def shutdown():
-    if application:
-        await application.stop()
-        await application.shutdown()
-    print("👋 Bot shutdown")
-
-@app.post("/telegram/webhook")
-async def webhook(request: Request):
+@router.post("/webhook")
+async def telegram_webhook(request: Request):
     """Telegram se aaya update handle karo"""
+    global application
+    if application is None:
+        application = get_application()
+        await application.initialize()
+        await application.start()
+    
     data = await request.json()
     update = Update.de_json(data, application.bot)
     await application.process_update(update)
     return {"ok": True}
 
-@app.get("/telegram/health")
-async def health():
+@router.get("/health")
+async def bot_health():
     """Bot health check"""
-    if not application:
-        return {"status": "error", "message": "Bot not initialized"}
-    
-    me = await application.bot.get_me()
-    webhook = await application.bot.get_webhook_info()
     return {
         "status": "alive",
-        "bot_name": me.first_name,
-        "bot_username": me.username,
-        "webhook_url": webhook.url,
-        "pending_updates": webhook.pending_update_count
+        "bot": "Singh Ji AI",
+        "modules_loaded": len(ACTIVE_MODULES),
+        "webhook_url": WEBHOOK_URL
     }
 
-@app.get("/telegram/setup-webhook")
+@router.get("/setup-webhook")
 async def setup_webhook():
     """Manual webhook setup"""
-    if not application:
-        return {"status": "error", "message": "Bot not initialized"}
+    global application
+    if application is None:
+        application = get_application()
+        await application.initialize()
+        await application.start()
+    
     await application.bot.set_webhook(url=WEBHOOK_URL, drop_pending_updates=True)
     return {"status": "success", "webhook_url": WEBHOOK_URL}
 
-@app.get("/telegram/delete-webhook")
+@router.get("/delete-webhook")
 async def delete_webhook():
     """Webhook delete"""
-    if not application:
-        return {"status": "error", "message": "Bot not initialized"}
-    await application.bot.delete_webhook(drop_pending_updates=True)
+    global application
+    if application:
+        await application.bot.delete_webhook(drop_pending_updates=True)
     return {"status": "success", "message": "Webhook deleted"}
-
-# ═══════════════════════════════════════════════════════
-# RUN
-# ═══════════════════════════════════════════════════════
-
-if __name__ == "__main__":
-    port = int(os.getenv("PORT", 8000))
-    uvicorn.run(app, host="0.0.0.0", port=port)
