@@ -12,6 +12,8 @@ import sys
 import json
 import time
 import asyncio
+import importlib
+from pathlib import Path
 import requests
 from datetime import datetime
 import logging
@@ -206,6 +208,67 @@ app.add_middleware(
 )
 
 # ═══════════════════════════════════════════════════════
+# 🦁 AUTO-LOADER — scans every top-level folder for handler.py
+# and wires it as /modules/<folder_name>/... automatically.
+# No need to hand-write a route for every new module you build —
+# just drop a folder with a handler.py in it, containing:
+#     async def handler(request: Request): ...
+# and it shows up here on the next deploy.
+# ═══════════════════════════════════════════════════════
+REPO_ROOT = Path(__file__).resolve().parent
+AUTOLOAD_EXCLUDE = {
+    "miniprogram", "__pycache__", ".git", ".github", "venv", ".venv",
+    "node_modules", "static", "templates", "tests",
+}
+AUTOLOADED_MODULES = []   # names that loaded successfully
+AUTOLOAD_FAILURES = {}    # name -> error string
+
+
+def _autoload_modules():
+    for entry in sorted(REPO_ROOT.iterdir()):
+        if not entry.is_dir() or entry.name in AUTOLOAD_EXCLUDE or entry.name.startswith("."):
+            continue
+        handler_file = entry / "handler.py"
+        if not handler_file.exists():
+            continue
+
+        module_name = entry.name
+        try:
+            mod = importlib.import_module(f"{module_name}.handler")
+            handler_func = getattr(mod, "handler", None)
+            if handler_func is None or not callable(handler_func):
+                AUTOLOAD_FAILURES[module_name] = "handler.py has no callable handler(request) function"
+                continue
+
+            async def _route(request: Request, _handler_func=handler_func):
+                return await _handler_func(request)
+
+            app.add_api_route(
+                f"/modules/{module_name}/{{full_path:path}}",
+                _route,
+                methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
+                name=f"module_{module_name}_sub",
+            )
+            app.add_api_route(
+                f"/modules/{module_name}",
+                _route,
+                methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
+                name=f"module_{module_name}_root",
+            )
+            AUTOLOADED_MODULES.append(module_name)
+            MODULES[module_name] = {"needs_key": None, "active": True}
+        except Exception as e:
+            AUTOLOAD_FAILURES[module_name] = str(e)
+            logger.warning(f"Module autoload failed for '{module_name}': {e}")
+
+    logger.info(f"🦁 Auto-loaded {len(AUTOLOADED_MODULES)} modules: {AUTOLOADED_MODULES}")
+    if AUTOLOAD_FAILURES:
+        logger.warning(f"🦁 {len(AUTOLOAD_FAILURES)} modules failed to auto-load: {AUTOLOAD_FAILURES}")
+
+
+_autoload_modules()  # run once at import time, before uvicorn starts serving
+
+# ═══════════════════════════════════════════════════════
 # 🦁 HEALTH CHECK
 # ═══════════════════════════════════════════════════════
 @app.get("/")
@@ -245,6 +308,8 @@ async def status():
         "active_count": len(active_modules),
         "active_modules": active_modules,
         "inactive_modules": inactive_modules,
+        "autoloaded_modules": AUTOLOADED_MODULES,
+        "autoload_failures": AUTOLOAD_FAILURES,
         "agents": {"total": 330, "active": SYSTEM_LOAD["active_agents"], "phase": SYSTEM_LOAD["phase"]},
         "available_keys": AVAILABLE_KEYS,
         "miniprogram": MINIPROGRAM_AVAILABLE,
