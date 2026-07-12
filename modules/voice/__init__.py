@@ -1,1 +1,3 @@
-# Singh Ji AI Ultra v7.0 - Voice
+from .voice import router
+
+__all__ = ["router"]
