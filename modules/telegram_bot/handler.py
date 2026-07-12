@@ -5,7 +5,7 @@ modules/telegram_bot/handler.py
 
 from fastapi import APIRouter, Request
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes, MessageHandler, filters
 import requests
 import json
 import os
@@ -183,6 +183,27 @@ async def system_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except:
         await update.message.reply_text("❌ System offline!")
 
+# ═══════════════════════════════════════════════════════
+# VOICE MESSAGE HANDLER — YEH ADD KIYA!
+# ═══════════════════════════════════════════════════════
+
+async def voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """User ne voice message bheja"""
+    await update.message.reply_text(
+        "🎙️ *Voice Message Received!*\n\n"
+        "Abhi STT (Speech-to-Text) integration chal raha hai! 🔧\n\n"
+        "Tab tak *text se* message bhejo:\n"
+        "• `/use weather Delhi`\n"
+        "• `/use news hindi`\n"
+        "• `/status`\n\n"
+        "Jaldi hi voice support aa raha hai! 🚀",
+        parse_mode="Markdown"
+    )
+
+# ═══════════════════════════════════════════════════════
+# BUTTON CALLBACKS
+# ═══════════════════════════════════════════════════════
+
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -241,14 +262,23 @@ def get_application():
         if not TELEGRAM_BOT_TOKEN:
             print("⚠️ TELEGRAM_BOT_TOKEN missing!")
             return None
+        
         application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
+        
+        # Command handlers
         application.add_handler(CommandHandler("start", start))
         application.add_handler(CommandHandler("modules", list_modules))
         application.add_handler(CommandHandler("use", use_module))
         application.add_handler(CommandHandler("news", news_scheduler))
         application.add_handler(CommandHandler("voice", voice_commands))
         application.add_handler(CommandHandler("status", system_status))
+        
+        # Button callbacks
         application.add_handler(CallbackQueryHandler(button_callback))
+        
+        # 🔥 VOICE MESSAGE HANDLER — YAHAN ADD KIYA!
+        application.add_handler(MessageHandler(filters.VOICE, voice_handler))
+        
     return application
 
 @router.post("/webhook")
