@@ -110,4 +110,4 @@ async def get_current_developer(token: str = None):
         "email": payload.get("email"),
         "role": payload.get("role", "developer")
     }
-EOF
+
