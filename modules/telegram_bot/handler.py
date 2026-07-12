@@ -1,22 +1,16 @@
 """
 🦁 SINGH JI AI — TELEGRAM MASTER CONTROL BOT v1.0
 Sab 95 Active Modules Telegram Se Control!
-
-Features:
-- /modules — Sab 95 modules ki list
-- /use <module> — Koi bhi module use karo
-- /news — 4:00 AM auto news scheduler
-- /voice — Voice commands
-- /status — System status
-
-Install: pip install python-telegram-bot requests
+Webhook Mode — Railway Ready!
 """
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 import requests
 import json
 import os
+from fastapi import FastAPI, Request
+import uvicorn
 
 # ═══════════════════════════════════════════════════════
 # CONFIG
@@ -24,6 +18,7 @@ import os
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 API_BASE_URL = "https://singhji-api-production-85ca.up.railway.app"
+WEBHOOK_URL = "https://singhji-api-production-85ca.up.railway.app/telegram/webhook"
 
 # ═══════════════════════════════════════════════════════
 # 95 ACTIVE MODULES LIST
@@ -94,36 +89,19 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     await update.message.reply_text(
-        f"🦁 *Singh Ji AI Ultra v8.0*
-
-"
-        f"Welcome *{user.first_name}*!
-
-"
-        f"*95 Active Modules* ready hain!
-"
-        f"Koi bhi module use karo — bas command do!
-
-"
-        f"*Commands:*
-"
-        f"/modules — Sab modules ki list
-"
-        f"/use <module> — Module use karo
-"
-        f"/news — News scheduler setting
-"
-        f"/voice — Voice commands
-"
-        f"/status — System status
-
-"
-        f"*Example:*
-"
-        f"`/use weather Delhi`
-"
-        f"`/use news hindi`
-"
+        f"🦁 *Singh Ji AI Ultra v8.0*\n\n"
+        f"Welcome *{user.first_name}*!\n\n"
+        f"*95 Active Modules* ready hain!\n"
+        f"Koi bhi module use karo — bas command do!\n\n"
+        f"*Commands:*\n"
+        f"/modules — Sab modules ki list\n"
+        f"/use <module> — Module use karo\n"
+        f"/news — News scheduler setting\n"
+        f"/voice — Voice commands\n"
+        f"/status — System status\n\n"
+        f"*Example:*\n"
+        f"`/use weather Delhi`\n"
+        f"`/use news hindi`\n"
         f"`/use goldrate`",
         parse_mode="Markdown",
         reply_markup=reply_markup
@@ -131,16 +109,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def list_modules(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Sab 95 modules ki list"""
-    module_text = "🦁 *Singh Ji AI — Active Modules (95)*
-
-"
+    module_text = "🦁 *Singh Ji AI — Active Modules (95)*\n\n"
 
     for name, code in ACTIVE_MODULES.items():
-        module_text += f"• {name} — `/{code}`
-"
+        module_text += f"• {name} — `/{code}`\n"
 
-    module_text += "
-*Use karo:* `/use <module_name> <query>`"
+    module_text += "\n*Use karo:* `/use <module_name> <query>`"
 
     await update.message.reply_text(module_text, parse_mode="Markdown")
 
@@ -150,15 +124,10 @@ async def use_module(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if not args:
         await update.message.reply_text(
-            "❌ *Usage:* `/use <module> <query>`
-
-"
-            "*Example:*
-"
-            "`/use weather Delhi`
-"
-            "`/use news hindi`
-"
+            "❌ *Usage:* `/use <module> <query>`\n\n"
+            "*Example:*\n"
+            "`/use weather Delhi`\n"
+            "`/use news hindi`\n"
             "`/use goldrate`",
             parse_mode="Markdown"
         )
@@ -167,7 +136,6 @@ async def use_module(update: Update, context: ContextTypes.DEFAULT_TYPE):
     module = args[0].lower()
     query = " ".join(args[1:]) if len(args) > 1 else ""
 
-    # API call karo
     try:
         response = requests.get(
             f"{API_BASE_URL}/modules/{module}/",
@@ -177,19 +145,13 @@ async def use_module(update: Update, context: ContextTypes.DEFAULT_TYPE):
         data = response.json()
 
         await update.message.reply_text(
-            f"✅ *{module.upper()} Result:*
-
-"
-            f"```json
-{json.dumps(data, indent=2, ensure_ascii=False)[:4000]}
-```",
+            f"✅ *{module.upper()} Result:*\n\n"
+            f"```json\n{json.dumps(data, indent=2, ensure_ascii=False)[:4000]}\n```",
             parse_mode="Markdown"
         )
     except Exception as e:
         await update.message.reply_text(
-            f"❌ *Error:* {str(e)}
-
-"
+            f"❌ *Error:* {str(e)}\n\n"
             f"Module `{module}` load nahi ho raha!",
             parse_mode="Markdown"
         )
@@ -206,14 +168,9 @@ async def news_scheduler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     await update.message.reply_text(
-        "📰 *News Scheduler Setting*
-
-"
-        "Kitne baje news chahiye?
-"
-        "Current: *4:00 AM* (Default)
-
-"
+        "📰 *News Scheduler Setting*\n\n"
+        "Kitne baje news chahiye?\n"
+        "Current: *4:00 AM* (Default)\n\n"
         "Select karo:",
         parse_mode="Markdown",
         reply_markup=reply_markup
@@ -222,24 +179,14 @@ async def news_scheduler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def voice_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Voice commands info"""
     await update.message.reply_text(
-        "🎙️ *Voice Commands*
-
-"
-        "*Bolo:*
-"
-        "• 'Mausam batao' → Weather
-"
-        "• 'News sunao' → News
-"
-        "• 'Sona ka rate' → Gold Rate
-"
-        "• 'Petrol ka rate' → Fuel Price
-"
-        "• 'Mandi rates' → Mandi
-"
-        "• 'Naukri dhoondo' → Rozgar
-
-"
+        "🎙️ *Voice Commands*\n\n"
+        "*Bolo:*\n"
+        "• 'Mausam batao' → Weather\n"
+        "• 'News sunao' → News\n"
+        "• 'Sona ka rate' → Gold Rate\n"
+        "• 'Petrol ka rate' → Fuel Price\n"
+        "• 'Mandi rates' → Mandi\n"
+        "• 'Naukri dhoondo' → Rozgar\n\n"
         "*Voice message bhejo* — main samajh jaunga!",
         parse_mode="Markdown"
     )
@@ -251,41 +198,22 @@ async def system_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
         status = "✅ Online" if response.status_code == 200 else "❌ Offline"
 
         await update.message.reply_text(
-            f"🦁 *Singh Ji AI System Status*
-
-"
-            f"Status: {status}
-"
-            f"Modules: *95/300* Active
-"
-            f"Version: *v8.0*
-"
-            f"Platform: *Railway*
-
-"
-            f"*Active Modules:*
-"
-            f"• Voice System ✅
-"
-            f"• News Scheduler ✅
-"
-            f"• Weather ✅
-"
-            f"• AI Chat ✅
-"
-            f"• Currency ✅
-"
-            f"• Gold Rate ✅
-"
-            f"• Mandi Rates ✅
-"
-            f"• Rozgar ✅
-"
-            f"• Banking ✅
-"
-            f"• UPI ✅
-
-"
+            f"🦁 *Singh Ji AI System Status*\n\n"
+            f"Status: {status}\n"
+            f"Modules: *95/300* Active\n"
+            f"Version: *v8.0*\n"
+            f"Platform: *Railway*\n\n"
+            f"*Active Modules:*\n"
+            f"• Voice System ✅\n"
+            f"• News Scheduler ✅\n"
+            f"• Weather ✅\n"
+            f"• AI Chat ✅\n"
+            f"• Currency ✅\n"
+            f"• Gold Rate ✅\n"
+            f"• Mandi Rates ✅\n"
+            f"• Rozgar ✅\n"
+            f"• Banking ✅\n"
+            f"• UPI ✅\n\n"
             f"*All systems operational!* 🚀",
             parse_mode="Markdown"
         )
@@ -302,62 +230,39 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
 
     if query.data == "list_modules":
-        module_text = "🦁 *Active Modules (95)*
-
-"
+        module_text = "🦁 *Active Modules (95)*\n\n"
         for name, code in list(ACTIVE_MODULES.items())[:20]:
-            module_text += f"• {name} — `/{code}`
-"
-        module_text += "
-...aur 75 modules! `/modules` se dekho"
+            module_text += f"• {name} — `/{code}`\n"
+        module_text += "\n...aur 75 modules! `/modules` se dekho"
         await query.edit_message_text(module_text, parse_mode="Markdown")
 
     elif query.data == "voice_cmd":
         await query.edit_message_text(
-            "🎙️ *Voice Commands*
-
-"
-            "Bolo ya voice message bhejo:
-"
-            "• 'Mausam batao' → Weather
-"
-            "• 'News sunao' → News
-"
-            "• 'Sona ka rate' → Gold Rate
-"
-            "• 'Petrol ka rate' → Fuel Price
-",
+            "🎙️ *Voice Commands*\n\n"
+            "Bolo ya voice message bhejo:\n"
+            "• 'Mausam batao' → Weather\n"
+            "• 'News sunao' → News\n"
+            "• 'Sona ka rate' → Gold Rate\n"
+            "• 'Petrol ka rate' → Fuel Price\n",
             parse_mode="Markdown"
         )
 
     elif query.data == "news_scheduler":
         await query.edit_message_text(
-            "📰 *News Scheduler*
-
-"
-            "⏰ *4:00 AM* — Subah ki pehli khabar
-
-"
-            "Aaj se har roz 4 baje news aayegi!
-"
+            "📰 *News Scheduler*\n\n"
+            "⏰ *4:00 AM* — Subah ki pehli khabar\n\n"
+            "Aaj se har roz 4 baje news aayegi!\n"
             "`/news` se time change karo",
             parse_mode="Markdown"
         )
 
     elif query.data == "status":
         await query.edit_message_text(
-            "🦁 *System Status*
-
-"
-            "✅ All 95 modules active
-"
-            "✅ Railway platform running
-"
-            "✅ Voice system online
-"
-            "✅ News scheduler ready
-
-"
+            "🦁 *System Status*\n\n"
+            "✅ All 95 modules active\n"
+            "✅ Railway platform running\n"
+            "✅ Voice system online\n"
+            "✅ News scheduler ready\n\n"
             "*Ready to serve!* 🚀",
             parse_mode="Markdown"
         )
@@ -372,42 +277,97 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         }
         time_set = time_map.get(query.data, "4:00 AM")
         await query.edit_message_text(
-            f"✅ *News Scheduler Updated*
-
-"
-            f"Ab news aayegi: *{time_set}*
-
-"
+            f"✅ *News Scheduler Updated*\n\n"
+            f"Ab news aayegi: *{time_set}*\n\n"
             f"Har roz {time_set} pe news milegi! 📰",
             parse_mode="Markdown"
         )
 
 # ═══════════════════════════════════════════════════════
-# MAIN
+# WEBHOOK SETUP
 # ═══════════════════════════════════════════════════════
 
-def main():
-    """Bot start karo"""
+# FastAPI app
+app = FastAPI(title="Singh Ji Telegram Bot")
+
+# Telegram Application
+application = None
+
+@app.on_event("startup")
+async def startup():
+    global application
     if not TELEGRAM_BOT_TOKEN:
         print("❌ TELEGRAM_BOT_TOKEN set nahi hai!")
         return
-
+    
     application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
-
-    # Command handlers
+    
+    # Handlers add karo
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("modules", list_modules))
     application.add_handler(CommandHandler("use", use_module))
     application.add_handler(CommandHandler("news", news_scheduler))
     application.add_handler(CommandHandler("voice", voice_commands))
     application.add_handler(CommandHandler("status", system_status))
-
-    # Button callbacks
     application.add_handler(CallbackQueryHandler(button_callback))
+    
+    # Webhook set karo
+    await application.initialize()
+    await application.start()
+    await application.bot.set_webhook(url=WEBHOOK_URL, drop_pending_updates=True)
+    print(f"🦁 Webhook set: {WEBHOOK_URL}")
 
-    print("🦁 Singh Ji AI Master Bot chal raha hai...")
-    print("📱 Telegram pe /start bhejo!")
-    application.run_polling()
+@app.on_event("shutdown")
+async def shutdown():
+    if application:
+        await application.stop()
+        await application.shutdown()
+    print("👋 Bot shutdown")
+
+@app.post("/telegram/webhook")
+async def webhook(request: Request):
+    """Telegram se aaya update handle karo"""
+    data = await request.json()
+    update = Update.de_json(data, application.bot)
+    await application.process_update(update)
+    return {"ok": True}
+
+@app.get("/telegram/health")
+async def health():
+    """Bot health check"""
+    if not application:
+        return {"status": "error", "message": "Bot not initialized"}
+    
+    me = await application.bot.get_me()
+    webhook = await application.bot.get_webhook_info()
+    return {
+        "status": "alive",
+        "bot_name": me.first_name,
+        "bot_username": me.username,
+        "webhook_url": webhook.url,
+        "pending_updates": webhook.pending_update_count
+    }
+
+@app.get("/telegram/setup-webhook")
+async def setup_webhook():
+    """Manual webhook setup"""
+    if not application:
+        return {"status": "error", "message": "Bot not initialized"}
+    await application.bot.set_webhook(url=WEBHOOK_URL, drop_pending_updates=True)
+    return {"status": "success", "webhook_url": WEBHOOK_URL}
+
+@app.get("/telegram/delete-webhook")
+async def delete_webhook():
+    """Webhook delete"""
+    if not application:
+        return {"status": "error", "message": "Bot not initialized"}
+    await application.bot.delete_webhook(drop_pending_updates=True)
+    return {"status": "success", "message": "Webhook deleted"}
+
+# ═══════════════════════════════════════════════════════
+# RUN
+# ═══════════════════════════════════════════════════════
 
 if __name__ == "__main__":
-    main()
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
