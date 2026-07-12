@@ -954,7 +954,7 @@ async def swarm_root():
         "busy": status["agents"]["busy"],
         "error": status["agents"]["error"],
         "memory_saved_mb": status["agents"]["memory_saved_mb"],
-        "phase": SYSTEM_LOAD["phase"],
+        "phase": SYSTEM_LOAD.get("phase", 1),
     }
 
 @app.get("/api/swarm/agents")
