@@ -1,6 +1,7 @@
 """
 🦁 SINGH JI AI — TELEGRAM BOT HANDLER
 Sab Features: Commands + AI Chat + Voice + TTS + Memory + Group + Admin + Broadcast + Auto-Promo
+Admin: JITENDRA Pratap Singh (1397477543)
 """
 
 from fastapi import APIRouter, Request
@@ -10,8 +11,7 @@ import requests
 import json
 import os
 import io
-import asyncio
-from datetime import datetime
+import random
 
 router = APIRouter()
 
@@ -24,9 +24,12 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 API_BASE_URL = "https://singhji-api-production-85ca.up.railway.app"
 WEBHOOK_URL = "https://singhji-api-production-85ca.up.railway.app/modules/telegram_bot/webhook"
 
-# User memory
+# ADMIN — JITENDRA Pratap Singh
+ADMIN_IDS = [1397477543]
+
+# User tracking
 user_memory = {}
-all_users = set()  # Sab users ka set
+all_users = set()
 message_count = 0
 
 # Auto-promo messages
@@ -122,7 +125,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global message_count
     user = update.effective_user
     
-    # User track karo
     all_users.add(user.id)
     user_memory[user.id] = f"Name: {user.first_name}, Username: @{user.username or 'N/A'}"
     message_count += 1
@@ -192,7 +194,6 @@ async def use_module(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await processing_msg.delete()
         data = response.json()
         
-        # Image check
         if isinstance(data, dict):
             image_url = data.get("image_url") or data.get("url") or data.get("data", {}).get("url")
             if image_url:
@@ -202,7 +203,6 @@ async def use_module(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
                 return
         
-        # Normal response
         result_text = json.dumps(data, indent=2, ensure_ascii=False)[:4000]
         await update.message.reply_text(
             f"✅ *{module.upper()} Result:*\n\n```json\n{result_text}\n```",
@@ -299,9 +299,6 @@ async def admin_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Sab users ko message bhejo"""
     user = update.effective_user
     
-    # Simple admin check (apna Telegram ID daalo)
-    ADMIN_IDS = [123456789]  # Yahan apna Telegram ID daalo
-    
     if user.id not in ADMIN_IDS:
         await update.message.reply_text("❌ *Admin only!*", parse_mode="Markdown")
         return
@@ -340,8 +337,6 @@ async def admin_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Bot stats dikhao"""
     user = update.effective_user
     
-    ADMIN_IDS = [123456789]  # Apna Telegram ID
-    
     if user.id not in ADMIN_IDS:
         await update.message.reply_text("❌ *Admin only!*", parse_mode="Markdown")
         return
@@ -357,12 +352,11 @@ async def admin_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 # ═══════════════════════════════════════════════════════
-# AUTO-PROMO — Har 10 messages pe
+# AUTO-PROMO
 # ═══════════════════════════════════════════════════════
 
 async def send_promo(context, user_id: int):
     """Auto promotion bhejo"""
-    import random
     promo = random.choice(PROMO_MESSAGES)
     
     try:
@@ -392,21 +386,18 @@ async def voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         await processing_msg.delete()
         
-        # AI se generic jawab
         ai_response = await get_ai_response(
             "User ne voice message bheja hai. Pucho kya chahiye.", 
             user.id,
             user.first_name
         )
         
-        # Text + Voice dono bhejo
         await update.message.reply_text(
             f"🎙️ *Voice Received!*\n\n🤖 *Singh Ji AI:*\n{ai_response}\n\n"
             f"💡 *Text se bhi puch sakte ho!*",
             parse_mode="Markdown"
         )
         
-        # TTS
         voice_response = await text_to_speech(ai_response)
         if voice_response:
             await update.message.reply_voice(
@@ -414,7 +405,6 @@ async def voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 caption="🎙️ Bolke jawab!"
             )
         
-        # Auto-promo (har 5th message)
         if message_count % 5 == 0:
             await send_promo(context, user.id)
         
@@ -432,23 +422,19 @@ async def text_chat_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     user_text = update.message.text
     
-    # User track karo
     all_users.add(user.id)
     message_count += 1
     
     if not user_text.startswith('/'):
         await update.message.chat.send_action(action="typing")
         
-        # AI se jawab lo
         ai_response = await get_ai_response(user_text, user.id, user.first_name)
         
-        # Text bhejo
         await update.message.reply_text(
             f"🤖 *Singh Ji AI:*\n\n{ai_response}",
             parse_mode="Markdown"
         )
         
-        # Voice bhi bhejo
         voice_bytes = await text_to_speech(ai_response)
         if voice_bytes:
             await update.message.reply_voice(
@@ -456,7 +442,6 @@ async def text_chat_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 caption="🎙️ Bolke sunao!"
             )
         
-        # Auto-promo (har 10th message)
         if message_count % 10 == 0:
             await send_promo(context, user.id)
 
