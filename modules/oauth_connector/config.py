@@ -1,106 +1,110 @@
 """
-Singh Ji AI - Platform Configuration
+🦁 Singh Ji AI — OAuth Connector Config
+Social Media Platform Configuration
 """
-from dataclasses import dataclass
-from typing import Dict, List
 
+from dataclasses import dataclass, field
+from typing import Dict, List, Optional
+import os
 
 @dataclass
 class PlatformConfig:
-    """Configuration for each video platform"""
+    """Individual platform configuration"""
     name: str
-    display_name: str
-    auth_type: str  # "api_key", "jwt", "oauth2"
-    base_url: str
-    docs_url: str
-    free_credits: int
-    max_duration: int  # seconds
-    supports_image_to_video: bool
-    supports_audio_sync: bool
-    watermark_on_free: bool
+    auth_url: str
+    token_url: str
+    scopes: List[str]
+    client_id_env: str
+    client_secret_env: str
+    redirect_uri: str = ""
+    enabled: bool = False
 
+@dataclass  
+class Config:
+    """Main OAuth configuration class"""
 
-PLATFORM_CONFIGS: Dict[str, PlatformConfig] = {
-    "seedance": PlatformConfig(
-        name="seedance",
-        display_name="Seedance 2.0",
-        auth_type="api_key",
-        base_url="https://modelslab.com/api/v6",
-        docs_url="https://docs.modelslab.com",
-        free_credits=100,
-        max_duration=20,
-        supports_image_to_video=True,
-        supports_audio_sync=True,
-        watermark_on_free=False
-    ),
-    "kling": PlatformConfig(
-        name="kling",
-        display_name="Kling AI",
-        auth_type="jwt",
-        base_url="https://api.klingai.com",
-        docs_url="https://docs.klingai.com",
-        free_credits=66,
-        max_duration=10,
-        supports_image_to_video=True,
-        supports_audio_sync=False,
-        watermark_on_free=False
-    ),
-    "hailuo": PlatformConfig(
-        name="hailuo",
-        display_name="Hailuo AI",
-        auth_type="api_key",
-        base_url="https://api.hailuo.ai/v1",
-        docs_url="https://docs.hailuo.ai",
-        free_credits=3,
-        max_duration=6,
-        supports_image_to_video=True,
-        supports_audio_sync=False,
-        watermark_on_free=True
-    ),
-    "luma": PlatformConfig(
-        name="luma",
-        display_name="Luma Ray",
-        auth_type="api_key",
-        base_url="https://api.lumalabs.ai",
-        docs_url="https://docs.lumalabs.ai",
-        free_credits=8,
-        max_duration=5,
-        supports_image_to_video=True,
-        supports_audio_sync=False,
-        watermark_on_free=True
-    ),
-    "pika": PlatformConfig(
-        name="pika",
-        display_name="Pika Labs",
-        auth_type="api_key",
-        base_url="https://api.pika.art",
-        docs_url="https://docs.pika.art",
-        free_credits=150,
-        max_duration=3,
-        supports_image_to_video=True,
-        supports_audio_sync=True,
-        watermark_on_free=True
-    ),
-    "veo": PlatformConfig(
-        name="veo",
-        display_name="Google Veo 3.1",
-        auth_type="api_key",
-        base_url="https://api.ofox.ai/v1",
-        docs_url="https://docs.ofox.ai",
-        free_credits=10,
-        max_duration=8,
-        supports_image_to_video=True,
-        supports_audio_sync=True,
-        watermark_on_free=False
-    )
-}
+    # Platform configs
+    platforms: Dict[str, PlatformConfig] = field(default_factory=dict)
 
+    # Global settings
+    auto_refresh: bool = True
+    refresh_buffer_minutes: int = 5
+    token_storage: str = "memory"  # memory, redis, supabase
 
-def get_platform_config(platform_name: str) -> PlatformConfig:
-    """Get config for a platform"""
-    return PLATFORM_CONFIGS.get(platform_name)
+    def __post_init__(self):
+        """Initialize default platforms"""
+        self.platforms = {
+            "facebook": PlatformConfig(
+                name="Facebook",
+                auth_url="https://www.facebook.com/v25.0/dialog/oauth",
+                token_url="https://graph.facebook.com/v25.0/oauth/access_token",
+                scopes=["pages_manage_posts", "pages_read_engagement"],
+                client_id_env="FACEBOOK_APP_ID",
+                client_secret_env="FACEBOOK_APP_SECRET",
+                redirect_uri=os.getenv("FACEBOOK_REDIRECT_URI", ""),
+                enabled=bool(os.getenv("FACEBOOK_ACCESS_TOKEN")),
+            ),
+            "instagram": PlatformConfig(
+                name="Instagram",
+                auth_url="https://api.instagram.com/oauth/authorize",
+                token_url="https://api.instagram.com/oauth/access_token",
+                scopes=["instagram_basic", "instagram_content_publish"],
+                client_id_env="INSTAGRAM_APP_ID",
+                client_secret_env="INSTAGRAM_APP_SECRET",
+                redirect_uri=os.getenv("INSTAGRAM_REDIRECT_URI", ""),
+                enabled=bool(os.getenv("INSTAGRAM_ACCESS_TOKEN")),
+            ),
+            "youtube": PlatformConfig(
+                name="YouTube",
+                auth_url="https://accounts.google.com/o/oauth2/v2/auth",
+                token_url="https://oauth2.googleapis.com/token",
+                scopes=["https://www.googleapis.com/auth/youtube.upload"],
+                client_id_env="YOUTUBE_CLIENT_ID",
+                client_secret_env="YOUTUBE_CLIENT_SECRET",
+                redirect_uri=os.getenv("YOUTUBE_REDIRECT_URI", ""),
+                enabled=bool(os.getenv("YOUTUBE_API_KEY")),
+            ),
+            "twitter": PlatformConfig(
+                name="Twitter/X",
+                auth_url="https://twitter.com/i/oauth2/authorize",
+                token_url="https://api.twitter.com/2/oauth2/token",
+                scopes=["tweet.read", "tweet.write", "users.read"],
+                client_id_env="TWITTER_CLIENT_ID",
+                client_secret_env="TWITTER_CLIENT_SECRET",
+                redirect_uri=os.getenv("TWITTER_REDIRECT_URI", ""),
+                enabled=bool(os.getenv("TWITTER_BEARER_TOKEN")),
+            ),
+            "linkedin": PlatformConfig(
+                name="LinkedIn",
+                auth_url="https://www.linkedin.com/oauth/v2/authorization",
+                token_url="https://www.linkedin.com/oauth/v2/accessToken",
+                scopes=["r_liteprofile", "w_member_social"],
+                client_id_env="LINKEDIN_CLIENT_ID",
+                client_secret_env="LINKEDIN_CLIENT_SECRET",
+                redirect_uri=os.getenv("LINKEDIN_REDIRECT_URI", ""),
+                enabled=False,
+            ),
+        }
 
+    def get_platform(self, name: str) -> Optional[PlatformConfig]:
+        """Get platform config by name"""
+        return self.platforms.get(name.lower())
 
-def get_all_platforms() -> List[PlatformConfig]:
-    """Get all platform configs"""
-    return list(PLATFORM_CONFIGS.values())
+    def get_enabled_platforms(self) -> Dict[str, PlatformConfig]:
+        """Get only enabled platforms"""
+        return {k: v for k, v in self.platforms.items() if v.enabled}
+
+    def is_enabled(self, platform: str) -> bool:
+        """Check if platform is enabled"""
+        p = self.platforms.get(platform.lower())
+        return p.enabled if p else False
+
+# Singleton instance
+_config_instance = None
+
+def get_config() -> Config:
+    """Get or create config singleton"""
+    global _config_instance
+    if _config_instance is None:
+        _config_instance = Config()
+    return _config_instance
