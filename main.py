@@ -177,6 +177,311 @@ AGENT_QUEUE = []
 SYSTEM_LOAD = {"active_agents": 0, "max_agents": 100, "phase": 0}
 TRISHUL_MEMORY = {}
 
+
+
+# ═══════════════════════════════════════════════════════
+# 🦁 SMART SARWAN 330 AGENT SWARM — EMBEDDED
+# On-Demand Loading | Module-Based | Memory Efficient
+# ═══════════════════════════════════════════════════════
+
+class _SmartSarwanSwarm:
+    """
+    Singh Ji AI Ultra v8.0 — Smart Agent Swarm
+
+    Features:
+    - 330 agents metadata register (0 memory)
+    - On-demand load based on active modules
+    - API key availability = agent activation
+    - Auto-sync with MODULES dict
+    """
+
+    # Module → Agent ID mapping
+    MODULE_AGENT_MAP = {
+        "weather": ["AGR-003", "AGR-023", "AGR-029"],
+        "mandi": ["AGR-002", "AGR-011", "AGR-027", "AGR-028"],
+        "plant_id": ["AGR-004", "AGR-024"],
+        "news": ["MED-003", "EDU-018"],
+        "facebook": ["MED-004", "MED-013"],
+        "youtube": ["MED-001", "MED-005", "MED-013"],
+        "instagram": ["MED-004", "MED-007"],
+        "payment": ["FIN-001", "FIN-019", "FIN-027"],
+        "upi": ["FIN-001", "FIN-027"],
+        "banking": ["FIN-005", "FIN-006", "FIN-007"],
+        "currency": ["FIN-016", "FIN-022"],
+        "fuel": ["FIN-003", "TRP-004"],
+        "goldrate": ["FIN-002"],
+        "retirement_tax": ["FIN-013", "FIN-011"],
+        "ai_chat": ["EDU-001", "EDU-003", "AI-001", "AI-005"],
+        "aavishkar": ["AI-001", "AI-003", "AI-005"],
+        "aavishkar_ai": ["AI-001", "AI-003", "AI-005", "AI-011"],
+        "language": ["EDU-007", "VCE-001", "VCE-002"],
+        "language_hub": ["EDU-007", "VCE-001", "VCE-002", "VCE-028"],
+        "voice": ["VCE-001", "VCE-005", "VCE-006", "VCE-027"],
+        "voice_cmd": ["VCE-021", "VCE-027"],
+        "voice_tts": ["VCE-006", "VCE-007", "VCE-008", "VCE-009"],
+        "whisper": ["VCE-005"],
+        "bhashini": ["VCE-001", "VCE-002", "EDU-007"],
+        "govt": ["GOV-001", "GOV-002", "GOV-003", "GOV-030"],
+        "sewer": ["GOV-029"],
+        "trolley": ["TRP-001", "TRP-002", "TRP-003"],
+        "telegram_bot": ["BOS-009", "VCE-027"],
+        "whatsapp": ["BOS-009", "VCE-027"],
+        "trishul": ["AI-013", "AI-014", "AI-015"],
+        "trishul_memory": ["AI-013", "AI-014"],
+        "supabase_memory": ["AI-013"],
+        "memory": ["AI-013", "AI-014"],
+        "guard_agent": ["SFT-001", "SFT-003", "SFT-015"],
+        "supreme_agent": ["SFT-030", "BOS-001", "AI-020"],
+        "admin": ["BOS-001", "BOS-004", "BOS-007"],
+        "analytics": ["BOS-007", "BOS-008"],
+        "daily_report": ["BOS-004"],
+        "meta_agent": ["BOS-001", "AI-004"],
+        "schedule": ["BOS-009", "EDU-029"],
+        "news_scheduler": ["BOS-009", "MED-003"],
+        "currents_api": ["MED-003"],
+        "newsdata": ["MED-003"],
+        "search": ["MED-003", "AI-009"],
+        "singhji_tv": ["MED-001", "MED-013"],
+        "bachpan": ["HLT-012"],
+        "emergency": ["HLT-004", "HLT-029"],
+        "horoscope": ["HLT-010"],
+        "rozgar": ["EDU-004", "EDU-020", "EDU-022"],
+        "init": ["BOS-001", "AI-020"],
+        "swarm": ["BOS-001", "AI-004", "AI-020"],
+    }
+
+    # API Key → Agent ID mapping
+    KEY_AGENT_MAP = {
+        "OPENWEATHER": ["AGR-003", "AGR-023", "AGR-029"],
+        "CURRENTS": ["MED-003", "EDU-018"],
+        "GROQ": ["AI-001", "AI-005", "AI-011", "EDU-001", "EDU-003"],
+        "GEMINI": ["AI-003", "AI-012", "EDU-001"],
+        "TELEGRAM": ["BOS-009", "VCE-027"],
+        "SUPABASE": ["AI-013", "AI-014"],
+        "CEREBRAS": ["AI-001", "AI-005"],
+        "CF": ["VCE-001", "VCE-002", "EDU-007"],
+        "HUGGINGFACE": ["AI-010", "AI-012", "VCE-003"],
+        "MANDI": ["AGR-002", "AGR-011"],
+        "NEWSDATA": ["MED-003", "EDU-018"],
+        "PLANT_ID": ["AGR-004", "AGR-024"],
+        "RAPIDAPI": ["FIN-008", "FIN-023", "TRP-001"],
+        "RAZORPAY": ["FIN-001", "FIN-019", "FIN-027"],
+        "TAVILY": ["MED-003", "AI-009"],
+        "TWILIO": ["VCE-013", "VCE-027"],
+        "FACEBOOK": ["MED-004", "MED-013"],
+        "YOUTUBE": ["MED-001", "MED-005", "MED-013"],
+        "BHASHINI": ["VCE-001", "VCE-002", "EDU-007"],
+    }
+
+    # Claw definitions
+    CLAWS = {
+        "claw_1_agriculture": {"name": "🌾 Agriculture", "emoji": "🌾", "agents": 30, "prefix": "AGR"},
+        "claw_2_health": {"name": "🏥 Health", "emoji": "🏥", "agents": 30, "prefix": "HLT"},
+        "claw_3_finance": {"name": "💰 Finance", "emoji": "💰", "agents": 30, "prefix": "FIN"},
+        "claw_4_education": {"name": "📚 Education", "emoji": "📚", "agents": 30, "prefix": "EDU"},
+        "claw_5_governance": {"name": "🏛️ Governance", "emoji": "🏛️", "agents": 30, "prefix": "GOV"},
+        "claw_6_transport": {"name": "🚗 Transport", "emoji": "🚗", "agents": 30, "prefix": "TRP"},
+        "claw_7_voice": {"name": "🎙️ Voice", "emoji": "🎙️", "agents": 30, "prefix": "VCE"},
+        "claw_8_media": {"name": "📺 Media", "emoji": "📺", "agents": 30, "prefix": "MED"},
+        "claw_9_safety": {"name": "🛡️ Safety", "emoji": "🛡️", "agents": 30, "prefix": "SFT"},
+        "claw_10_boss": {"name": "👑 Boss", "emoji": "👑", "agents": 10, "prefix": "BOS"},
+        "claw_11_core_ai": {"name": "🧠 Core AI", "emoji": "🧠", "agents": 20, "prefix": "AI"},
+    }
+
+    def __init__(self):
+        self.all_agents = {}      # 330 agents metadata (lightweight)
+        self.active_agents = {}   # Currently loaded agents
+        self.module_status = {}   # Which modules are active
+        self.key_status = {}      # Which keys available
+        self.stats = {
+            "total_registered": 0,
+            "currently_loaded": 0,
+            "active_running": 0,
+            "peak_loaded": 0,
+        }
+        self._register_all()
+
+    def _register_all(self):
+        """Register all 330 agents as lightweight metadata"""
+        for claw_key, claw_info in self.CLAWS.items():
+            for i in range(1, claw_info["agents"] + 1):
+                agent_id = f"{claw_info['prefix']}-{i:03d}"
+
+                # Find linked modules
+                linked = []
+                for mod, agents in self.MODULE_AGENT_MAP.items():
+                    if agent_id in agents:
+                        linked.append(mod)
+
+                # Find required keys
+                required = []
+                for key, agents in self.KEY_AGENT_MAP.items():
+                    if agent_id in agents:
+                        required.append(key)
+
+                self.all_agents[agent_id] = {
+                    "id": agent_id,
+                    "name": f"{claw_info['prefix']} Agent {i}",
+                    "claw": claw_key,
+                    "claw_name": claw_info["name"],
+                    "claw_emoji": claw_info["emoji"],
+                    "status": "offline",
+                    "linked_modules": linked,
+                    "required_keys": required,
+                    "tasks_completed": 0,
+                    "tasks_failed": 0,
+                    "last_active": None,
+                }
+
+        self.stats["total_registered"] = len(self.all_agents)
+        logger.info(f"🦁 {len(self.all_agents)} agents registered (metadata only, 0 memory)")
+
+    def sync(self, modules_status: dict, available_keys: dict):
+        """Sync agents with module/key status"""
+        self.module_status = {name: info.get("active", False) for name, info in modules_status.items()}
+        self.key_status = available_keys
+
+        to_load = set()
+        to_unload = set()
+
+        for agent_id, agent in self.all_agents.items():
+            should_load = self._should_load(agent)
+            is_loaded = agent_id in self.active_agents
+
+            if should_load and not is_loaded:
+                to_load.add(agent_id)
+            elif not should_load and is_loaded:
+                to_unload.add(agent_id)
+
+        # Always keep boss + core AI loaded
+        for agent_id in self.all_agents:
+            if self.all_agents[agent_id]["claw"] in ["claw_10_boss", "claw_11_core_ai"]:
+                to_load.add(agent_id)
+
+        for aid in to_load:
+            self._load(aid)
+        for aid in to_unload:
+            if aid not in self.active_agents:
+                continue
+            # Don't unload boss/core agents
+            if self.all_agents[aid]["claw"] not in ["claw_10_boss", "claw_11_core_ai"]:
+                self._unload(aid)
+
+        self.stats["currently_loaded"] = len(self.active_agents)
+        if len(self.active_agents) > self.stats["peak_loaded"]:
+            self.stats["peak_loaded"] = len(self.active_agents)
+
+        logger.info(f"🐝 Smart Sync: +{len(to_load)} loaded, -{len(to_unload)} unloaded | Active: {len(self.active_agents)}/{len(self.all_agents)}")
+        return {
+            "loaded": len(to_load),
+            "unloaded": len(to_unload),
+            "active": len(self.active_agents),
+            "total": len(self.all_agents),
+        }
+
+    def _should_load(self, agent: dict) -> bool:
+        """Decide if agent should be loaded"""
+        # Boss & Core AI always load
+        if agent["claw"] in ["claw_10_boss", "claw_11_core_ai"]:
+            return True
+
+        # Check linked modules
+        for mod in agent["linked_modules"]:
+            if self.module_status.get(mod, False):
+                return True
+
+        # Check required keys
+        for key in agent["required_keys"]:
+            if self.key_status.get(key, False):
+                return True
+
+        return False
+
+    def _load(self, agent_id: str):
+        """Load agent into memory"""
+        agent = self.all_agents[agent_id].copy()
+        agent["status"] = "idle"
+        agent["last_active"] = datetime.now().isoformat()
+        self.active_agents[agent_id] = agent
+
+    def _unload(self, agent_id: str):
+        """Unload agent from memory"""
+        if agent_id in self.active_agents:
+            del self.active_agents[agent_id]
+
+    def on_request(self, module_name: str, task_type: str = None) -> list:
+        """Load agents for specific module request"""
+        linked_ids = self.MODULE_AGENT_MAP.get(module_name, [])
+        available = []
+
+        for aid in linked_ids:
+            if aid not in self.active_agents:
+                self._load(aid)
+            if self.active_agents[aid]["status"] in ["idle", "active"]:
+                available.append(self.active_agents[aid])
+
+        # Fallback to core AI
+        if not available:
+            for fallback in ["AI-020", "AI-004", "AI-001"]:
+                if fallback not in self.active_agents:
+                    self._load(fallback)
+                available.append(self.active_agents[fallback])
+
+        return available
+
+    def get_status(self):
+        """Full system status"""
+        claw_stats = {}
+        for aid, agent in self.active_agents.items():
+            c = agent["claw"]
+            if c not in claw_stats:
+                claw_stats[c] = {"name": agent["claw_name"], "emoji": agent["claw_emoji"], "total": 0, "active": 0, "idle": 0, "busy": 0}
+            claw_stats[c]["total"] += 1
+            if agent["status"] == "active":
+                claw_stats[c]["active"] += 1
+            elif agent["status"] == "idle":
+                claw_stats[c]["idle"] += 1
+            elif agent["status"] == "busy":
+                claw_stats[c]["busy"] += 1
+
+        unloaded = len(self.all_agents) - len(self.active_agents)
+        memory_saved = round(unloaded * 0.5, 1)  # ~0.5MB per agent
+
+        return {
+            "system": "Singh Ji AI Ultra v8.0 — Smart Swarm",
+            "timestamp": datetime.now().isoformat(),
+            "agents": {
+                "total_registered": len(self.all_agents),
+                "currently_loaded": len(self.active_agents),
+                "active_running": sum(1 for a in self.active_agents.values() if a["status"] == "active"),
+                "idle": sum(1 for a in self.active_agents.values() if a["status"] == "idle"),
+                "busy": sum(1 for a in self.active_agents.values() if a["status"] == "busy"),
+                "error": sum(1 for a in self.active_agents.values() if a["status"] == "error"),
+                "peak_loaded": self.stats["peak_loaded"],
+                "memory_saved_mb": memory_saved,
+            },
+            "claws": claw_stats,
+        }
+
+    def get_all_agents(self, status_filter: str = None):
+        agents = list(self.active_agents.values())
+        if status_filter:
+            agents = [a for a in agents if a["status"] == status_filter]
+        return agents
+
+    def get_agent(self, agent_id: str):
+        if agent_id not in self.active_agents and agent_id in self.all_agents:
+            self._load(agent_id)
+        return self.active_agents.get(agent_id)
+
+    def get_agents_by_claw(self, claw: str):
+        return [a for a in self.active_agents.values() if a["claw"] == claw]
+
+# ═══════════════════════════════════════════════════════
+# 🦁 GLOBAL SMART SWARM INSTANCE
+# ═══════════════════════════════════════════════════════
+SMART_SWARM = _SmartSarwanSwarm()
+
 # ═══════════════════════════════════════════════════════
 # 🦁 LIFESPAN (replaces deprecated @app.on_event)
 # ═══════════════════════════════════════════════════════
@@ -184,6 +489,16 @@ TRISHUL_MEMORY = {}
 async def lifespan(app: FastAPI):
     SYSTEM_LOAD["phase"] = 1
     logger.info("🦁 Singh Ji AI Ultra v8.0 Started!")
+
+    # 🐝 SMART SWARM INIT
+    try:
+        sync = SMART_SWARM.sync(MODULES, AVAILABLE_KEYS)
+        SYSTEM_LOAD["active_agents"] = sync["active"]
+        logger.info(f"🐝 Smart Swarm: {sync['active']}/{sync['total']} agents loaded")
+        logger.info(f"🐝 Memory saved: ~{round((sync['total'] - sync['active']) * 0.5, 1)}MB")
+    except Exception as e:
+        logger.warning(f"Smart swarm init: {e}")
+
     logger.info(f"🦁 Available Keys: {AVAILABLE_KEYS}")
     logger.info(f"🦁 Mini-Program Available: {MINIPROGRAM_AVAILABLE}")
     yield
@@ -620,16 +935,119 @@ async def gmail_auth_url():
     url = f"https://accounts.google.com/o/oauth2/v2/auth?client_id={GMAIL_CLIENT_ID}&redirect_uri={redirect_uri}&scope={scope}&response_type=code&access_type=offline"
     return {"auth_url": url, "note": "Visit this URL to authorize Gmail access"}
 
+
 # ═══════════════════════════════════════════════════════
-# 🦁 SWARM MODULE
+# 🦁 SMART SWARM MODULE — Sarwan 330 Agent Swarm
 # ═══════════════════════════════════════════════════════
+
 @app.get("/api/swarm/")
 async def swarm_root():
-    return {"module": "Sarwan 330", "total": 330, "active": SYSTEM_LOAD["active_agents"], "phase": SYSTEM_LOAD["phase"]}
+    """Smart Swarm status — on-demand loaded agents"""
+    status = SMART_SWARM.get_status()
+    return {
+        "module": "Sarwan 330 Smart Swarm",
+        "version": "8.0.0-smart",
+        "total_registered": status["agents"]["total_registered"],
+        "currently_loaded": status["agents"]["currently_loaded"],
+        "active_running": status["agents"]["active_running"],
+        "idle": status["agents"]["idle"],
+        "busy": status["agents"]["busy"],
+        "error": status["agents"]["error"],
+        "memory_saved_mb": status["agents"]["memory_saved_mb"],
+        "phase": SYSTEM_LOAD["phase"],
+    }
 
 @app.get("/api/swarm/agents")
 async def swarm_list():
-    return {"total": len(AGENT_SWARM), "active": SYSTEM_LOAD["active_agents"], "sample": list(AGENT_SWARM.keys())[:5]}
+    """Smart agent list — only loaded agents shown"""
+    status = SMART_SWARM.get_status()
+    loaded = SMART_SWARM.get_all_agents()
+    return {
+        "total_registered": status["agents"]["total_registered"],
+        "currently_loaded": len(loaded),
+        "active": status["agents"]["active_running"],
+        "idle": status["agents"]["idle"],
+        "busy": status["agents"]["busy"],
+        "error": status["agents"]["error"],
+        "offline_saved": status["agents"]["total_registered"] - len(loaded),
+        "memory_saved_mb": status["agents"]["memory_saved_mb"],
+        "agents": loaded[:30],
+        "sample_ids": [a["id"] for a in loaded[:5]],
+    }
+
+@app.get("/api/swarm/status")
+async def swarm_status():
+    """Full smart swarm status"""
+    return SMART_SWARM.get_status()
+
+@app.get("/api/swarm/agent/{agent_id}")
+async def swarm_agent_detail(agent_id: str):
+    """Get specific agent — loads on-demand if not loaded"""
+    agent = SMART_SWARM.get_agent(agent_id)
+    if not agent:
+        return JSONResponse(
+            {"error": "Agent not found", "agent_id": agent_id, "total_registered": len(SMART_SWARM.all_agents)},
+            status_code=404
+        )
+    return agent
+
+@app.post("/api/swarm/sync")
+async def swarm_sync():
+    """Re-sync agents with current module status"""
+    result = SMART_SWARM.sync(MODULES, AVAILABLE_KEYS)
+    SYSTEM_LOAD["active_agents"] = result["active"]
+    return {
+        "synced": True,
+        "loaded": result["loaded"],
+        "unloaded": result["unloaded"],
+        "active": result["active"],
+        "total": result["total"],
+        "memory_saved_mb": round((result["total"] - result["active"]) * 0.5, 1),
+    }
+
+@app.post("/api/swarm/request/{module_name}")
+async def swarm_request(module_name: str, request: Request):
+    """On-demand agent loading for specific module"""
+    data = await request.json()
+    available = SMART_SWARM.on_request(module_name, data.get("task_type"))
+    return {
+        "module": module_name,
+        "task_type": data.get("task_type", "general"),
+        "agents_available": len(available),
+        "agents": [{"id": a["id"], "name": a["name"], "status": a["status"], "claw": a["claw_name"]} for a in available[:5]],
+    }
+
+@app.get("/api/swarm/memory")
+async def swarm_memory():
+    """Memory usage stats"""
+    status = SMART_SWARM.get_status()
+    return {
+        "total_agents": status["agents"]["total_registered"],
+        "loaded_agents": status["agents"]["currently_loaded"],
+        "unloaded_agents": status["agents"]["total_registered"] - status["agents"]["currently_loaded"],
+        "memory_saved_mb": status["agents"]["memory_saved_mb"],
+        "peak_loaded": status["agents"]["peak_loaded"],
+        "load_efficiency": f"{round((status['agents']['total_registered'] - status['agents']['currently_loaded']) / status['agents']['total_registered'] * 100, 1)}%",
+    }
+
+@app.get("/api/swarm/claws")
+async def swarm_claws():
+    """Claw-wise agent distribution"""
+    status = SMART_SWARM.get_status()
+    return {"claws": status["claws"]}
+
+@app.get("/api/swarm/claw/{claw_name}")
+async def swarm_claw_detail(claw_name: str):
+    """Get agents in a specific claw"""
+    claw_key = None
+    for key, info in SMART_SWARM.CLAWS.items():
+        if info["name"].lower() == claw_name.lower() or key == claw_name:
+            claw_key = key
+            break
+    if not claw_key:
+        return JSONResponse({"error": "Claw not found"}, status_code=404)
+    agents = SMART_SWARM.get_agents_by_claw(claw_key)
+    return {"claw": claw_key, "name": SMART_SWARM.CLAWS[claw_key]["name"], "agents": agents}
 
 # ═══════════════════════════════════════════════════════
 # 🦁 RETIREMENT & TAX
