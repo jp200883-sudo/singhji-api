@@ -542,3 +542,33 @@ async def unified_detect(
         "detections": results,
         "processed_at": datetime.utcnow().isoformat()
     }
+    # ============================================
+# 🔄 AUTO-LOADER COMPATIBILITY — LAST MEIN LAGAO
+# ============================================
+
+async def handler(request):
+    """Auto-loader ke liye fallback handler"""
+    return {
+        "module": "Guard Agent",
+        "status": "active",
+        "agents": ["vehicle", "human", "sound", "face", "anpr", "fire", "crowd", "object", "behavior"],
+        "total_alerts": len(alerts_db),
+        "total_cameras": len(cameras_db),
+        "routes": [
+            "/modules/guard_agent/",
+            "/modules/guard_agent/vehicle",
+            "/modules/guard_agent/human",
+            "/modules/guard_agent/sound",
+            "/modules/guard_agent/face",
+            "/modules/guard_agent/anpr",
+            "/modules/guard_agent/fire",
+            "/modules/guard_agent/crowd",
+            "/modules/guard_agent/object",
+            "/modules/guard_agent/behavior",
+            "/modules/guard_agent/camera/register",
+            "/modules/guard_agent/camera/list",
+            "/modules/guard_agent/alerts",
+            "/modules/guard_agent/detect",
+        ],
+        "note": "Use router endpoints for full functionality"
+    }
