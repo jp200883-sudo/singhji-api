@@ -216,6 +216,15 @@ app.add_middleware(
 # and it shows up here on the next deploy.
 # ═══════════════════════════════════════════════════════
 REPO_ROOT = Path(__file__).resolve().parent
+# Module folders may live directly at repo root, OR inside a "modules/"
+# subfolder. Check both — whichever actually has handler.py files wins.
+_MODULES_SUBDIR = REPO_ROOT / "modules"
+if _MODULES_SUBDIR.is_dir() and any((_MODULES_SUBDIR / d / "handler.py").exists() for d in os.listdir(_MODULES_SUBDIR) if (_MODULES_SUBDIR / d).is_dir()):
+    SCAN_ROOT = _MODULES_SUBDIR
+    SCAN_ROOT_IS_PACKAGE_PREFIX = "modules."
+else:
+    SCAN_ROOT = REPO_ROOT
+    SCAN_ROOT_IS_PACKAGE_PREFIX = ""
 AUTOLOAD_EXCLUDE = {
     "miniprogram", "__pycache__", ".git", ".github", "venv", ".venv",
     "node_modules", "static", "templates", "tests",
@@ -225,7 +234,7 @@ AUTOLOAD_FAILURES = {}    # name -> error string
 
 
 def _autoload_modules():
-    for entry in sorted(REPO_ROOT.iterdir()):
+    for entry in sorted(SCAN_ROOT.iterdir()):
         if not entry.is_dir() or entry.name in AUTOLOAD_EXCLUDE or entry.name.startswith("."):
             continue
         handler_file = entry / "handler.py"
@@ -233,8 +242,9 @@ def _autoload_modules():
             continue
 
         module_name = entry.name
+        import_path = f"{SCAN_ROOT_IS_PACKAGE_PREFIX}{module_name}.handler"
         try:
-            mod = importlib.import_module(f"{module_name}.handler")
+            mod = importlib.import_module(import_path)
             handler_func = getattr(mod, "handler", None)
             if handler_func is None or not callable(handler_func):
                 AUTOLOAD_FAILURES[module_name] = "handler.py has no callable handler(request) function"
@@ -310,6 +320,7 @@ async def status():
         "inactive_modules": inactive_modules,
         "autoloaded_modules": AUTOLOADED_MODULES,
         "autoload_failures": AUTOLOAD_FAILURES,
+        "autoload_scan_root": str(SCAN_ROOT),
         "agents": {"total": 330, "active": SYSTEM_LOAD["active_agents"], "phase": SYSTEM_LOAD["phase"]},
         "available_keys": AVAILABLE_KEYS,
         "miniprogram": MINIPROGRAM_AVAILABLE,
@@ -1013,8 +1024,8 @@ async def api_check():
         "FACEBOOK": (f"https://graph.facebook.com/v25.0/{FACEBOOK_PAGE_ID}?access_token={FACEBOOK_ACCESS_TOKEN or ''}", {}, "GET"),
     }
     results = {}
-    live_count = all
-    dead_count = all
+    live_count = 0
+    dead_count = 0
 
     for name, (url, headers, method) in tests.items():
         if not AVAILABLE_KEYS.get(name):
