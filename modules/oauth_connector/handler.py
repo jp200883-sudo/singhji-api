@@ -1,99 +1,155 @@
 """
-Singh Ji AI - Video Aggregator Handler
+🦁 Singh Ji AI — OAuth Connector Handler
+Social Media OAuth Management
 """
+
+from fastapi import Request, APIRouter
+from fastapi.responses import JSONResponse, RedirectResponse
 import os
-import hashlib
-from datetime import datetime
-from fastapi import APIRouter, BackgroundTasks
-from pydantic import BaseModel
-from typing import Optional, List
+import json
+import logging
+from datetime import datetime, timedelta
 
-router = APIRouter(prefix="/video", tags=["Video"])
+# Import Config properly
+from .config import Config, get_config, PlatformConfig
 
-USER_REGISTRY = {}
+logger = logging.getLogger(__name__)
 
-PLATFORMS = {
-    "seedance": {"name": "Seedance 2.0", "free_credits": 100, "max_duration": 20, "watermark": False, "priority": 1},
-    "kling": {"name": "Kling AI", "free_credits": 66, "max_duration": 10, "watermark": False, "priority": 2},
-    "veo": {"name": "Google Veo 3.1", "free_credits": 10, "max_duration": 8, "watermark": False, "priority": 3},
-    "pika": {"name": "Pika Labs", "free_credits": 150, "max_duration": 3, "watermark": True, "priority": 4},
-    "luma": {"name": "Luma Ray", "free_credits": 8, "max_duration": 5, "watermark": True, "priority": 5},
-    "hailuo": {"name": "Hailuo AI", "free_credits": 3, "max_duration": 6, "watermark": True, "priority": 6}
-}
+router = APIRouter(prefix="/oauth")
 
-class RegisterRequest(BaseModel):
-    email: str
-    platforms: List[str]
+# Token storage (in-memory, replace with Redis/Supabase for production)
+_token_store = {}
 
-class VideoRequest(BaseModel):
-    email: str
-    prompt: str
-    duration: Optional[int] = 5
+def _get_stored_token(platform: str) -> dict:
+    """Get stored token for platform"""
+    return _token_store.get(platform, {})
 
-@router.post("/register")
-async def register_user(request: RegisterRequest):
-    email = request.email
-    platforms = request.platforms
-    valid = [p for p in platforms if p in PLATFORMS]
-    USER_REGISTRY[email] = {"platforms": valid, "registered_at": datetime.now().isoformat()}
-    return {"success": True, "email": email, "platforms": valid, "message": f"Registered {len(valid)} platforms!"}
-
-@router.post("/generate")
-async def auto_generate(request: VideoRequest, background_tasks: BackgroundTasks):
-    email = request.email
-    prompt = request.prompt
-    duration = request.duration
-
-    user = USER_REGISTRY.get(email)
-    if not user:
-        return {"success": False, "message": "Register first!", "action": "/api/oauth_connector/video/register"}
-
-    best = None
-    best_score = -1
-    for p in user["platforms"]:
-        if p in PLATFORMS:
-            config = PLATFORMS[p]
-            score = 0
-            if not config["watermark"]:
-                score += 100
-            score += config["free_credits"]
-            if duration <= config["max_duration"]:
-                score += 50
-            if score > best_score:
-                best_score = score
-                best = p
-
-    if not best:
-        return {"success": False, "message": "No suitable platform found!"}
-
-    platform_config = PLATFORMS[best]
-    video_id = hashlib.sha256(f"{email}{prompt}{best}{datetime.now()}".encode()).hexdigest()[:16]
-
-    return {
-        "success": True,
-        "video_id": video_id,
-        "email": email,
-        "platform": best,
-        "platform_name": platform_config["name"],
-        "prompt": prompt,
-        "duration": min(duration, platform_config["max_duration"]),
-        "status": "processing",
-        "watermark": platform_config["watermark"],
-        "message": f"Video generating on {platform_config['name']}!"
+def _store_token(platform: str, token_data: dict):
+    """Store token for platform"""
+    _token_store[platform] = {
+        **token_data,
+        "stored_at": datetime.now().isoformat(),
     }
 
-@router.get("/status/{video_id}")
-async def check_status(video_id: str):
-    return {"success": True, "video_id": video_id, "status": "processing", "message": "Video is being generated..."}
+# ═══════════════════════════════════════════════════════
+# 🦁 ROUTES
+# ═══════════════════════════════════════════════════════
 
-@router.get("/download/{video_id}")
-async def download_video(video_id: str):
-    return {"success": True, "video_id": video_id, "status": "ready", "clean_video_url": f"https://cdn.singhji.ai/video/{video_id}_clean.mp4", "message": "Clean video ready! No watermark!"}
+@router.get("/")
+async def oauth_root():
+    """OAuth connector status"""
+    config = get_config()
+    enabled = config.get_enabled_platforms()
+    return {
+        "module": "OAuth Connector",
+        "status": "active",
+        "platforms_total": len(config.platforms),
+        "platforms_enabled": len(enabled),
+        "platforms": {k: {"name": v.name, "enabled": v.enabled} for k, v in config.platforms.items()},
+    }
 
-@router.get("/platforms")
-async def list_platforms():
-    return {"success": True, "platforms": [{"name": k, "display_name": v["name"], "free_credits": v["free_credits"], "watermark": v["watermark"], "max_duration": v["max_duration"]} for k, v in PLATFORMS.items()]}
+@router.get("/{platform}/auth-url")
+async def oauth_auth_url(platform: str):
+    """Get OAuth authorization URL for platform"""
+    config = get_config()
+    plat = config.get_platform(platform)
 
-@router.get("/health")
-async def health():
-    return {"status": "ok", "mode": "Auto Video Aggregator", "registered_users": len(USER_REGISTRY)}
+    if not plat:
+        return JSONResponse({"error": f"Platform '{platform}' not found"}, status_code=404)
+
+    if not plat.enabled:
+        return JSONResponse({"error": f"Platform '{platform}' not enabled"}, status_code=400)
+
+    client_id = os.getenv(plat.client_id_env, "")
+    if not client_id:
+        return JSONResponse({"error": f"Client ID not set for {platform}"}, status_code=500)
+
+    scopes = "%20".join(plat.scopes)
+    auth_url = f"{plat.auth_url}?client_id={client_id}&redirect_uri={plat.redirect_uri}&scope={scopes}&response_type=code&state=singhji_{platform}"
+
+    return {
+        "platform": platform,
+        "auth_url": auth_url,
+        "scopes": plat.scopes,
+    }
+
+@router.get("/{platform}/callback")
+async def oauth_callback(platform: str, code: str = None, error: str = None, state: str = None):
+    """OAuth callback handler"""
+    if error:
+        return JSONResponse({"error": error, "platform": platform}, status_code=400)
+
+    if not code:
+        return JSONResponse({"error": "Authorization code missing"}, status_code=400)
+
+    config = get_config()
+    plat = config.get_platform(platform)
+
+    if not plat:
+        return JSONResponse({"error": "Platform not found"}, status_code=404)
+
+    # Store authorization code (exchange for token in production)
+    _store_token(platform, {
+        "code": code,
+        "state": state,
+        "platform": platform,
+        "status": "authorized",
+    })
+
+    logger.info(f"✅ OAuth authorized for {platform}")
+
+    return {
+        "status": "success",
+        "platform": platform,
+        "message": f"{plat.name} authorized successfully",
+        "code_received": bool(code),
+    }
+
+@router.get("/{platform}/status")
+async def oauth_status(platform: str):
+    """Check OAuth status for platform"""
+    token = _get_stored_token(platform)
+    config = get_config()
+    plat = config.get_platform(platform)
+
+    return {
+        "platform": platform,
+        "name": plat.name if plat else platform,
+        "enabled": plat.enabled if plat else False,
+        "authorized": bool(token.get("code")),
+        "token_stored_at": token.get("stored_at"),
+    }
+
+@router.post("/{platform}/disconnect")
+async def oauth_disconnect(platform: str):
+    """Disconnect OAuth for platform"""
+    if platform in _token_store:
+        del _token_store[platform]
+        logger.info(f"⛔ OAuth disconnected for {platform}")
+
+    return {"status": "disconnected", "platform": platform}
+
+@router.get("/status/all")
+async def oauth_all_status():
+    """Get status of all platforms"""
+    config = get_config()
+    result = {}
+
+    for key, plat in config.platforms.items():
+        token = _get_stored_token(key)
+        result[key] = {
+            "name": plat.name,
+            "enabled": plat.enabled,
+            "authorized": bool(token.get("code")),
+            "client_id_set": bool(os.getenv(plat.client_id_env, "")),
+        }
+
+    return {"platforms": result, "total": len(result), "authorized": sum(1 for v in result.values() if v["authorized"])}
+
+# ═══════════════════════════════════════════════════════
+# 🦁 HANDLER (for auto-loader compatibility)
+# ═══════════════════════════════════════════════════════
+
+async def handler(request: Request):
+    """Fallback handler for auto-loader"""
+    return {"module": "OAuth Connector", "status": "active", "note": "Use /oauth/ routes"}
