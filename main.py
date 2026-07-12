@@ -142,9 +142,33 @@ AVAILABLE_KEYS = {
 }
 
 # ═══════════════════════════════════════════════════════
+# 🦁 MODULE REGISTRY — real list of what's built into this app
+# ═══════════════════════════════════════════════════════
+MODULES = {
+    "memory": {"needs_key": None, "active": True},
+    "weather": {"needs_key": "OPENWEATHER", "active": AVAILABLE_KEYS["OPENWEATHER"]},
+    "news": {"needs_key": "CURRENTS", "active": AVAILABLE_KEYS["CURRENTS"]},
+    "mandi": {"needs_key": None, "active": True},
+    "plant_id": {"needs_key": "PLANT_ID", "active": AVAILABLE_KEYS["PLANT_ID"]},
+    "payment": {"needs_key": "RAZORPAY", "active": AVAILABLE_KEYS["RAZORPAY"]},
+    "admin": {"needs_key": None, "active": True},
+    "facebook": {"needs_key": "FACEBOOK", "active": AVAILABLE_KEYS["FACEBOOK"]},
+    "instagram": {"needs_key": "INSTAGRAM", "active": AVAILABLE_KEYS["INSTAGRAM"]},
+    "youtube": {"needs_key": "YOUTUBE", "active": AVAILABLE_KEYS["YOUTUBE"]},
+    "gmail": {"needs_key": "GMAIL", "active": AVAILABLE_KEYS["GMAIL"]},
+    "swarm": {"needs_key": None, "active": True},
+    "retirement_tax": {"needs_key": None, "active": True},
+    "telegram_bot": {"needs_key": "TELEGRAM", "active": AVAILABLE_KEYS["TELEGRAM"]},
+    "trishul_memory": {"needs_key": None, "active": True},
+    "aavishkar_ai": {"needs_key": "GROQ/GEMINI", "active": AVAILABLE_KEYS["GROQ"] or AVAILABLE_KEYS["GEMINI"]},
+    "bhashini": {"needs_key": "BHASHINI", "active": AVAILABLE_KEYS["BHASHINI"]},
+    "whisper": {"needs_key": None, "active": True},
+    "miniprogram": {"needs_key": None, "active": MINIPROGRAM_AVAILABLE},
+}
+
+# ═══════════════════════════════════════════════════════
 # 🦁 GLOBAL STORES
 # ═══════════════════════════════════════════════════════
-MODULES = {}
 MEMORY_STORE = {}
 AGENT_SWARM = {}
 AGENT_QUEUE = []
@@ -187,11 +211,14 @@ app.add_middleware(
 @app.get("/")
 @app.head("/")
 async def root():
+    active_modules = [name for name, info in MODULES.items() if info["active"]]
     return {
         "name": "Singh Ji AI Ultra v8.0",
         "version": "8.0.0",
         "status": "LIVE",
-        "modules": len(MODULES),
+        "total_modules": len(MODULES),
+        "active_modules_count": len(active_modules),
+        "active_modules": active_modules,
         "agents_active": SYSTEM_LOAD["active_agents"],
         "available_keys": AVAILABLE_KEYS,
         "miniprogram": MINIPROGRAM_AVAILABLE,
@@ -207,9 +234,17 @@ async def health():
 # ═══════════════════════════════════════════════════════
 @app.get("/api/status")
 async def status():
+    active_modules = [name for name, info in MODULES.items() if info["active"]]
+    inactive_modules = [
+        {"name": name, "needs_key": info["needs_key"]}
+        for name, info in MODULES.items() if not info["active"]
+    ]
     return {
         "name": "Singh Ji AI Ultra v8.0",
-        "modules": len(MODULES),
+        "total_modules": len(MODULES),
+        "active_count": len(active_modules),
+        "active_modules": active_modules,
+        "inactive_modules": inactive_modules,
         "agents": {"total": 330, "active": SYSTEM_LOAD["active_agents"], "phase": SYSTEM_LOAD["phase"]},
         "available_keys": AVAILABLE_KEYS,
         "miniprogram": MINIPROGRAM_AVAILABLE,
