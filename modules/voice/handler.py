@@ -337,29 +337,7 @@ async def send_voice_whatsapp(
         "voice_clone": voice_clone_name or "default",
         "message": f"🎤 Voice message in {lang.get('name', 'Unknown')} sent to {to_number}",
         "note": "Set WHATSAPP_TOKEN for live sending",
-    }
-
-# ═══════════════════════════════════════════════════════
-# 🔄 AUTO-LOADER COMPATIBILITY
-# ═══════════════════════════════════════════════════════
-
-async def handler(request):
-    """Auto-loader ke liye fallback"""
-    return {
-        "module": "Unified World Voice",
-        "status": "active",
-        "total_languages": len(WORLD_LANGUAGES),
-        "regions": ["India", "China", "Africa", "Middle East", "Global"],
-        "routes": [
-            "/modules/voice/",
-            "/modules/voice/languages",
-            "/modules/voice/translate",
-            "/modules/voice/clone",
-            "/modules/voice/whatsapp/send",
-        ],
-        "note": "🌍 Any language → Any language voice translation",
-    }
-    
+    }    
 # ============================================
 # 🌍 UNIFIED WORLD VOICE — SABSE NEECHE LAGAO
 # ============================================
