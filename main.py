@@ -543,6 +543,7 @@ else:
 AUTOLOAD_EXCLUDE = {
     "miniprogram", "__pycache__", ".git", ".github", "venv", ".venv",
     "node_modules", "static", "templates", "tests",
+    "voice", 
 }
 AUTOLOADED_MODULES = []   # names that loaded successfully
 AUTOLOAD_FAILURES = {}    # name -> error string
@@ -1437,13 +1438,7 @@ async def mp_admin_apps(status: str = None):
 @app.post("/api/miniprogram/admin/approve/{app_id}")
 async def mp_admin_approve(app_id: str):
     return MiniAuth.approve_app(app_id)
-    # ===== VOICE MODULE =====
-try:
-    from modules.voice import router as voice_router
-    app.include_router(voice_router, prefix="/modules/voice")
-    logger.info("🎙️ Voice module loaded successfully")
-except Exception as e:
-    logger.warning(f"⚠️ Voice module failed to load: {e}")
+  
 
 # ═══════════════════════════════════════════════════════
 # 🦁 API STATUS CHECK
