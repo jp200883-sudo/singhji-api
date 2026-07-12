@@ -359,3 +359,37 @@ async def handler(request):
         ],
         "note": "🌍 Any language → Any language voice translation",
     }
+    
+# ============================================
+# 🌍 UNIFIED WORLD VOICE — SABSE NEECHE LAGAO
+# ============================================
+
+async def handler(request):
+    return {
+        "module": "Unified World Voice",
+        "status": "active",
+        "total_languages": 50,
+        "regions": ["India", "China", "Africa", "Middle East", "Global"],
+        "engines": {
+            "meta_seamlessm4t": "101 languages",
+            "google_gemini": "70 languages", 
+            "bhashini_cf": "22 Indian languages",
+            "intron_sahara": "57 African languages",
+            "minimax": "Chinese + Voice Clone",
+            "nourvoice": "Arabic 14 dialects",
+        },
+        "features": [
+            "speech_to_speech_translation",
+            "speech_to_text",
+            "text_to_speech", 
+            "voice_cloning",
+            "emotion_preservation",
+            "cross_language_any_to_any",
+        ],
+        "example": {
+            "hindi_to_chinese": "नमस्ते → 你好",
+            "arabic_to_swahili": "مرحبا → Habari",
+            "english_to_hindi": "Hello → नमस्ते",
+        },
+        "tagline": "🎤 बोलो हिंदी में, सुनो चीनी में — Any → Any Voice!",
+    }
