@@ -23,7 +23,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/voice", tags=["Unified World Voice"])
+router = APIRouter(tags=["Unified World Voice"])
 
 # ═══════════════════════════════════════════════════════
 # 🌍 LANGUAGE DATABASE — World Coverage
