@@ -621,119 +621,15 @@ async def gmail_auth_url():
     return {"auth_url": url, "note": "Visit this URL to authorize Gmail access"}
 
 # ═══════════════════════════════════════════════════════
-# 🦁 SMART AGENT SWARM INTEGRATION — Add to main.py
+# 🦁 SWARM MODULE
 # ═══════════════════════════════════════════════════════
-
-# 1. REPLACE OLD IMPORT with this:
-from smart_agent_swarm import SmartSarwanSwarm
-
-# 2. REPLACE OLD SWARM MANAGER with this:
-SMART_SWARM = SmartSarwanSwarm("singhji_310_agent_swarm.json")
-
-# 3. IN LIFESPAN (startup) — Replace swarm init:
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    SYSTEM_LOAD["phase"] = 1
-    logger.info("🦁 Singh Ji AI Ultra v8.0 Started!")
-
-    # 🐝 SMART AGENT SWARM STARTUP
-    try:
-        # Pehle sab agents register (metadata only, 0 memory)
-        SMART_SWARM.register_all_agents()
-
-        # Ab modules ke hisaab se smart load
-        sync_result = SMART_SWARM.sync_with_modules(MODULES, AVAILABLE_KEYS)
-        SYSTEM_LOAD["active_agents"] = sync_result["active"]
-
-        logger.info(f"🐝 Smart Swarm: {sync_result['active']}/{sync_result['total']} agents loaded")
-        logger.info(f"🐝 Memory saved: ~{round((sync_result['total'] - sync_result['active']) * 0.5, 1)}MB")
-    except Exception as e:
-        logger.warning(f"Smart Swarm init failed: {e}")
-
-    logger.info(f"🦁 Available Keys: {AVAILABLE_KEYS}")
-    logger.info(f"🦁 Mini-Program Available: {MINIPROGRAM_AVAILABLE}")
-    yield
-
-    # 🛑 SHUTDOWN
-    logger.info("🦁 Singh Ji AI Ultra v8.0 Stopped!")
-
-# 4. REPLACE EXISTING SWARM ROUTES with these SMART routes:
-
 @app.get("/api/swarm/")
 async def swarm_root():
-    status = SMART_SWARM.get_status()
-    return {
-        "module": "Sarwan 330 Smart Swarm",
-        "total_registered": status["agents"]["total_registered"],
-        "currently_loaded": status["agents"]["currently_loaded"],
-        "active_running": status["agents"]["active_running"],
-        "idle": status["agents"]["idle"],
-        "busy": status["agents"]["busy"],
-        "peak_loaded": status["agents"]["peak_loaded"],
-        "memory_saved_mb": status["agents"]["memory_saved_mb"],
-        "phase": SYSTEM_LOAD["phase"],
-        "swarm_mode": status["swarm_mode"],
-    }
-
-@app.get("/api/swarm/status")
-async def swarm_status():
-    return SMART_SWARM.get_status()
+    return {"module": "Sarwan 330", "total": 330, "active": SYSTEM_LOAD["active_agents"], "phase": SYSTEM_LOAD["phase"]}
 
 @app.get("/api/swarm/agents")
-async def swarm_agents(claw: str = None, status: str = None):
-    return {"agents": SMART_SWARM.get_all_agents(status)}
-
-@app.get("/api/swarm/agent/{agent_id}")
-async def swarm_agent_detail(agent_id: str):
-    agent = SMART_SWARM.get_agent(agent_id)
-    if not agent:
-        return JSONResponse({"error": "Agent not found"}, status_code=404)
-    return agent
-
-@app.post("/api/swarm/sync")
-async def swarm_sync():
-    """Modules ke hisaab se agents ko re-sync karega"""
-    result = SMART_SWARM.sync_with_modules(MODULES, AVAILABLE_KEYS)
-    SYSTEM_LOAD["active_agents"] = result["active"]
-    return {
-        "synced": True,
-        "loaded": result["loaded"],
-        "unloaded": result["unloaded"],
-        "active": result["active"],
-        "total": result["total"],
-    }
-
-@app.post("/api/swarm/request/{module_name}")
-async def swarm_request(module_name: str, request: Request):
-    """Jab koi module request aaye — tab related agents load ho"""
-    data = await request.json()
-    available = SMART_SWARM.on_request(module_name, data.get("task_type"))
-
-    return {
-        "module": module_name,
-        "agents_available": len(available),
-        "agents": [{"id": a.id, "name": a.name, "status": a.status.value} for a in available[:5]],
-    }
-
-@app.get("/api/swarm/claws")
-async def swarm_claws():
-    status = SMART_SWARM.get_status()
-    return {"claws": status["claws"]}
-
-@app.get("/api/swarm/memory")
-async def swarm_memory():
-    """Memory usage stats"""
-    status = SMART_SWARM.get_status()
-    return {
-        "total_agents": status["agents"]["total_registered"],
-        "loaded_agents": status["agents"]["currently_loaded"],
-        "unloaded_agents": status["agents"]["total_registered"] - status["agents"]["currently_loaded"],
-        "memory_saved_mb": status["agents"]["memory_saved_mb"],
-        "peak_loaded": status["agents"]["peak_loaded"],
-    }
-
-# 5. EXISTING MODULE ROUTES mein — Har module ke end mein ye add karo:
-# Example: Weather module ke baad
+async def swarm_list():
+    return {"total": len(AGENT_SWARM), "active": SYSTEM_LOAD["active_agents"], "sample": list(AGENT_SWARM.keys())[:5]}
 
 # ═══════════════════════════════════════════════════════
 # 🦁 RETIREMENT & TAX
