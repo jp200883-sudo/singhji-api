@@ -542,8 +542,7 @@ else:
     SCAN_ROOT_IS_PACKAGE_PREFIX = ""
 AUTOLOAD_EXCLUDE = {
     "miniprogram", "__pycache__", ".git", ".github", "venv", ".venv",
-    "node_modules", "static", "templates", "tests",
-    "voice", 
+    "node_modules", "static", "templates", "tests", "voice",
 }
 AUTOLOADED_MODULES = []   # names that loaded successfully
 AUTOLOAD_FAILURES = {}    # name -> error string
