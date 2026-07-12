@@ -246,8 +246,18 @@ def _autoload_modules():
         try:
             mod = importlib.import_module(import_path)
             handler_func = getattr(mod, "handler", None)
+            router_obj = getattr(mod, "router", None)
+
+            if router_obj is not None:
+                # Proper FastAPI APIRouter — include it directly, its own
+                # routes decide their paths (usually under its own prefix).
+                app.include_router(router_obj, prefix=f"/modules/{module_name}")
+                AUTOLOADED_MODULES.append(module_name)
+                MODULES[module_name] = {"needs_key": None, "active": True}
+                continue
+
             if handler_func is None or not callable(handler_func):
-                AUTOLOAD_FAILURES[module_name] = "handler.py has no callable handler(request) function"
+                AUTOLOAD_FAILURES[module_name] = "handler.py has no callable handler(request) function or router"
                 continue
 
             async def _route(request: Request, _handler_func=handler_func):
