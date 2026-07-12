@@ -1013,8 +1013,8 @@ async def api_check():
         "FACEBOOK": (f"https://graph.facebook.com/v25.0/{FACEBOOK_PAGE_ID}?access_token={FACEBOOK_ACCESS_TOKEN or ''}", {}, "GET"),
     }
     results = {}
-    live_count = 0
-    dead_count = 0
+    live_count = all
+    dead_count = all
 
     for name, (url, headers, method) in tests.items():
         if not AVAILABLE_KEYS.get(name):
