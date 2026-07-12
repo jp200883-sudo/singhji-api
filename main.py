@@ -621,10 +621,6 @@ async def gmail_auth_url():
     return {"auth_url": url, "note": "Visit this URL to authorize Gmail access"}
 
 # ═══════════════════════════════════════════════════════
-# 🦁 SWARM MODULE
-# ═══════════════════════════════════════════════════════
-
-# ═══════════════════════════════════════════════════════
 # 🦁 SMART AGENT SWARM INTEGRATION — Add to main.py
 # ═══════════════════════════════════════════════════════
 
