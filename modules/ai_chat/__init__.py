@@ -1,2 +1,2 @@
-from .handler import process
+from .handler import handler as process
 __all__ = ["process"]
