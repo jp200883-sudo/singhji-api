@@ -1,394 +1,426 @@
 """
-🦁 SINGH JI AI — 300+ AGENT SWARM SYSTEM 🦁
-Version: v8.0 Swarm Edition
-Deploy: Render (Web Service)
-Features: 300 Agents | 4000 Steps | 11 Claw Groups
+🦁 SINGH JI AI ULTRA v8.0 — SMART SARWAN AGENT SWARM
+On-Demand Loading | Module-Based Activation | Auto-Scaling
 """
 
-import asyncio
+import os
 import json
+import asyncio
 import time
 import random
-from typing import Dict, List, Any, Optional
+import threading
+from datetime import datetime
+from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
 from enum import Enum
-from datetime import datetime
 import logging
 
-# Setup logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("SinghJiSwarm")
+logger = logging.getLogger(__name__)
 
-# ============================================
-# STEP TRACKER — 4000 Steps System
-# ============================================
-class StepTracker:
-    """Tracks up to 4000 steps per task"""
-    def __init__(self, max_steps: int = 4000):
-        self.max_steps = max_steps
-        self.current_step = 0
-        self.step_log = []
+# ═══════════════════════════════════════════════════════
+# 🦁 MODULE → AGENT MAPPING (Kaunsa agent kis module se linked)
+# ═══════════════════════════════════════════════════════
+MODULE_AGENT_MAP = {
+    # Agriculture Claw
+    "mandi": ["AGR-002", "AGR-011", "AGR-027", "AGR-028"],
+    "weather": ["AGR-003", "AGR-023", "AGR-029"],
+    "plant_id": ["AGR-004", "AGR-024"],
+    "pani": ["AGR-006", "AGR-026"],
 
-    def next_step(self, action: str, agent_id: str) -> bool:
-        if self.current_step >= self.max_steps:
-            logger.warning(f"⚠️ Step limit reached: {self.max_steps}")
-            return False
-        self.current_step += 1
-        self.step_log.append({
-            "step": self.current_step,
-            "action": action,
-            "agent": agent_id,
-            "timestamp": datetime.now().isoformat()
-        })
-        return True
+    # Health Claw
+    "bachpan": ["HLT-012"],
+    "emergency": ["HLT-004", "HLT-029"],
+    "horoscope": ["HLT-010"],
 
-    def get_progress(self) -> Dict:
-        return {
-            "current": self.current_step,
-            "max": self.max_steps,
-            "percentage": (self.current_step / self.max_steps) * 100,
-            "remaining": self.max_steps - self.current_step
-        }
+    # Finance Claw
+    "banking": ["FIN-005", "FIN-006", "FIN-007"],
+    "currency": ["FIN-016", "FIN-022"],
+    "fuel": ["FIN-003"],
+    "goldrate": ["FIN-002"],
+    "payment": ["FIN-001", "FIN-019", "FIN-027"],
+    "upi": ["FIN-001", "FIN-027"],
+    "retirement_tax": ["FIN-013", "FIN-011"],
 
-# ============================================
-# AGENT CLASS — Each Agent is a Worker
-# ============================================
+    # Education Claw
+    "ai_chat": ["EDU-001", "EDU-003", "AI-001", "AI-005"],
+    "language": ["EDU-007", "VCE-001", "VCE-002"],
+    "language_hub": ["EDU-007", "VCE-001", "VCE-002", "VCE-028"],
+
+    # Governance Claw
+    "govt": ["GOV-001", "GOV-002", "GOV-003", "GOV-030"],
+    "sewer": ["GOV-029"],
+
+    # Transport Claw
+    "trolley": ["TRP-001", "TRP-002", "TRP-003"],
+    "fuel": ["TRP-004"],
+
+    # Voice Claw
+    "voice": ["VCE-001", "VCE-005", "VCE-006", "VCE-027"],
+    "voice_cmd": ["VCE-021", "VCE-027"],
+    "voice_tts": ["VCE-006", "VCE-007", "VCE-008", "VCE-009"],
+    "whisper": ["VCE-005"],
+    "bhashini": ["VCE-001", "VCE-002"],
+
+    # Media Claw
+    "facebook": ["MED-004", "MED-013"],
+    "youtube": ["MED-001", "MED-005", "MED-013"],
+    "instagram": ["MED-004", "MED-007"],
+    "singhji_tv": ["MED-001", "MED-013"],
+    "search": ["MED-003", "AI-009"],
+
+    # Safety Claw
+    "guard_agent": ["SFT-001", "SFT-003", "SFT-015"],
+    "supreme_agent": ["SFT-030", "BOS-001", "AI-020"],
+
+    # Boss Claw
+    "admin": ["BOS-001", "BOS-004", "BOS-007"],
+    "analytics": ["BOS-007", "BOS-008"],
+    "daily_report": ["BOS-004"],
+    "meta_agent": ["BOS-001", "AI-004"],
+
+    # Core AI Claw
+    "aavishkar": ["AI-001", "AI-003", "AI-005"],
+    "aavishkar_ai": ["AI-001", "AI-003", "AI-005", "AI-011"],
+    "trishul": ["AI-013", "AI-014", "AI-015"],
+    "trishul_memory": ["AI-013", "AI-014"],
+    "supabase_memory": ["AI-013"],
+
+    # News
+    "news": ["MED-003", "EDU-018"],
+    "news_scheduler": ["MED-003", "BOS-009"],
+    "newsdata": ["MED-003"],
+    "currents_api": ["MED-003"],
+
+    # Schedule
+    "schedule": ["BOS-009", "EDU-029"],
+    "news_scheduler": ["BOS-009", "MED-003"],
+
+    # Rozgar
+    "rozgar": ["EDU-004", "EDU-020", "EDU-022"],
+
+    # Telegram
+    "telegram_bot": ["BOS-009", "VCE-027"],
+
+    # WhatsApp
+    "whatsapp": ["BOS-009", "VCE-027"],
+
+    # Memory
+    "memory": ["AI-013", "AI-014"],
+
+    # Init
+    "init": ["BOS-001", "AI-020"],
+}
+
+# ═══════════════════════════════════════════════════════
+# 🦁 API KEY → AGENT MAPPING (Key available = Related agents active)
+# ═══════════════════════════════════════════════════════
+KEY_AGENT_MAP = {
+    "OPENWEATHER": ["AGR-003", "AGR-023", "AGR-029"],
+    "CURRENTS": ["MED-003", "EDU-018"],
+    "GROQ": ["AI-001", "AI-005", "AI-011", "EDU-001", "EDU-003"],
+    "GEMINI": ["AI-003", "AI-012", "EDU-001"],
+    "TELEGRAM": ["BOS-009", "VCE-027"],
+    "SUPABASE": ["AI-013", "AI-014"],
+    "CEREBRAS": ["AI-001", "AI-005"],
+    "CF": ["VCE-001", "VCE-002", "EDU-007"],
+    "HUGGINGFACE": ["AI-010", "AI-012", "VCE-003"],
+    "MANDI": ["AGR-002", "AGR-011"],
+    "NEWSDATA": ["MED-003", "EDU-018"],
+    "PLANT_ID": ["AGR-004", "AGR-024"],
+    "RAPIDAPI": ["FIN-008", "FIN-023", "TRP-001"],
+    "RAZORPAY": ["FIN-001", "FIN-019", "FIN-027"],
+    "TAVILY": ["MED-003", "AI-009"],
+    "TWILIO": ["VCE-013", "VCE-027"],
+    "FACEBOOK": ["MED-004", "MED-013"],
+    "GMAIL": ["MED-004"],
+    "INSTAGRAM": ["MED-004", "MED-007"],
+    "YOUTUBE": ["MED-001", "MED-005", "MED-013"],
+    "BHASHINI": ["VCE-001", "VCE-002", "EDU-007"],
+}
+
+class AgentStatus(Enum):
+    OFFLINE = "offline"
+    IDLE = "idle"
+    ACTIVE = "active"
+    BUSY = "busy"
+    ERROR = "error"
+    PAUSED = "paused"
+
+class TaskPriority(Enum):
+    CRITICAL = 0
+    HIGH = 1
+    NORMAL = 2
+    LOW = 3
+
 @dataclass
 class Agent:
     id: str
     name: str
     role: str
-    claw_group: str
-    status: str = "idle"  # idle, working, completed, error
-    skills: List[str] = field(default_factory=list)
-    memory: Dict = field(default_factory=dict)
-    step_tracker: StepTracker = field(default_factory=StepTracker)
+    claw: str
+    claw_name: str
+    status: AgentStatus = AgentStatus.OFFLINE
+    linked_modules: List[str] = field(default_factory=list)
+    required_keys: List[str] = field(default_factory=list)
+    last_active: Optional[str] = None
+    tasks_completed: int = 0
+    tasks_failed: int = 0
+    current_task: Optional[str] = None
 
-    async def execute(self, task: Dict) -> Dict:
-        """Execute a task — this is where the magic happens!"""
-        self.status = "working"
-        start_time = time.time()
+    def to_dict(self):
+        return {
+            "id": self.id, "name": self.name, "role": self.role,
+            "claw": self.claw, "claw_name": self.claw_name,
+            "status": self.status.value, "linked_modules": self.linked_modules,
+            "required_keys": self.required_keys,
+            "last_active": self.last_active, "tasks_completed": self.tasks_completed,
+            "tasks_failed": self.tasks_failed, "current_task": self.current_task,
+        }
 
-        # Log step
-        self.step_tracker.next_step(f"Starting: {task.get('type', 'unknown')}", self.id)
+class SmartSarwanSwarm:
+    """
+    🦁 SMART AGENT SWARM — On-Demand Loading
 
+    Features:
+    - Module active hone pe related agents load
+    - API key available = related agents activate
+    - Lazy loading — pehle se sab load nahi
+    - Auto-scale based on traffic
+    - Memory efficient
+    """
+
+    def __init__(self, config_path: str = "singhji_310_agent_swarm.json"):
+        self.all_agents: Dict[str, Agent] = {}  # Sab 330 agents (metadata only)
+        self.active_agents: Dict[str, Agent] = {}  # Currently loaded agents
+        self.config_path = config_path
+        self.module_status: Dict[str, bool] = {}  # Kaunsa module active hai
+        self.key_status: Dict[str, bool] = {}  # Kaunsi key available hai
+        self.swarm_mode = False
+        self.max_parallel = 20  # Reduced for memory efficiency
+        self._load_threshold = 10  # Agents ka minimum batch size
+
+        self.stats = {
+            "total_registered": 0,
+            "currently_loaded": 0,
+            "active_running": 0,
+            "peak_loaded": 0,
+            "memory_saved": 0,  # Estimated
+        }
+
+    def register_all_agents(self):
+        """Sirf metadata load karega — 330 agents ki info, memory mein nahi"""
         try:
-            # Simulate agent work (replace with real logic)
-            result = await self._process_task(task)
+            with open(self.config_path, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+        except:
+            config = self._get_default_config()
 
-            self.status = "completed"
-            self.step_tracker.next_step(f"Completed: {task.get('type', 'unknown')}", self.id)
+        for claw_key, claw_data in config.get("claw_groups", {}).items():
+            for agent_data in claw_data.get("agents_list", []):
+                agent_id = agent_data["id"]
 
-            return {
-                "agent_id": self.id,
-                "agent_name": self.name,
-                "status": "success",
-                "result": result,
-                "steps_used": self.step_tracker.current_step,
-                "time_taken": round(time.time() - start_time, 3)
-            }
-        except Exception as e:
-            self.status = "error"
-            return {
-                "agent_id": self.id,
-                "agent_name": self.name,
-                "status": "error",
-                "error": str(e),
-                "steps_used": self.step_tracker.current_step
-            }
+                # Find linked modules
+                linked = []
+                for mod, agents in MODULE_AGENT_MAP.items():
+                    if agent_id in agents:
+                        linked.append(mod)
 
-    async def _process_task(self, task: Dict) -> Any:
-        """Override this for real implementation"""
-        await asyncio.sleep(0.1)  # Simulate work
-        return f"[{self.name}] processed: {task}"
+                # Find required keys
+                required = []
+                for key, agents in KEY_AGENT_MAP.items():
+                    if agent_id in agents:
+                        required.append(key)
 
-# ============================================
-# CLAW GROUP — Team of Agents
-# ============================================
-class ClawGroup:
-    """A team of agents working together"""
-    def __init__(self, name: str, leader: str):
-        self.name = name
-        self.leader = leader
-        self.agents: Dict[str, Agent] = {}
-        self.task_queue = asyncio.Queue()
-        self.results = []
+                agent = Agent(
+                    id=agent_id,
+                    name=agent_data["name"],
+                    role=agent_data["role"],
+                    claw=claw_key,
+                    claw_name=claw_data.get("name", claw_key),
+                    status=AgentStatus.OFFLINE,
+                    linked_modules=linked,
+                    required_keys=required,
+                )
+                self.all_agents[agent_id] = agent
 
-    def add_agent(self, agent: Agent):
-        self.agents[agent.id] = agent
-        logger.info(f"✅ Added {agent.name} to {self.name}")
+        self.stats["total_registered"] = len(self.all_agents)
+        logger.info(f"🦁 {len(self.all_agents)} agents REGISTERED (metadata only, 0 memory)")
+        return len(self.all_agents)
 
-    async def dispatch_task(self, task: Dict) -> List[Dict]:
-        """Send task to all agents in parallel"""
-        tasks = []
-        for agent in self.agents.values():
-            if agent.status == "idle":
-                tasks.append(agent.execute(task))
-
-        if not tasks:
-            return [{"error": "No idle agents available"}]
-
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-        self.results.extend([r for r in results if isinstance(r, dict)])
-        return self.results
-
-    def get_stats(self) -> Dict:
-        return {
-            "group": self.name,
-            "leader": self.leader,
-            "total_agents": len(self.agents),
-            "idle": sum(1 for a in self.agents.values() if a.status == "idle"),
-            "working": sum(1 for a in self.agents.values() if a.status == "working"),
-            "completed": sum(1 for a in self.agents.values() if a.status == "completed"),
-            "errors": sum(1 for a in self.agents.values() if a.status == "error")
-        }
-
-# ============================================
-# MASTER SWARM — The Big Boss
-# ============================================
-class SinghJiSwarm:
-    """300+ Agent Swarm Controller"""
-
-    def __init__(self):
-        self.claws: Dict[str, ClawGroup] = {}
-        self.master_tracker = StepTracker(max_steps=4000)
-        self.global_memory = {}
-        self.is_running = False
-
-    def create_claw(self, claw_id: str, name: str, leader: str):
-        self.claws[claw_id] = ClawGroup(name, leader)
-        logger.info(f"🔥 Created Claw: {name} (Leader: {leader})")
-
-    def add_agent_to_claw(self, claw_id: str, agent: Agent):
-        if claw_id in self.claws:
-            self.claws[claw_id].add_agent(agent)
-        else:
-            logger.error(f"❌ Claw {claw_id} not found!")
-
-    async def execute_mission(self, mission: Dict) -> Dict:
+    def sync_with_modules(self, modules_status: Dict[str, dict], available_keys: Dict[str, bool]):
         """
-        Execute a mission across multiple claws
-        Example mission:
-        {
-            "type": "farmer_help",
-            "claws": ["claw_1_agriculture", "claw_2_health"],
-            "tasks": [
-                {"type": "crop_advice", "crop": "wheat"},
-                {"type": "health_check", "symptom": "fever"}
-            ]
-        }
+        Main.py se call hoga — jab modules load hote hain
+        modules_status: {"weather": {"active": True, "needs_key": "OPENWEATHER"}, ...}
         """
-        self.is_running = True
-        start_time = time.time()
+        self.module_status = {name: info.get("active", False) for name, info in modules_status.items()}
+        self.key_status = available_keys
 
-        logger.info(f"🚀 MISSION STARTED: {mission.get('type', 'unknown')}")
+        # Decide kaunse agents load karne hain
+        agents_to_load = set()
+        agents_to_unload = set()
 
-        all_results = []
+        for agent_id, agent in self.all_agents.items():
+            should_load = self._should_agent_load(agent)
+            is_loaded = agent_id in self.active_agents
 
-        # Dispatch to each claw
-        for claw_id in mission.get("claws", []):
-            if claw_id in self.claws:
-                claw = self.claws[claw_id]
-                for task in mission.get("tasks", []):
-                    if self.master_tracker.next_step(f"Dispatch to {claw_id}", "MASTER"):
-                        results = await claw.dispatch_task(task)
-                        all_results.extend(results)
-            else:
-                logger.warning(f"⚠️ Claw {claw_id} not found")
+            if should_load and not is_loaded:
+                agents_to_load.add(agent_id)
+            elif not should_load and is_loaded:
+                agents_to_unload.add(agent_id)
 
-        self.is_running = False
+        # Load agents
+        for agent_id in agents_to_load:
+            self._load_agent(agent_id)
+
+        # Unload agents
+        for agent_id in agents_to_unload:
+            self._unload_agent(agent_id)
+
+        logger.info(f"🐝 Sync complete: +{len(agents_to_load)} loaded, -{len(agents_to_unload)} unloaded")
+        logger.info(f"🐝 Active agents: {len(self.active_agents)}/{len(self.all_agents)}")
+        return {
+            "loaded": len(agents_to_load),
+            "unloaded": len(agents_to_unload),
+            "active": len(self.active_agents),
+            "total": len(self.all_agents),
+        }
+
+    def _should_agent_load(self, agent: Agent) -> bool:
+        """Decide karna: agent load hona chahiye ya nahi"""
+        # 1. Agar koi linked module active hai → LOAD
+        for mod in agent.linked_modules:
+            if self.module_status.get(mod, False):
+                # Check if module needs key and key is available
+                return True
+
+        # 2. Agar required key available hai → LOAD
+        for key in agent.required_keys:
+            if self.key_status.get(key, False):
+                return True
+
+        # 3. Boss agents hamesha load (critical)
+        if agent.claw == "claw_10_boss":
+            return True
+
+        # 4. Core AI agents hamesha load
+        if agent.claw == "claw_11_core_ai":
+            return True
+
+        return False
+
+    def _load_agent(self, agent_id: str):
+        """Agent ko memory mein load karega"""
+        if agent_id in self.active_agents:
+            return
+
+        agent = self.all_agents[agent_id]
+        agent.status = AgentStatus.IDLE
+        agent.last_active = datetime.now().isoformat()
+        self.active_agents[agent_id] = agent
+
+        self.stats["currently_loaded"] = len(self.active_agents)
+        if len(self.active_agents) > self.stats["peak_loaded"]:
+            self.stats["peak_loaded"] = len(self.active_agents)
+
+        logger.debug(f"✅ Loaded agent {agent_id} ({agent.name})")
+
+    def _unload_agent(self, agent_id: str):
+        """Agent ko memory se unload karega"""
+        if agent_id not in self.active_agents:
+            return
+
+        agent = self.active_agents[agent_id]
+        agent.status = AgentStatus.OFFLINE
+        agent.current_task = None
+        del self.active_agents[agent_id]
+
+        self.stats["currently_loaded"] = len(self.active_agents)
+        logger.debug(f"⛔ Unloaded agent {agent_id}")
+
+    def on_request(self, module_name: str, task_type: str = None) -> List[Agent]:
+        """
+        Jab user request aaye — tab related agents load ho
+        Returns: List of available agents for this request
+        """
+        # Find agents linked to this module
+        linked_agent_ids = MODULE_AGENT_MAP.get(module_name, [])
+
+        available = []
+        for agent_id in linked_agent_ids:
+            # Load if not already loaded
+            if agent_id not in self.active_agents:
+                self._load_agent(agent_id)
+
+            agent = self.active_agents.get(agent_id)
+            if agent and agent.status in [AgentStatus.IDLE, AgentStatus.ACTIVE]:
+                available.append(agent)
+
+        # If no specific agents, use Core AI
+        if not available:
+            for agent_id in ["AI-020", "AI-004", "AI-001"]:
+                if agent_id not in self.active_agents:
+                    self._load_agent(agent_id)
+                agent = self.active_agents.get(agent_id)
+                if agent and agent.status in [AgentStatus.IDLE, AgentStatus.ACTIVE]:
+                    available.append(agent)
+
+        return available
+
+    def get_status(self) -> Dict[str, Any]:
+        """Full system status"""
+        claw_stats = {}
+        for agent in self.active_agents.values():
+            if agent.claw not in claw_stats:
+                claw_stats[agent.claw] = {"name": agent.claw_name, "total": 0, "active": 0, "idle": 0, "busy": 0}
+            claw_stats[agent.claw]["total"] += 1
+            if agent.status == AgentStatus.ACTIVE:
+                claw_stats[agent.claw]["active"] += 1
+            elif agent.status == AgentStatus.IDLE:
+                claw_stats[agent.claw]["idle"] += 1
+            elif agent.status == AgentStatus.BUSY:
+                claw_stats[agent.claw]["busy"] += 1
+
+        # Calculate memory saved
+        unloaded = len(self.all_agents) - len(self.active_agents)
+        memory_saved_mb = unloaded * 0.5  # Estimate: 0.5MB per agent
 
         return {
-            "mission": mission.get("type"),
-            "status": "completed",
-            "total_results": len(all_results),
-            "steps_used": self.master_tracker.current_step,
-            "steps_remaining": self.master_tracker.get_progress()["remaining"],
-            "time_taken": round(time.time() - start_time, 3),
-            "results": all_results
+            "system": "Singh Ji AI Ultra v8.0 — Smart Swarm",
+            "timestamp": datetime.now().isoformat(),
+            "agents": {
+                "total_registered": len(self.all_agents),
+                "currently_loaded": len(self.active_agents),
+                "active_running": sum(1 for a in self.active_agents.values() if a.status == AgentStatus.ACTIVE),
+                "idle": sum(1 for a in self.active_agents.values() if a.status == AgentStatus.IDLE),
+                "busy": sum(1 for a in self.active_agents.values() if a.status == AgentStatus.BUSY),
+                "peak_loaded": self.stats["peak_loaded"],
+                "memory_saved_mb": round(memory_saved_mb, 1),
+            },
+            "modules": self.module_status,
+            "keys": self.key_status,
+            "claws": claw_stats,
+            "swarm_mode": self.swarm_mode,
         }
 
-    def get_swarm_stats(self) -> Dict:
-        """Get full swarm statistics"""
-        stats = {
-            "system": "Singh Ji AI — 300+ Agent Swarm",
-            "total_claws": len(self.claws),
-            "total_agents": sum(len(c.agents) for c in self.claws.values()),
-            "master_steps": self.master_tracker.get_progress(),
-            "claws": {}
-        }
-        for claw_id, claw in self.claws.items():
-            stats["claws"][claw_id] = claw.get_stats()
-        return stats
+    def get_all_agents(self, status_filter: str = None) -> List[Dict]:
+        """Currently loaded agents return karega"""
+        agents = self.active_agents.values()
+        if status_filter:
+            agents = [a for a in agents if a.status.value == status_filter]
+        return [a.to_dict() for a in agents]
 
-    def get_agent_by_id(self, agent_id: str) -> Optional[Agent]:
-        for claw in self.claws.values():
-            if agent_id in claw.agents:
-                return claw.agents[agent_id]
-        return None
+    def get_agent(self, agent_id: str) -> Optional[Dict]:
+        """Agent detail — load if not loaded"""
+        if agent_id not in self.active_agents and agent_id in self.all_agents:
+            self._load_agent(agent_id)
+        agent = self.active_agents.get(agent_id)
+        return agent.to_dict() if agent else None
 
-# ============================================
-# CLAUDE ETHICS OVERLAY — Safety + Ethics
-# ============================================
-class ClaudeEthicsOverlay:
-    """
-    Claude की "किमियत" = Safety + Ethics
-    Singh Ji AI में add करो — सबसे तगड़ी "किमियत"!
-    """
+    def _get_default_config(self):
+        """Default config agar JSON nahi mile"""
+        return {"claw_groups": {}}
 
-    SAFETY_RULES = [
-        "No harmful content for children",
-        "No hate speech or discrimination",
-        "No illegal activities",
-        "Protect user privacy",
-        "Be honest about limitations"
-    ]
-
-    def __init__(self, swarm: SinghJiSwarm):
-        self.swarm = swarm
-        self.violations = []
-
-    def check_safety(self, content: str) -> Dict:
-        """Check if content is safe"""
-        issues = []
-
-        # Simple checks (replace with real NLP)
-        harmful_keywords = ["harm", "kill", "attack", "bomb", "weapon"]
-        for keyword in harmful_keywords:
-            if keyword in content.lower():
-                issues.append(f"Potential harm detected: {keyword}")
-
-        is_safe = len(issues) == 0
-
-        if not is_safe:
-            self.violations.append({
-                "content": content[:100],
-                "issues": issues,
-                "timestamp": datetime.now().isoformat()
-            })
-
-        return {
-            "is_safe": is_safe,
-            "issues": issues,
-            "action": "block" if not is_safe else "allow"
-        }
-
-    def get_ethics_report(self) -> Dict:
-        return {
-            "total_violations": len(self.violations),
-            "safety_rules": self.SAFETY_RULES,
-            "recent_violations": self.violations[-10:]
-        }
-
-# ============================================
-# INITIALIZE SWARM — Load 300 Agents
-# ============================================
-def initialize_swarm() -> SinghJiSwarm:
-    """Initialize the full 300+ Agent Swarm"""
-    swarm = SinghJiSwarm()
-
-    # Load agent definitions
-    agent_data = {
-        "claw_1_agriculture": ("🌾 Agriculture Claw", "CropMaster Agent"),
-        "claw_2_health": ("🏥 Health Claw", "Dr. Singh Agent"),
-        "claw_3_finance": ("💰 Finance Claw", "Banker Singh Agent"),
-        "claw_4_education": ("📚 Education Claw", "Guru Ji Agent"),
-        "claw_5_governance": ("🏛️ Governance Claw", "Sarkar Agent"),
-        "claw_6_transport": ("🚗 Transport Claw", "Chalak Agent"),
-        "claw_7_voice": ("🎙️ Voice Claw", "Bolti Agent"),
-        "claw_8_media": ("📺 Media Claw", "Chitra Agent"),
-        "claw_9_safety": ("🛡️ Safety Claw", "Rakshak Agent"),
-        "claw_10_boss": ("👑 Boss Claw", "Master Singh Agent"),
-        "claw_11_core_ai": ("🧠 Core AI Claw", "Singh Brain Agent"),
-    }
-
-    # Create claws
-    for claw_id, (name, leader) in agent_data.items():
-        swarm.create_claw(claw_id, name, leader)
-
-    # Add sample agents (in real app, load from JSON)
-    # This is just a demo — full 300 loaded from singhji_310_agent_swarm.json
-
-    logger.info("🦁 SWARM INITIALIZED — Ready for 4000 Steps!")
-    return swarm
-
-# ============================================
-# FASTAPI ENDPOINTS — Render Deploy Ready
-# ============================================
-"""
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-
-app = FastAPI(title="Singh Ji AI — 300 Agent Swarm API")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-swarm = initialize_swarm()
-ethics = ClaudeEthicsOverlay(swarm)
-
-@app.get("/")
-async def root():
-    return {"message": "🦁 Singh Ji AI — 300 Agent Swarm Active!"}
-
-@app.get("/swarm/stats")
-async def swarm_stats():
-    return swarm.get_swarm_stats()
-
-@app.post("/swarm/mission")
-async def run_mission(mission: Dict):
-    # Safety check first
-    safety = ethics.check_safety(str(mission))
-    if not safety["is_safe"]:
-        return {"error": "Safety violation", "details": safety}
-
-    return await swarm.execute_mission(mission)
-
-@app.get("/swarm/agent/{agent_id}")
-async def get_agent(agent_id: str):
-    agent = swarm.get_agent_by_id(agent_id)
-    if agent:
-        return {
-            "id": agent.id,
-            "name": agent.name,
-            "role": agent.role,
-            "status": agent.status,
-            "claw": agent.claw_group
-        }
-    return {"error": "Agent not found"}
-
-@app.get("/swarm/ethics/report")
-async def ethics_report():
-    return ethics.get_ethics_report()
-"""
-
-# ============================================
-# DEMO RUN
-# ============================================
-async def demo():
-    swarm = initialize_swarm()
-
-    # Demo mission
-    mission = {
-        "type": "farmer_emergency",
-        "claws": ["claw_1_agriculture"],
-        "tasks": [
-            {"type": "crop_disease", "crop": "wheat", "symptom": "yellow leaves"},
-            {"type": "weather_alert", "location": "Punjab"}
-        ]
-    }
-
-    result = await swarm.execute_mission(mission)
-    print(json.dumps(result, indent=2, ensure_ascii=False))
-
-    print("\n" + "="*60)
-    print("SWARM STATS:")
-    print(json.dumps(swarm.get_swarm_stats(), indent=2, ensure_ascii=False))
-
-if __name__ == "__main__":
-    asyncio.run(demo())
+# ═══════════════════════════════════════════════════════
+# 🦁 GLOBAL INSTANCE
+# ═══════════════════════════════════════════════════════
+SMART_SWARM = SmartSarwanSwarm()
