@@ -1,16 +1,56 @@
 """
-🦁 SINGH JI AI — TELEGRAM MASTER CONTROL BOT v1.0
-Sab 95 Active Modules Telegram Se Control!
-Webhook Mode — Railway Ready!
+🦁 SINGH JI AI — TELEGRAM BOT HANDLER
+modules/telegram_bot/handler.py
 """
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
-import requests
-import json
+from fastapi import APIRouter, Request
+from telegram import Update
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler
 import os
-from fastapi import FastAPI, Request
-import uvicorn
+
+router = APIRouter()
+
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
+WEBHOOK_URL = "https://singhji-api-production-85ca.up.railway.app/modules/telegram_bot/webhook"
+
+# Application global
+application = None
+
+async def start(update, context):
+    await update.message.reply_text("🦁 Singh Ji AI Bot Ready! /start")
+
+async def status(update, context):
+    await update.message.reply_text("✅ System Online!")
+
+def init_bot():
+    global application
+    if not TELEGRAM_BOT_TOKEN:
+        print("❌ TELEGRAM_BOT_TOKEN missing!")
+        return None
+    
+    application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("status", status))
+    return application
+
+@router.post("/webhook")
+async def telegram_webhook(request: Request):
+    """Telegram webhook handler"""
+    global application
+    if not application:
+        application = init_bot()
+        if application:
+            await application.initialize()
+            await application.start()
+    
+    data = await request.json()
+    update = Update.de_json(data, application.bot)
+    await application.process_update(update)
+    return {"ok": True}
+
+@router.get("/health")
+async def bot_health():
+    return {"status": "alive", "bot": "Singh Ji AI"}
 
 # ═══════════════════════════════════════════════════════
 # CONFIG
