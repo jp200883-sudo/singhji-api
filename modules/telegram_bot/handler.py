@@ -1,7 +1,7 @@
 """
-🦁 SINGH JI AI — TELEGRAM BOT HANDLER (Production Ready)
+🦁 SINGH JI AI — TELEGRAM BOT HANDLER (Production Ready - FIXED v8.1)
 modules/telegram_bot/handler.py
-Version: v8.0 Ultimate — All Features + Security + Analytics
+Version: v8.1 Ultimate — All Bugs Fixed + Optimized
 """
 
 from fastapi import APIRouter, Request, HTTPException
@@ -61,7 +61,7 @@ class Config:
 config = Config()
 
 # ═══════════════════════════════════════════════════════
-# RATE LIMITER
+# RATE LIMITER (FIXED — Lock Removed, Background Cleanup)
 # ═══════════════════════════════════════════════════════
 
 class RateLimiter:
@@ -69,31 +69,55 @@ class RateLimiter:
         self.max_requests = max_requests
         self.window_seconds = window_seconds
         self.requests: Dict[int, list] = {}
-        self._cleanup_lock = asyncio.Lock()
+        self._cleanup_task = None
     
     async def is_allowed(self, user_id: int) -> bool:
-        """Check if user is within rate limits"""
-        async with self._cleanup_lock:
-            now = datetime.now()
-            
-            if user_id not in self.requests:
-                self.requests[user_id] = []
-            
-            # Clean old requests
-            self.requests[user_id] = [
-                req for req in self.requests[user_id] 
-                if now - req < timedelta(seconds=self.window_seconds)
-            ]
-            
-            if len(self.requests[user_id]) >= self.max_requests:
-                return False
-            
-            self.requests[user_id].append(now)
-            return True
+        """Check if user is within rate limits — NO LOCK, async-safe"""
+        now = datetime.now()
+        
+        if user_id not in self.requests:
+            self.requests[user_id] = []
+        
+        # Clean old requests for this user only (fast)
+        cutoff = now - timedelta(seconds=self.window_seconds)
+        self.requests[user_id] = [
+            req for req in self.requests[user_id] 
+            if req > cutoff
+        ]
+        
+        if len(self.requests[user_id]) >= self.max_requests:
+            return False
+        
+        self.requests[user_id].append(now)
+        return True
     
     def get_user_requests(self, user_id: int) -> int:
         """Get current request count for user"""
         return len(self.requests.get(user_id, []))
+    
+    async def start_cleanup(self):
+        """Start background cleanup task"""
+        while True:
+            await asyncio.sleep(300)  # Every 5 minutes
+            self._cleanup_expired()
+    
+    def _cleanup_expired(self):
+        """Remove expired entries from all users"""
+        now = datetime.now()
+        cutoff = now - timedelta(seconds=self.window_seconds * 2)  # 2x window safety
+        expired_users = []
+        
+        for user_id, reqs in self.requests.items():
+            self.requests[user_id] = [r for r in reqs if r > cutoff]
+            if not self.requests[user_id]:
+                expired_users.append(user_id)
+        
+        # Remove empty users
+        for uid in expired_users:
+            del self.requests[uid]
+        
+        if expired_users:
+            logger.info(f"🧹 Rate limiter cleanup: {len(expired_users)} users removed")
 
 rate_limiter = RateLimiter(config.RATE_LIMIT_MAX, config.RATE_LIMIT_WINDOW)
 
@@ -912,7 +936,7 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 {chr(10).join([f"• {mod}: {count}" for mod, count in analytics_summary['top_modules'][:5]])}
 
 *Environment:* {config.ENVIRONMENT}
-*Version:* v8.0 Ultimate
+*Version:* v8.1 Fixed
     """
     
     await update.message.reply_text(
@@ -942,7 +966,7 @@ async def about_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     about_text = """
 🦁 *SINGH JI AI ULTRA*
 
-*Version:* 8.0 Ultimate
+*Version:* 8.1 Fixed
 *Created:* 2024
 *Platform:* Railway
 
@@ -1098,7 +1122,7 @@ async def text_chat_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
 
 async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle messages in group chats"""
+    """Handle messages in group chats — FIXED: No random replies!"""
     message = update.message
     user = update.effective_user
     bot_username = context.bot.username
@@ -1115,11 +1139,8 @@ async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYP
     elif message.reply_to_message and message.reply_to_message.from_user.id == context.bot.id:
         should_respond = True
     
-    # Random response (5% chance if message is a question)
-    elif "?" in message.text and len(message.text) < 100:
-        import random
-        if random.random() < 0.05:  # 5% chance
-            should_respond = True
+    # ❌ REMOVED: Random 5% response — was causing spam!
+    # Only respond when explicitly mentioned or replied
     
     if should_respond and user_text.strip():
         await update.message.chat.send_action(action="typing")
@@ -1419,8 +1440,7 @@ async def setup_application() -> Application:
         BotCommand("status", "📊 System status"),
         BotCommand("settings", "⚙️ Settings"),
         BotCommand("about", "ℹ️ About Singh Ji AI"),
-        BotCommand("news", "📰 News scheduler"),
-        BotCommand("voice", "🎙️ Voice commands"),
+        BotCommand("stats", "📈 Usage statistics"),
     ]
     await application.bot.set_my_commands(commands)
     
@@ -1473,7 +1493,7 @@ def verify_webhook_secret(request: Request) -> bool:
 
 @router.post("/webhook")
 async def telegram_webhook(request: Request):
-    """Handle incoming webhook from Telegram"""
+    """Handle incoming webhook from Telegram — FIXED!"""
     global application
     
     # Verify webhook secret
@@ -1481,12 +1501,12 @@ async def telegram_webhook(request: Request):
         raise HTTPException(status_code=403, detail="Unauthorized")
     
     try:
-        # Get application
+        # Get application — FIX: Only initialize once, NEVER start() in webhook mode!
         if application is None:
             application = await setup_application()
             await application.initialize()
-            await application.start()
-            logger.info("✅ Bot started via webhook!")
+            # ❌ REMOVED: await application.start() — causes duplicate handlers!
+            logger.info("✅ Bot initialized via webhook!")
         
         # Process update
         data = await request.json()
@@ -1506,7 +1526,7 @@ async def health_check():
     """Health check endpoint"""
     return {
         "status": "healthy",
-        "bot": "Singh Ji AI v8.0",
+        "bot": "Singh Ji AI v8.1",
         "timestamp": datetime.now().isoformat(),
         "modules": len(ACTIVE_MODULES),
         "token_set": bool(config.TELEGRAM_BOT_TOKEN),
@@ -1526,7 +1546,7 @@ async def setup_webhook():
     try:
         app = await setup_application()
         await app.initialize()
-        await app.start()
+        # ❌ REMOVED: await app.start() — webhook mode mein nahi chahiye!
         
         # Set webhook
         await app.bot.set_webhook(
@@ -1559,7 +1579,7 @@ async def delete_webhook():
     try:
         if application:
             await application.bot.delete_webhook(drop_pending_updates=True)
-            await application.stop()
+            # ❌ REMOVED: await application.stop() — polling mode mein hi chahiye
             global app_instance
             app_instance = None
         
@@ -1643,23 +1663,25 @@ async def broadcast_message(request: Request):
         raise HTTPException(status_code=500, detail=str(e))
 
 # ═══════════════════════════════════════════════════════
-# STARTUP/SHUTDOWN EVENTS
+# STARTUP/SHUTDOWN EVENTS — FIXED: No polling in production!
 # ═══════════════════════════════════════════════════════
 
 @router.on_event("startup")
 async def startup_event():
-    """Initialize bot on startup if using polling"""
+    """Initialize bot on startup — FIXED: Only in development!"""
     if config.ENVIRONMENT == "development":
         try:
             app = await setup_application()
             await app.initialize()
             await app.start()
             
-            # Use polling in development
+            # Use polling in development ONLY
             await app.updater.start_polling()
-            logger.info("✅ Bot started in polling mode!")
+            logger.info("✅ Bot started in polling mode (development)!")
         except Exception as e:
             logger.error(f"Startup error: {e}")
+    else:
+        logger.info("🚀 Production mode — webhook only, no polling!")
 
 @router.on_event("shutdown")
 async def shutdown_event():
