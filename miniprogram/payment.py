@@ -138,3 +138,37 @@ class PaymentManager:
 
 # Global instance
 payment = PaymentManager()
+
+# ═══════════════════════════════════════════════════════
+# 🦁 MINIPAYMENT ALIAS — for main.py compatibility
+# ═══════════════════════════════════════════════════════
+class MiniPayment:
+    """Alias for PaymentManager — used by main.py import"""
+
+    @staticmethod
+    def process(amount, user_id=None, merchant_id=None, method="upi", metadata=None):
+        """Demo payment processing"""
+        from datetime import datetime
+        return {
+            "status": "demo",
+            "message": "Payment gateway on hold — activate at 1000+ users",
+            "amount": amount,
+            "user_id": user_id or "demo_user",
+            "merchant_id": merchant_id or "demo_merchant",
+            "method": method,
+            "upi_id": "jp200883@sbi",
+            "commission_rate": 0.0,
+            "timestamp": datetime.now().isoformat()
+        }
+
+    @staticmethod
+    def get_commission(amount, method):
+        """Commission calculator"""
+        rates = {"upi": 0.0, "card": 0.02, "netbanking": 0.01}
+        rate = rates.get(method, 0.0)
+        return {
+            "amount": amount,
+            "method": method,
+            "rate": rate,
+            "commission": round(amount * rate, 2)
+        }
