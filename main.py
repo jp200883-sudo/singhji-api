@@ -20,13 +20,12 @@ from pathlib import Path
 from datetime import datetime, timedelta
 import requests
 import logging
+from collections import defaultdict, deque
+import threading
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
 logger = logging.getLogger(__name__)
 
-# ═══════════════════════════════════════════════════════
-# 🦁 ALL API KEYS — 100% from Railway env
-# ═══════════════════════════════════════════════════════
 ADMIN_API_KEY = os.getenv("ADMIN_API_KEY")
 CEREBRAS_API_KEY = os.getenv("CEREBRAS_API_KEY")
 CF_API_TOKEN = os.getenv("CF_API_TOKEN")
@@ -59,9 +58,6 @@ GMAIL_CLIENT_SECRET = os.getenv("GMAIL_CLIENT_SECRET")
 INSTAGRAM_ACCESS_TOKEN = os.getenv("INSTAGRAM_ACCESS_TOKEN")
 INSTAGRAM_BUSINESS_ID = os.getenv("INSTAGRAM_BUSINESS_ID")
 
-# ═══════════════════════════════════════════════════════
-# 🦁 AVAILABLE KEYS MAP
-# ═══════════════════════════════════════════════════════
 AVAILABLE_KEYS = {
     "ADMIN": bool(ADMIN_API_KEY),
     "CEREBRAS": bool(CEREBRAS_API_KEY),
@@ -88,9 +84,6 @@ AVAILABLE_KEYS = {
     "INSTAGRAM": bool(INSTAGRAM_ACCESS_TOKEN),
 }
 
-# ═══════════════════════════════════════════════════════
-# 🦁 SUPABASE CLIENT
-# ═══════════════════════════════════════════════════════
 SUPABASE_CLIENT = None
 try:
     from supabase import create_client
@@ -100,9 +93,6 @@ try:
 except Exception as e:
     logger.warning(f"Supabase init failed: {e}")
 
-# ═══════════════════════════════════════════════════════
-# 🦁 CACHE SYSTEM
-# ═══════════════════════════════════════════════════════
 CACHE_TTL = {
     "weather": 1800,
     "mandi": 21600,
@@ -143,15 +133,11 @@ def _cache_set(key, value, ttl=None):
     except Exception as e:
         logger.warning(f"Cache set error: {e}")
 
-# ═══════════════════════════════════════════════════════
-# 🦁 MEMORY SYSTEM
-# ═══════════════════════════════════════════════════════
 MEMORY_STORE = {}
-MAX_MEMORY_SIZE = 1000  # Prevent memory leak
+MAX_MEMORY_SIZE = 1000
 
 def _check_memory_limit():
     if len(MEMORY_STORE) > MAX_MEMORY_SIZE:
-        # Remove oldest entries (first 20%)
         keys_to_remove = list(MEMORY_STORE.keys())[:int(MAX_MEMORY_SIZE * 0.2)]
         for k in keys_to_remove:
             del MEMORY_STORE[k]
@@ -178,35 +164,19 @@ def _memory_get(key, table="memory_store"):
         try:
             resp = SUPABASE_CLIENT.table(table).select("*").eq("key", key).execute()
             if resp.data:
-                return {
-                    "key": key,
-                    "data": resp.data[0]["value"],
-                    "exists": True,
-                    "store": "supabase"
-                }
+                return {"key": key, "data": resp.data[0]["value"], "exists": True, "store": "supabase"}
         except Exception as e:
             logger.warning(f"Supabase get error: {e}")
     if key in MEMORY_STORE:
-        return {
-            "key": key,
-            "data": MEMORY_STORE[key],
-            "exists": True,
-            "store": "ram"
-        }
+        return {"key": key, "data": MEMORY_STORE[key], "exists": True, "store": "ram"}
     return {"key": key, "data": None, "exists": False}
 
-# ═══════════════════════════════════════════════════════
-# 🦁 ADMIN AUTH
-# ═══════════════════════════════════════════════════════
 def _check_admin_auth(request):
     if not ADMIN_API_KEY:
         return True
     provided = request.headers.get("X-Admin-Key") or request.query_params.get("admin_key")
     return provided == ADMIN_API_KEY
 
-# ═══════════════════════════════════════════════════════
-# 🦁 SMART SWARM
-# ═══════════════════════════════════════════════════════
 class _SmartSarwanSwarm:
     def __init__(self):
         self.all_agents = {}
@@ -250,11 +220,7 @@ class _SmartSarwanSwarm:
             agent["status"] = "idle"
             agent["last_active"] = datetime.now().isoformat()
             self.active_agents[aid] = agent
-        return {
-            "loaded": len(to_load),
-            "active": len(self.active_agents),
-            "total": len(self.all_agents)
-        }
+        return {"loaded": len(to_load), "active": len(self.active_agents), "total": len(self.all_agents)}
 
     def get_status(self):
         return {
@@ -287,8 +253,56 @@ MODULES = {
 }
 
 # ═══════════════════════════════════════════════════════
-# 🦁 LIFESPAN
+# 🦁 RATE LIMITER — per-IP, in-memory sliding window
+# Global default limit on all /api/, /modules/, /telegram/ paths.
+# Stricter limit on expensive/misuse-prone paths (voice, AI chat,
+# bhashini, plant id).
 # ═══════════════════════════════════════════════════════
+_rate_lock = threading.Lock()
+_rate_buckets = defaultdict(deque)
+
+RATE_LIMIT_GLOBAL = (60, 60)   # 60 requests / 60 seconds per IP
+RATE_LIMIT_STRICT = (8, 60)    # 8 requests / 60 seconds per IP
+STRICT_PATH_PREFIXES = (
+    "/api/chat",
+    "/api/whisper/",
+    "/api/bhashini/",
+    "/api/tts",
+    "/api/plant/",
+    "/modules/voice",
+)
+RATE_LIMITED_PREFIXES = ("/api/", "/modules/")
+
+def _client_ip(request: Request) -> str:
+    xff = request.headers.get("x-forwarded-for")
+    if xff:
+        return xff.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+def _rate_check(key: str, max_calls: int, window_seconds: int) -> bool:
+    """Returns True if the caller should be BLOCKED (limit exceeded)."""
+    now = time.time()
+    with _rate_lock:
+        dq = _rate_buckets[key]
+        while dq and dq[0] < now - window_seconds:
+            dq.popleft()
+        if len(dq) >= max_calls:
+            return True
+        dq.append(now)
+        return False
+
+def _is_rate_limited(request: Request, bucket: str, max_calls: int, window_seconds: int) -> bool:
+    """IP-based check, for the global HTTP middleware."""
+    ip = _client_ip(request)
+    return _rate_check(f"{bucket}:{ip}", max_calls, window_seconds)
+
+# Telegram webhook traffic all arrives from Telegram's own servers (same
+# IP range for every user), so IP-based limiting would throttle the whole
+# bot at once. Instead we rate-limit per Telegram user_id, checked inside
+# the webhook handler itself — see RATE_LIMIT_TELEGRAM_USER below.
+RATE_LIMIT_TELEGRAM_USER = (15, 60)  # 15 messages / 60 seconds per Telegram user
+
+
 @asynccontextmanager
 async def lifespan(app):
     logger.info("Singh Ji AI Ultra v8.0 HYBRID Starting...")
@@ -298,23 +312,41 @@ async def lifespan(app):
     yield
     logger.info("Singh Ji AI Ultra v8.0 Stopped!")
 
-app = FastAPI(
-    title="Singh Ji AI Ultra v8.0 HYBRID",
-    version="8.0.0-hybrid",
-    lifespan=lifespan
-)
+app = FastAPI(title="Singh Ji AI Ultra v8.0 HYBRID", version="8.0.0-hybrid", lifespan=lifespan)
+
+ALLOWED_ORIGINS = [
+    "https://jp200883-sudo.github.io",
+    "http://localhost:3000",
+    "http://localhost:8000",
+]
+_extra_origins = os.getenv("EXTRA_CORS_ORIGINS", "")
+if _extra_origins:
+    ALLOWED_ORIGINS.extend([o.strip() for o in _extra_origins.split(",") if o.strip()])
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ═══════════════════════════════════════════════════════
-# 🦁 HEALTH & STATUS
-# ═══════════════════════════════════════════════════════
+@app.middleware("http")
+async def rate_limit_middleware(request: Request, call_next):
+    path = request.url.path
+    if any(path.startswith(p) for p in STRICT_PATH_PREFIXES):
+        limited = _is_rate_limited(request, "strict", *RATE_LIMIT_STRICT)
+    elif any(path.startswith(p) for p in RATE_LIMITED_PREFIXES):
+        limited = _is_rate_limited(request, "global", *RATE_LIMIT_GLOBAL)
+    else:
+        limited = False
+    if limited:
+        return JSONResponse(
+            {"error": "Rate limit exceeded. Please wait a bit and try again.", "retry_after_seconds": 60},
+            status_code=429
+        )
+    return await call_next(request)
+
 @app.get("/")
 @app.head("/")
 async def root():
@@ -337,10 +369,7 @@ async def health():
 @app.get("/api/status")
 async def status():
     active = [n for n, i in MODULES.items() if i["active"]]
-    inactive = [
-        {"name": n, "needs_key": i["needs_key"]}
-        for n, i in MODULES.items() if not i["active"]
-    ]
+    inactive = [{"name": n, "needs_key": i["needs_key"]} for n, i in MODULES.items() if not i["active"]]
     return {
         "name": "Singh Ji AI Ultra v8.0",
         "total_modules": len(MODULES),
@@ -352,55 +381,19 @@ async def status():
         "timestamp": datetime.now().isoformat()
     }
 
-# ═══════════════════════════════════════════════════════
-# 🦁 API CHECK — 100% Real
-# ═══════════════════════════════════════════════════════
 @app.get("/api/check")
 async def api_check():
     tests = {
-        "OPENWEATHER": (
-            "https://api.openweathermap.org/data/2.5/weather?q=Delhi&appid=" + str(OPENWEATHER_API_KEY or ""),
-            {}, "GET"
-        ),
-        "GROQ": (
-            "https://api.groq.com/openai/v1/models",
-            {"Authorization": f"Bearer {GROQ_API_KEY or ''}"}, "GET"
-        ),
-        "GEMINI": (
-            "https://generativelanguage.googleapis.com/v1beta/models?key=" + str(GEMINI_API_KEY or ""),
-            {}, "GET"
-        ),
-        "TELEGRAM": (
-            f"https://api.telegram.org/bot{TELEGRAM_TOKEN or ''}/getMe",
-            {}, "GET"
-        ),
-        "SUPABASE": (
-            f"{SUPABASE_URL or ''}/rest/v1/",
-            {
-                "apikey": SUPABASE_SERVICE_KEY or "",
-                "Authorization": f"Bearer {SUPABASE_SERVICE_KEY or ''}"
-            }, "GET"
-        ),
-        "FACEBOOK": (
-            f"https://graph.facebook.com/v25.0/{FACEBOOK_PAGE_ID}?access_token={FACEBOOK_ACCESS_TOKEN or ''}",
-            {}, "GET"
-        ),
-        "YOUTUBE": (
-            f"https://www.googleapis.com/youtube/v3/search?part=snippet&q=test&maxResults=1&key={YOUTUBE_API_KEY or ''}",
-            {}, "GET"
-        ),
-        "CURRENTS": (
-            f"https://api.currentsapi.services/v1/latest-news?apiKey={CURRENTS_API_KEY or ''}",
-            {}, "GET"
-        ),
-        "NEWSDATA": (
-            f"https://newsdata.io/api/1/latest?apikey={NEWSDATA_API_KEY or ''}&q=test",
-            {}, "GET"
-        ),
-        "TAVILY": (
-            f"https://api.tavily.com/search?api_key={TAVILY_API_KEY or ''}&query=test&max_results=1",
-            {}, "GET"
-        ),
+        "OPENWEATHER": ("https://api.openweathermap.org/data/2.5/weather?q=Delhi&appid=" + str(OPENWEATHER_API_KEY or ""), {}, "GET"),
+        "GROQ": ("https://api.groq.com/openai/v1/models", {"Authorization": f"Bearer {GROQ_API_KEY or ''}"}, "GET"),
+        "GEMINI": ("https://generativelanguage.googleapis.com/v1beta/models?key=" + str(GEMINI_API_KEY or ""), {}, "GET"),
+        "TELEGRAM": (f"https://api.telegram.org/bot{TELEGRAM_TOKEN or ''}/getMe", {}, "GET"),
+        "SUPABASE": (f"{SUPABASE_URL or ''}/rest/v1/", {"apikey": SUPABASE_SERVICE_KEY or "", "Authorization": f"Bearer {SUPABASE_SERVICE_KEY or ''}"}, "GET"),
+        "FACEBOOK": (f"https://graph.facebook.com/v25.0/{FACEBOOK_PAGE_ID}?access_token={FACEBOOK_ACCESS_TOKEN or ''}", {}, "GET"),
+        "YOUTUBE": (f"https://www.googleapis.com/youtube/v3/search?part=snippet&q=test&maxResults=1&key={YOUTUBE_API_KEY or ''}", {}, "GET"),
+        "CURRENTS": (f"https://api.currentsapi.services/v1/latest-news?apiKey={CURRENTS_API_KEY or ''}", {}, "GET"),
+        "NEWSDATA": (f"https://newsdata.io/api/1/latest?apikey={NEWSDATA_API_KEY or ''}&q=test", {}, "GET"),
+        "TAVILY": (f"https://api.tavily.com/search?api_key={TAVILY_API_KEY or ''}&query=test&max_results=1", {}, "GET"),
     }
     results = {}
     live = dead = 0
@@ -422,15 +415,8 @@ async def api_check():
         except Exception as e:
             results[name] = {"status": "FAIL", "error": str(e)[:50]}
             dead += 1
-    return {
-        "timestamp": datetime.now().isoformat(),
-        "summary": {"live": live, "dead": dead, "total": live + dead},
-        "results": results
-    }
+    return {"timestamp": datetime.now().isoformat(), "summary": {"live": live, "dead": dead, "total": live + dead}, "results": results}
 
-# ═══════════════════════════════════════════════════════
-# 🦁 WEATHER — 100% Real
-# ═══════════════════════════════════════════════════════
 @app.get("/api/weather/{city}")
 async def weather_city(city: str):
     cache_key = _cache_key("weather", city)
@@ -441,23 +427,15 @@ async def weather_city(city: str):
     if not OPENWEATHER_API_KEY:
         return {"error": "OPENWEATHER_API_KEY missing"}
     try:
-        url = (
-            f"https://api.openweathermap.org/data/2.5/weather"
-            f"?q={city}&appid={OPENWEATHER_API_KEY}&units=metric"
-        )
+        url = f"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={OPENWEATHER_API_KEY}&units=metric"
         resp = requests.get(url, timeout=10)
         data = resp.json()
         if resp.status_code == 200:
             result = {
-                "city": city,
-                "temp": data["main"]["temp"],
-                "feels_like": data["main"]["feels_like"],
-                "humidity": data["main"]["humidity"],
-                "pressure": data["main"]["pressure"],
-                "wind_speed": data["wind"]["speed"],
-                "desc": data["weather"][0]["description"],
-                "icon": data["weather"][0]["icon"],
-                "source": "OPENWEATHER_LIVE"
+                "city": city, "temp": data["main"]["temp"], "feels_like": data["main"]["feels_like"],
+                "humidity": data["main"]["humidity"], "pressure": data["main"]["pressure"],
+                "wind_speed": data["wind"]["speed"], "desc": data["weather"][0]["description"],
+                "icon": data["weather"][0]["icon"], "source": "OPENWEATHER_LIVE"
             }
             _cache_set(cache_key, result, CACHE_TTL["weather"])
             return result
@@ -465,9 +443,6 @@ async def weather_city(city: str):
     except Exception as e:
         return {"error": str(e)}
 
-# ═══════════════════════════════════════════════════════
-# 🦁 NEWS — 100% Real
-# ═══════════════════════════════════════════════════════
 @app.get("/api/news/latest")
 async def news_latest(source: str = "currents"):
     cache_key = _cache_key("news", source)
@@ -477,10 +452,7 @@ async def news_latest(source: str = "currents"):
         return cached
     if source == "currents" and CURRENTS_API_KEY:
         try:
-            resp = requests.get(
-                f"https://api.currentsapi.services/v1/latest-news?apiKey={CURRENTS_API_KEY}",
-                timeout=10
-            )
+            resp = requests.get(f"https://api.currentsapi.services/v1/latest-news?apiKey={CURRENTS_API_KEY}", timeout=10)
             data = resp.json()
             result = {"source": "CURRENTS_LIVE", "news": data.get("news", [])[:10]}
             _cache_set(cache_key, result, CACHE_TTL["news"])
@@ -489,10 +461,7 @@ async def news_latest(source: str = "currents"):
             return {"error": str(e)}
     if source == "newsdata" and NEWSDATA_API_KEY:
         try:
-            resp = requests.get(
-                f"https://newsdata.io/api/1/latest?apikey={NEWSDATA_API_KEY}&q=india",
-                timeout=10
-            )
+            resp = requests.get(f"https://newsdata.io/api/1/latest?apikey={NEWSDATA_API_KEY}&q=india", timeout=10)
             data = resp.json()
             result = {"source": "NEWSDATA_LIVE", "news": data.get("results", [])[:10]}
             _cache_set(cache_key, result, CACHE_TTL["news"])
@@ -501,9 +470,6 @@ async def news_latest(source: str = "currents"):
             return {"error": str(e)}
     return {"error": "No news API key available"}
 
-# ═══════════════════════════════════════════════════════
-# 🦁 MANDI — 100% Real
-# ═══════════════════════════════════════════════════════
 MANDI_RESOURCE_ID = "9ef84268-d588-465a-a308-a864a43d0070"
 MANDI_BASE_URL = f"https://api.data.gov.in/resource/{MANDI_RESOURCE_ID}"
 
@@ -517,31 +483,17 @@ async def mandi_state(state: str, commodity: str = None, limit: int = 50):
     if not MANDI_API_KEY:
         return {"error": "MANDI_API_KEY missing"}
     try:
-        params = {
-            "api-key": MANDI_API_KEY,
-            "format": "json",
-            "limit": limit,
-            "filters[state.keyword]": state
-        }
+        params = {"api-key": MANDI_API_KEY, "format": "json", "limit": limit, "filters[state.keyword]": state}
         if commodity:
             params["filters[commodity.keyword]"] = commodity
         resp = requests.get(MANDI_BASE_URL, params=params, timeout=15)
         data = resp.json()
-        result = {
-            "state": state,
-            "commodity_filter": commodity,
-            "count": len(data.get("records", [])),
-            "records": data.get("records", []),
-            "source": "AGMARKNET_LIVE"
-        }
+        result = {"state": state, "commodity_filter": commodity, "count": len(data.get("records", [])), "records": data.get("records", []), "source": "AGMARKNET_LIVE"}
         _cache_set(cache_key, result, CACHE_TTL["mandi"])
         return result
     except Exception as e:
         return {"error": str(e)}
 
-# ═══════════════════════════════════════════════════════
-# 🦁 PLANT ID — 100% Real
-# ═══════════════════════════════════════════════════════
 @app.post("/api/plant/identify")
 async def plant_identify(request: Request):
     if not PLANT_ID_API:
@@ -564,20 +516,13 @@ async def plant_identify(request: Request):
         return {
             "status": "success",
             "is_plant": result.get("result", {}).get("is_plant", {}).get("binary"),
-            "top_match": {
-                "name": top.get("name"),
-                "probability": top.get("probability"),
-                "common_names": top.get("details", {}).get("common_names")
-            } if top else None,
+            "top_match": {"name": top.get("name"), "probability": top.get("probability"), "common_names": top.get("details", {}).get("common_names")} if top else None,
             "all_suggestions": suggestions[:5],
             "source": "PLANT.ID_LIVE"
         }
     except Exception as e:
         return {"error": str(e)}
 
-# ═══════════════════════════════════════════════════════
-# 🦁 AI CHAT — 100% Real (Groq + Gemini + Cerebras)
-# ═══════════════════════════════════════════════════════
 @app.post("/api/chat")
 async def ai_chat(request: Request):
     data = await request.json()
@@ -595,100 +540,54 @@ async def ai_chat(request: Request):
             cached["source"] = "CACHE"
             return cached
 
-    # Try Groq
     if model in ["groq", "auto"] and GROQ_API_KEY:
         try:
             resp = requests.post(
                 "https://api.groq.com/openai/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {GROQ_API_KEY}",
-                    "Content-Type": "application/json"
-                },
-                json={
-                    "model": "llama3-8b-8192",
-                    "messages": [{"role": "user", "content": prompt}]
-                },
+                headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"},
+                json={"model": "llama3-8b-8192", "messages": [{"role": "user", "content": prompt}]},
                 timeout=30
             )
             result = resp.json()
             response_text = result["choices"][0]["message"]["content"]
-            result_data = {
-                "status": "success",
-                "model": "groq",
-                "response": response_text,
-                "source": "GROQ_LIVE"
-            }
+            result_data = {"status": "success", "model": "groq", "response": response_text, "source": "GROQ_LIVE"}
             if not is_personal:
                 _cache_set(cache_key, result_data, CACHE_TTL["ai_chat"])
-            _memory_save(
-                f"chat:{user_id}:{int(time.time())}",
-                {"prompt": prompt, "response": response_text, "model": "groq"}
-            )
+            _memory_save(f"chat:{user_id}:{int(time.time())}", {"prompt": prompt, "response": response_text, "model": "groq"})
             return result_data
         except Exception as e:
             logger.warning(f"Groq failed: {e}")
 
-    # Try Gemini
     if model in ["gemini", "auto"] and GEMINI_API_KEY:
         try:
-            url = (
-                f"https://generativelanguage.googleapis.com/v1beta/models/"
-                f"gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
-            )
-            resp = requests.post(
-                url,
-                json={"contents": [{"parts": [{"text": prompt}]}]},
-                timeout=30
-            )
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+            resp = requests.post(url, json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=30)
             result = resp.json()
             text = result["candidates"][0]["content"]["parts"][0]["text"]
-            result_data = {
-                "status": "success",
-                "model": "gemini",
-                "response": text,
-                "source": "GEMINI_LIVE"
-            }
+            result_data = {"status": "success", "model": "gemini", "response": text, "source": "GEMINI_LIVE"}
             if not is_personal:
                 _cache_set(cache_key, result_data, CACHE_TTL["ai_chat"])
-            _memory_save(
-                f"chat:{user_id}:{int(time.time())}",
-                {"prompt": prompt, "response": text, "model": "gemini"}
-            )
+            _memory_save(f"chat:{user_id}:{int(time.time())}", {"prompt": prompt, "response": text, "model": "gemini"})
             return result_data
         except Exception as e:
             logger.warning(f"Gemini failed: {e}")
 
-    # Try Cerebras
     if model in ["cerebras", "auto"] and CEREBRAS_API_KEY:
         try:
             resp = requests.post(
                 "https://api.cerebras.ai/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {CEREBRAS_API_KEY}",
-                    "Content-Type": "application/json"
-                },
-                json={
-                    "model": "llama-3.1-8b",
-                    "messages": [{"role": "user", "content": prompt}]
-                },
+                headers={"Authorization": f"Bearer {CEREBRAS_API_KEY}", "Content-Type": "application/json"},
+                json={"model": "llama-3.1-8b", "messages": [{"role": "user", "content": prompt}]},
                 timeout=30
             )
             result = resp.json()
             text = result["choices"][0]["message"]["content"]
-            return {
-                "status": "success",
-                "model": "cerebras",
-                "response": text,
-                "source": "CEREBRAS_LIVE"
-            }
+            return {"status": "success", "model": "cerebras", "response": text, "source": "CEREBRAS_LIVE"}
         except Exception as e:
             logger.warning(f"Cerebras failed: {e}")
 
     return {"error": "All AI models failed or no API keys"}
 
-# ═══════════════════════════════════════════════════════
-# 🦁 MEMORY MODULE
-# ═══════════════════════════════════════════════════════
 @app.get("/api/memory/{key}")
 async def memory_get(key: str):
     return _memory_get(key)
@@ -700,17 +599,11 @@ async def memory_save(request: Request):
     value = data.get("value", data)
     return _memory_save(key, value)
 
-# ═══════════════════════════════════════════════════════
-# 🦁 BHASHINI — 100% Real (Govt of India)
-# ═══════════════════════════════════════════════════════
 BHASHINI_PIPELINE_URL = "https://meity-auth.ulcacontrib.org/ulca/apis/v0/model/getModelsPipeline"
 
 @app.get("/api/bhashini/")
 async def bhashini_root():
-    return {
-        "module": "Bhashini",
-        "status": "active" if AVAILABLE_KEYS["BHASHINI"] else "missing_credentials"
-    }
+    return {"module": "Bhashini", "status": "active" if AVAILABLE_KEYS["BHASHINI"] else "missing_credentials"}
 
 @app.post("/api/bhashini/translate")
 async def bhashini_translate(request: Request):
@@ -721,70 +614,28 @@ async def bhashini_translate(request: Request):
     source = data.get("source", "hi")
     target = data.get("target", "en")
     try:
-        headers = {
-            "userID": BHASHINI_USER_ID,
-            "ulcaApiKey": BHASHINI_ULCA_API_KEY,
-            "Content-Type": "application/json"
-        }
+        headers = {"userID": BHASHINI_USER_ID, "ulcaApiKey": BHASHINI_ULCA_API_KEY, "Content-Type": "application/json"}
         payload = {
-            "pipelineTasks": [{
-                "taskType": "translation",
-                "config": {
-                    "language": {
-                        "sourceLanguage": source,
-                        "targetLanguage": target
-                    }
-                }
-            }],
-            "pipelineRequestConfig": {
-                "pipelineId": "64392f96daac500b55c543cd"
-            }
+            "pipelineTasks": [{"taskType": "translation", "config": {"language": {"sourceLanguage": source, "targetLanguage": target}}}],
+            "pipelineRequestConfig": {"pipelineId": "64392f96daac500b55c543cd"}
         }
         resp = requests.post(BHASHINI_PIPELINE_URL, headers=headers, json=payload, timeout=15)
         pipeline = resp.json()
-        
         service_id = pipeline["pipelineResponseConfig"][0]["config"][0]["serviceId"]
         compute_url = pipeline["pipelineInferenceAPIEndPoint"]["callbackUrl"]
         key_name = pipeline["pipelineInferenceAPIEndPoint"]["inferenceApiKey"]["name"]
         key_value = pipeline["pipelineInferenceAPIEndPoint"]["inferenceApiKey"]["value"]
-        
         compute_payload = {
-            "pipelineTasks": [{
-                "taskType": "translation",
-                "config": {
-                    "language": {
-                        "sourceLanguage": source,
-                        "targetLanguage": target
-                    },
-                    "serviceId": service_id
-                }
-            }],
+            "pipelineTasks": [{"taskType": "translation", "config": {"language": {"sourceLanguage": source, "targetLanguage": target}, "serviceId": service_id}}],
             "inputData": {"input": [{"source": text}]}
         }
-        
-        compute_resp = requests.post(
-            compute_url,
-            headers={key_name: key_value, "Content-Type": "application/json"},
-            json=compute_payload,
-            timeout=20
-        )
+        compute_resp = requests.post(compute_url, headers={key_name: key_value, "Content-Type": "application/json"}, json=compute_payload, timeout=20)
         result = compute_resp.json()
         translated = result["pipelineResponse"][0]["output"][0]["target"]
-        
-        return {
-            "status": "success",
-            "original": text,
-            "translated": translated,
-            "source": source,
-            "target": target,
-            "source_api": "BHASHINI_LIVE"
-        }
+        return {"status": "success", "original": text, "translated": translated, "source": source, "target": target, "source_api": "BHASHINI_LIVE"}
     except Exception as e:
         return {"error": str(e)}
 
-# ═══════════════════════════════════════════════════════
-# 🦁 WHISPER — 100% Real (Open Source)
-# ═══════════════════════════════════════════════════════
 _whisper_model = None
 WHISPER_MODEL_SIZE = os.getenv("WHISPER_MODEL_SIZE", "base")
 
@@ -807,11 +658,9 @@ async def whisper_transcribe(request: Request):
     language = data.get("language")
     if not audio_b64:
         return {"error": "audio_base64 required"}
-    
     model = _get_whisper_model()
     if model is None:
         return {"error": "Whisper model not available"}
-    
     try:
         audio_bytes = base64.b64decode(audio_b64)
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=True) as tmp:
@@ -819,20 +668,10 @@ async def whisper_transcribe(request: Request):
             tmp.flush()
             segments, info = model.transcribe(tmp.name, language=language)
             transcript = " ".join(seg.text.strip() for seg in segments)
-        
-        return {
-            "status": "success",
-            "transcript": transcript,
-            "detected_language": info.language,
-            "language_probability": round(info.language_probability, 3),
-            "source": "WHISPER_LOCAL"
-        }
+        return {"status": "success", "transcript": transcript, "detected_language": info.language, "language_probability": round(info.language_probability, 3), "source": "WHISPER_LOCAL"}
     except Exception as e:
         return {"error": str(e)}
 
-# ═══════════════════════════════════════════════════════
-# 🦁 TTS — 100% Real (gTTS Hindi)
-# ═══════════════════════════════════════════════════════
 @app.post("/api/tts")
 async def text_to_speech(request: Request):
     data = await request.json()
@@ -847,38 +686,20 @@ async def text_to_speech(request: Request):
         tts.write_to_fp(mp3_fp)
         mp3_fp.seek(0)
         audio_b64 = base64.b64encode(mp3_fp.read()).decode("utf-8")
-        return {
-            "status": "success",
-            "audio_base64": audio_b64,
-            "lang": lang,
-            "source": "GTTS_LIVE"
-        }
+        return {"status": "success", "audio_base64": audio_b64, "lang": lang, "source": "GTTS_LIVE"}
     except Exception as e:
         return {"error": str(e)}
 
-# ═══════════════════════════════════════════════════════
-# 🦁 FACEBOOK — 100% Real
-# ═══════════════════════════════════════════════════════
 @app.get("/api/facebook/status")
 async def facebook_status():
     if not FACEBOOK_ACCESS_TOKEN:
         return {"error": "FACEBOOK_ACCESS_TOKEN missing"}
     try:
-        url = (
-            f"https://graph.facebook.com/v25.0/{FACEBOOK_PAGE_ID}"
-            f"?access_token={FACEBOOK_ACCESS_TOKEN}&fields=id,name,followers_count"
-        )
+        url = f"https://graph.facebook.com/v25.0/{FACEBOOK_PAGE_ID}?access_token={FACEBOOK_ACCESS_TOKEN}&fields=id,name,followers_count"
         resp = requests.get(url, timeout=10)
         data = resp.json()
         if resp.status_code == 200:
-            return {
-                "status": "connected",
-                "page": {
-                    "id": data.get("id"),
-                    "name": data.get("name"),
-                    "followers": data.get("followers_count", 0)
-                }
-            }
+            return {"status": "connected", "page": {"id": data.get("id"), "name": data.get("name"), "followers": data.get("followers_count", 0)}}
         return {"error": data.get("error", {}).get("message", "Unknown")}
     except Exception as e:
         return {"error": str(e)}
@@ -890,10 +711,7 @@ async def facebook_post(request: Request):
     data = await request.json()
     try:
         url = f"https://graph.facebook.com/v25.0/{FACEBOOK_PAGE_ID}/feed"
-        payload = {
-            "access_token": FACEBOOK_ACCESS_TOKEN,
-            "message": data.get("message", "")
-        }
+        payload = {"access_token": FACEBOOK_ACCESS_TOKEN, "message": data.get("message", "")}
         if data.get("link"):
             payload["link"] = data["link"]
         resp = requests.post(url, data=payload, timeout=10)
@@ -901,80 +719,49 @@ async def facebook_post(request: Request):
     except Exception as e:
         return {"error": str(e)}
 
-# ═══════════════════════════════════════════════════════
-# 🦁 INSTAGRAM — 100% Real
-# ═══════════════════════════════════════════════════════
 @app.get("/api/instagram/status")
 async def instagram_status():
     if not INSTAGRAM_ACCESS_TOKEN:
         return {"error": "INSTAGRAM_ACCESS_TOKEN missing"}
     try:
-        url = (
-            f"https://graph.facebook.com/v25.0/{INSTAGRAM_BUSINESS_ID}"
-            f"?access_token={INSTAGRAM_ACCESS_TOKEN}&fields=id,username,followers_count"
-        )
+        url = f"https://graph.facebook.com/v25.0/{INSTAGRAM_BUSINESS_ID}?access_token={INSTAGRAM_ACCESS_TOKEN}&fields=id,username,followers_count"
         resp = requests.get(url, timeout=10)
         data = resp.json()
         if resp.status_code == 200:
-            return {
-                "status": "connected",
-                "account": {
-                    "id": data.get("id"),
-                    "username": data.get("username"),
-                    "followers": data.get("followers_count", 0)
-                }
-            }
+            return {"status": "connected", "account": {"id": data.get("id"), "username": data.get("username"), "followers": data.get("followers_count", 0)}}
         return {"error": data.get("error", {}).get("message", "Unknown")}
     except Exception as e:
         return {"error": str(e)}
 
-# ═══════════════════════════════════════════════════════
-# 🦁 YOUTUBE — 100% Real
-# ═══════════════════════════════════════════════════════
 @app.get("/api/youtube/search")
 async def youtube_search(q: str = "", max_results: int = 10):
     if not YOUTUBE_API_KEY:
         return {"error": "YOUTUBE_API_KEY missing"}
     try:
-        url = (
-            f"https://www.googleapis.com/youtube/v3/search"
-            f"?part=snippet&q={q}&maxResults={max_results}&key={YOUTUBE_API_KEY}"
-        )
+        url = f"https://www.googleapis.com/youtube/v3/search?part=snippet&q={q}&maxResults={max_results}&key={YOUTUBE_API_KEY}"
         resp = requests.get(url, timeout=10)
         return resp.json()
     except Exception as e:
         return {"error": str(e)}
 
-# ═══════════════════════════════════════════════════════
-# 🦁 SEARCH — 100% Real (Tavily)
-# ═══════════════════════════════════════════════════════
 @app.get("/api/search")
 async def web_search(q: str = "", max_results: int = 5):
     if not TAVILY_API_KEY:
         return {"error": "TAVILY_API_KEY missing"}
     try:
         url = "https://api.tavily.com/search"
-        payload = {
-            "api_key": TAVILY_API_KEY,
-            "query": q,
-            "max_results": max_results,
-            "search_depth": "basic"
-        }
+        payload = {"api_key": TAVILY_API_KEY, "query": q, "max_results": max_results, "search_depth": "basic"}
         resp = requests.post(url, json=payload, timeout=15)
         return resp.json()
     except Exception as e:
         return {"error": str(e)}
 
-# ═══════════════════════════════════════════════════════
-# 🦁 RETIREMENT & TAX
-# ═══════════════════════════════════════════════════════
 @app.post("/api/retirement/tax-calculate")
 async def tax_calculate(request: Request):
     data = await request.json()
     income = data.get("income", 0)
     regime = data.get("regime", "new")
     deductions = data.get("deductions", 0)
-    
     if regime == "new":
         if income <= 300000:
             tax = 0
@@ -998,22 +785,10 @@ async def tax_calculate(request: Request):
             tax = 12500 + (taxable - 500000) * 0.20
         else:
             tax = 112500 + (taxable - 1000000) * 0.30
-    
     cess = tax * 0.04
     total_tax = tax + cess
-    
-    return {
-        "income": income,
-        "regime": regime,
-        "tax": round(tax, 2),
-        "cess": round(cess, 2),
-        "total": round(total_tax, 2),
-        "take_home": round(income - total_tax, 2)
-    }
+    return {"income": income, "regime": regime, "tax": round(tax, 2), "cess": round(cess, 2), "total": round(total_tax, 2), "take_home": round(income - total_tax, 2)}
 
-# ═══════════════════════════════════════════════════════
-# 🦁 SWARM
-# ═══════════════════════════════════════════════════════
 @app.get("/api/swarm/status")
 async def swarm_status():
     return SMART_SWARM.get_status()
@@ -1023,9 +798,6 @@ async def swarm_sync():
     result = SMART_SWARM.sync(MODULES, AVAILABLE_KEYS)
     return {"synced": True, **result}
 
-# ═══════════════════════════════════════════════════════
-# 🦁 TELEGRAM BOT — 100% Real (FIXED)
-# ═══════════════════════════════════════════════════════
 TELEGRAM_API_BASE = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
 
 def _telegram_send_message(chat_id, text, reply_markup=None):
@@ -1054,22 +826,10 @@ def _telegram_send_voice(chat_id, audio_b64, caption=""):
 
 MAIN_KEYBOARD = {
     "inline_keyboard": [
-        [
-            {"text": "🌤 Weather", "callback_data": "weather"},
-            {"text": "📰 News", "callback_data": "news"}
-        ],
-        [
-            {"text": "🌾 Mandi Bhav", "callback_data": "mandi"},
-            {"text": "🧠 AI Chat", "callback_data": "ai_chat"}
-        ],
-        [
-            {"text": "🎙️ Voice", "callback_data": "voice"},
-            {"text": "📊 Status", "callback_data": "status"}
-        ],
-        [
-            {"text": "💰 Tax Calc", "callback_data": "tax"},
-            {"text": "🌱 Plant ID", "callback_data": "plant"}
-        ],
+        [{"text": "Weather", "callback_data": "weather"}, {"text": "News", "callback_data": "news"}],
+        [{"text": "Mandi Bhav", "callback_data": "mandi"}, {"text": "AI Chat", "callback_data": "ai_chat"}],
+        [{"text": "Voice", "callback_data": "voice"}, {"text": "Status", "callback_data": "status"}],
+        [{"text": "Tax Calc", "callback_data": "tax"}, {"text": "Plant ID", "callback_data": "plant"}],
     ]
 }
 
@@ -1078,7 +838,6 @@ async def telegram_webhook(request: Request):
     try:
         data = await request.json()
 
-        # Callback queries (button clicks)
         if "callback_query" in data:
             callback = data["callback_query"]
             chat_id = callback["message"]["chat"]["id"]
@@ -1086,17 +845,14 @@ async def telegram_webhook(request: Request):
 
             if query_data == "status":
                 status = SMART_SWARM.get_status()
-                text = "🦁 <b>Singh Ji AI Status</b>\n\n"
-                text += f"🐝 Agents: {status['currently_loaded']}/330\n"
-                text += f"✅ Active: {status['active_running']}\n"
-                text += f"😴 Idle: {status['idle']}\n"
-                text += f"🔑 APIs: {sum(1 for v in AVAILABLE_KEYS.values() if v)}/{len(AVAILABLE_KEYS)}"
+                text = "Status\n\n"
+                text += f"Agents: {status['currently_loaded']}/330\n"
+                text += f"Active: {status['active_running']}\n"
+                text += f"Idle: {status['idle']}\n"
+                text += f"APIs: {sum(1 for v in AVAILABLE_KEYS.values() if v)}/{len(AVAILABLE_KEYS)}"
                 _telegram_send_message(chat_id, text)
-
             elif query_data == "weather":
-                msg = "🌤 <b>Weather</b>\n\nCity batao!\nExample: <code>/weather Delhi</code>"
-                _telegram_send_message(chat_id, msg)
-
+                _telegram_send_message(chat_id, "Weather\n\nCity batao!")
             elif query_data == "news":
                 if NEWSDATA_API_KEY:
                     try:
@@ -1104,36 +860,26 @@ async def telegram_webhook(request: Request):
                         resp = requests.get(url, timeout=10)
                         news_data = resp.json()
                         articles = news_data.get("results", [])[:5]
-                        text = "📰 <b>Latest News</b>\n\n"
+                        text = "News\n\n"
                         for i, article in enumerate(articles, 1):
                             text += f"{i}. {article.get('title', 'No title')}\n"
                             desc = article.get('description', 'No description')[:100]
-                            text += f"   📝 {desc}...\n\n"
+                            text += f"   {desc}...\n\n"
                         _telegram_send_message(chat_id, text)
                     except Exception as e:
-                        _telegram_send_message(chat_id, f"❌ News error: {str(e)[:100]}")
+                        _telegram_send_message(chat_id, f"News error: {str(e)[:100]}")
                 else:
-                    _telegram_send_message(chat_id, "❌ News API key missing")
-
+                    _telegram_send_message(chat_id, "News API key missing")
             elif query_data == "mandi":
-                msg = "🌾 <b>Mandi Bhav</b>\n\nState batao!\nExample: <code>/mandi Punjab</code>"
-                _telegram_send_message(chat_id, msg)
-
+                _telegram_send_message(chat_id, "Mandi Bhav\n\nState batao!")
             elif query_data == "ai_chat":
-                msg = "🧠 <b>AI Chat</b>\n\nKuch bhi poochho!\nMain jawab dunga."
-                _telegram_send_message(chat_id, msg)
-
+                _telegram_send_message(chat_id, "AI Chat\n\nKuch bhi poochho!")
             elif query_data == "voice":
-                msg = "🎙️ <b>Voice</b>\n\nVoice message bhejo!\nMain transcribe karke AI response dunga."
-                _telegram_send_message(chat_id, msg)
-
+                _telegram_send_message(chat_id, "Voice\n\nVoice message bhejo!")
             elif query_data == "tax":
-                msg = "💰 <b>Tax Calculator</b>\n\nIncome batao!\nExample: <code>/tax 500000</code>"
-                _telegram_send_message(chat_id, msg)
-
+                _telegram_send_message(chat_id, "Tax Calculator\n\nIncome batao!")
             elif query_data == "plant":
-                msg = "🌱 <b>Plant ID</b>\n\nPlant ki photo bhejo!\nMain identify karunga."
-                _telegram_send_message(chat_id, msg)
+                _telegram_send_message(chat_id, "Plant ID\n\nPlant ki photo bhejo!")
 
             return {"status": "ok"}
 
@@ -1145,74 +891,116 @@ async def telegram_webhook(request: Request):
         text = message.get("text", "")
         user_id = message["from"]["id"]
 
-        # Save user preference
         if user_id not in USER_PREFERENCES:
             USER_PREFERENCES[user_id] = {"language": "hi", "location": None}
 
-        # /start
+        if _rate_check(f"tg_user:{user_id}", *RATE_LIMIT_TELEGRAM_USER):
+            _telegram_send_message(chat_id, "Thoda slow karo! 1 minute mein try karo.")
+            return {"status": "ok"}
+
+        # Voice messages have no "text" field, so they must be handled
+        # here, BEFORE the text-based if/elif chain below — every branch
+        # of that chain ends in an early return, so voice would never be
+        # reached if checked after it.
+        if "voice" in message:
+            voice = message["voice"]
+            file_id = voice["file_id"]
+            try:
+                file_resp = requests.get(f"{TELEGRAM_API_BASE}/getFile?file_id={file_id}", timeout=10)
+                file_data = file_resp.json()
+                if file_data.get("ok"):
+                    file_path = file_data["result"]["file_path"]
+                    file_url = f"https://api.telegram.org/file/bot{TELEGRAM_TOKEN}/{file_path}"
+                    audio_resp = requests.get(file_url, timeout=15)
+                    audio_bytes = audio_resp.content
+                    model = _get_whisper_model()
+                    if model:
+                        with tempfile.NamedTemporaryFile(suffix=".ogg", delete=True) as tmp:
+                            tmp.write(audio_bytes)
+                            tmp.flush()
+                            segments, info = model.transcribe(tmp.name)
+                            transcript = " ".join(seg.text.strip() for seg in segments)
+                        transcript_msg = "Transcript:" + chr(10) + transcript + chr(10) + chr(10) + "AI soch raha hai..."
+                        _telegram_send_message(chat_id, transcript_msg)
+                        ai_text = None
+                        if GROQ_API_KEY:
+                            ai_resp = requests.post(
+                                "https://api.groq.com/openai/v1/chat/completions",
+                                headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"},
+                                json={"model": "llama3-8b-8192", "messages": [{"role": "user", "content": transcript}]},
+                                timeout=30
+                            )
+                            ai_result = ai_resp.json()
+                            ai_text = ai_result["choices"][0]["message"]["content"]
+                            try:
+                                from gtts import gTTS
+                                tts_text = ai_text[:500] if len(ai_text) > 500 else ai_text
+                                tts = gTTS(text=tts_text, lang="hi", slow=False)
+                                mp3_fp = io.BytesIO()
+                                tts.write_to_fp(mp3_fp)
+                                mp3_fp.seek(0)
+                                tts_b64 = base64.b64encode(mp3_fp.read()).decode("utf-8")
+                                _telegram_send_voice(chat_id, tts_b64, "AI Response (Hindi)")
+                            except Exception:
+                                ai_msg = "AI Response:" + chr(10) + chr(10) + ai_text
+                                _telegram_send_message(chat_id, ai_msg)
+                        _memory_save(f"telegram_voice:{user_id}:{int(time.time())}", {"transcript": transcript, "response": ai_text})
+                    else:
+                        _telegram_send_message(chat_id, "Whisper model not available")
+                else:
+                    _telegram_send_message(chat_id, "Could not download voice file")
+            except Exception as e:
+                logger.error(f"Voice processing error: {e}")
+                err_msg = "Voice processing error: " + str(e)[:100]
+                _telegram_send_message(chat_id, err_msg)
+            return {"status": "ok"}
+
         if text == "/start":
-            welcome = "🦁 <b>Welcome to Singh Ji AI Ultra v8.0!</b>\n\n"
-            welcome += "Main aapka AI assistant hoon.\n"
-            welcome += "Niche buttons se kuch bhi try karo! 👇"
+            welcome = "Welcome to Singh Ji AI Ultra v8.0!\n\nMain aapka AI assistant hoon.\n"
             _telegram_send_message(chat_id, welcome, MAIN_KEYBOARD)
             return {"status": "ok"}
 
-        # /help
         elif text == "/help":
-            help_text = "🦁 <b>Singh Ji AI Commands</b>\n\n"
-            help_text += "/start - Start bot\n"
-            help_text += "/weather city - Weather check\n"
-            help_text += "/news - Latest news\n"
-            help_text += "/mandi state - Mandi bhav\n"
-            help_text += "/tax income - Tax calculate\n"
-            help_text += "/status - System status\n"
-            help_text += "/ai question - AI chat\n"
-            help_text += "🎙️ Voice message bhejo - STT + AI"
+            help_text = "Commands\n\n/start\n/weather city\n/news\n/mandi state\n/tax income\n/status\n/ai question"
             _telegram_send_message(chat_id, help_text)
             return {"status": "ok"}
 
-        # /status
         elif text == "/status":
             status = SMART_SWARM.get_status()
-            status_text = "🦁 <b>Singh Ji AI Status</b>\n\n"
-            status_text += "🐝 Total Agents: 330\n"
-            status_text += f"✅ Loaded: {status['currently_loaded']}\n"
-            status_text += f"🏃 Active: {status['active_running']}\n"
-            status_text += f"😴 Idle: {status['idle']}\n"
+            status_text = "Status\n\n"
+            status_text += "Total Agents: 330\n"
+            status_text += f"Loaded: {status['currently_loaded']}\n"
+            status_text += f"Active: {status['active_running']}\n"
+            status_text += f"Idle: {status['idle']}\n"
             api_count = sum(1 for v in AVAILABLE_KEYS.values() if v)
-            status_text += f"🔑 Active APIs: {api_count}/{len(AVAILABLE_KEYS)}\n"
-            status_text += f"⏰ Time: {datetime.now().strftime('%H:%M:%S')}"
+            status_text += f"Active APIs: {api_count}/{len(AVAILABLE_KEYS)}\n"
+            status_text += f"Time: {datetime.now().strftime('%H:%M:%S')}"
             _telegram_send_message(chat_id, status_text)
             return {"status": "ok"}
 
-        # /weather
         elif text.startswith("/weather "):
             city = text.replace("/weather ", "").strip()
             if OPENWEATHER_API_KEY:
                 try:
-                    url = (
-                        f"https://api.openweathermap.org/data/2.5/weather"
-                        f"?q={city}&appid={OPENWEATHER_API_KEY}&units=metric"
-                    )
+                    url = f"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={OPENWEATHER_API_KEY}&units=metric"
                     resp = requests.get(url, timeout=10)
                     data = resp.json()
                     if resp.status_code == 200:
-                        weather_text = f"🌤 <b>Weather in {city}</b>\n\n"
-                        weather_text += f"🌡 Temperature: {data['main']['temp']}°C\n"
-                        weather_text += f"🤒 Feels like: {data['main']['feels_like']}°C\n"
-                        weather_text += f"💧 Humidity: {data['main']['humidity']}%\n"
-                        weather_text += f"🌬 Wind: {data['wind']['speed']} m/s\n"
-                        weather_text += f"☁️ {data['weather'][0]['description'].title()}"
+                        weather_text = f"Weather in {city}\n\n"
+                        weather_text += f"Temperature: {data['main']['temp']}C\n"
+                        weather_text += f"Feels like: {data['main']['feels_like']}C\n"
+                        weather_text += f"Humidity: {data['main']['humidity']}%\n"
+                        weather_text += f"Wind: {data['wind']['speed']} m/s\n"
+                        weather_text += f"{data['weather'][0]['description'].title()}"
                         _telegram_send_message(chat_id, weather_text)
                     else:
-                        _telegram_send_message(chat_id, f"❌ City not found: {city}")
+                        _telegram_send_message(chat_id, f"City not found: {city}")
                 except Exception as e:
-                    _telegram_send_message(chat_id, f"❌ Error: {str(e)[:100]}")
+                    _telegram_send_message(chat_id, f"Error: {str(e)[:100]}")
             else:
-                _telegram_send_message(chat_id, "❌ Weather API key missing")
+                _telegram_send_message(chat_id, "Weather API key missing")
             return {"status": "ok"}
 
-        # /news
         elif text == "/news":
             if NEWSDATA_API_KEY:
                 try:
@@ -1220,45 +1008,38 @@ async def telegram_webhook(request: Request):
                     resp = requests.get(url, timeout=10)
                     news_data = resp.json()
                     articles = news_data.get("results", [])[:5]
-                    news_text = "📰 <b>Latest News</b>\n\n"
+                    news_text = "Latest News\n\n"
                     for i, article in enumerate(articles, 1):
-                        news_text += f"{i}. <b>{article.get('title', 'No title')}</b>\n"
+                        news_text += f"{i}. {article.get('title', 'No title')}\n"
                         desc = article.get('description', 'No description')[:80]
                         news_text += f"   {desc}...\n\n"
                     _telegram_send_message(chat_id, news_text)
                 except Exception as e:
-                    _telegram_send_message(chat_id, f"❌ News error: {str(e)[:100]}")
+                    _telegram_send_message(chat_id, f"News error: {str(e)[:100]}")
             else:
-                _telegram_send_message(chat_id, "❌ News API key missing")
+                _telegram_send_message(chat_id, "News API key missing")
             return {"status": "ok"}
 
-        # /mandi
         elif text.startswith("/mandi "):
             state = text.replace("/mandi ", "").strip()
             if MANDI_API_KEY:
                 try:
-                    params = {
-                        "api-key": MANDI_API_KEY,
-                        "format": "json",
-                        "limit": 10,
-                        "filters[state.keyword]": state
-                    }
+                    params = {"api-key": MANDI_API_KEY, "format": "json", "limit": 10, "filters[state.keyword]": state}
                     resp = requests.get(MANDI_BASE_URL, params=params, timeout=15)
                     data = resp.json()
                     records = data.get("records", [])
-                    mandi_text = f"🌾 <b>Mandi Bhav - {state}</b>\n\n"
+                    mandi_text = f"Mandi Bhav - {state}\n\n"
                     for i, record in enumerate(records[:5], 1):
                         mandi_text += f"{i}. {record.get('commodity', 'Unknown')}\n"
-                        mandi_text += f"   💰 ₹{record.get('modal_price', 'N/A')}/quintal\n"
-                        mandi_text += f"   📍 {record.get('district', 'N/A')}, {record.get('market', 'N/A')}\n\n"
+                        mandi_text += f"   Rs {record.get('modal_price', 'N/A')}/quintal\n"
+                        mandi_text += f"   {record.get('district', 'N/A')}, {record.get('market', 'N/A')}\n\n"
                     _telegram_send_message(chat_id, mandi_text)
                 except Exception as e:
-                    _telegram_send_message(chat_id, f"❌ Error: {str(e)[:100]}")
+                    _telegram_send_message(chat_id, f"Error: {str(e)[:100]}")
             else:
-                _telegram_send_message(chat_id, "❌ Mandi API key missing")
+                _telegram_send_message(chat_id, "Mandi API key missing")
             return {"status": "ok"}
 
-        # /tax
         elif text.startswith("/tax "):
             try:
                 income = float(text.replace("/tax ", "").strip())
@@ -1276,77 +1057,59 @@ async def telegram_webhook(request: Request):
                     tax = 150000 + (income - 1500000) * 0.30
                 cess = tax * 0.04
                 total = tax + cess
-                tax_text = "💰 <b>Tax Calculation</b>\n\n"
-                tax_text += f"📊 Income: ₹{income:,.0f}\n"
-                tax_text += f"📝 Tax: ₹{tax:,.2f}\n"
-                tax_text += f"🏥 Health Cess (4%): ₹{cess:,.2f}\n"
-                tax_text += f"💸 Total Tax: ₹{total:,.2f}\n"
-                tax_text += f"✅ Take Home: ₹{income - total:,.2f}"
+                tax_text = "Tax Calculation\n\n"
+                tax_text += f"Income: Rs {income:,.0f}\n"
+                tax_text += f"Tax: Rs {tax:,.2f}\n"
+                tax_text += f"Health Cess (4%): Rs {cess:,.2f}\n"
+                tax_text += f"Total Tax: Rs {total:,.2f}\n"
+                tax_text += f"Take Home: Rs {income - total:,.2f}"
                 _telegram_send_message(chat_id, tax_text)
-            except:
-                _telegram_send_message(chat_id, "❌ Invalid income. Example: /tax 500000")
+            except Exception:
+                _telegram_send_message(chat_id, "Invalid income. Example: /tax 500000")
             return {"status": "ok"}
 
-        # /ai
         elif text.startswith("/ai "):
             prompt = text.replace("/ai ", "").strip()
             if GROQ_API_KEY:
                 try:
                     resp = requests.post(
                         "https://api.groq.com/openai/v1/chat/completions",
-                        headers={
-                            "Authorization": f"Bearer {GROQ_API_KEY}",
-                            "Content-Type": "application/json"
-                        },
-                        json={
-                            "model": "llama3-8b-8192",
-                            "messages": [{"role": "user", "content": prompt}]
-                        },
+                        headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"},
+                        json={"model": "llama3-8b-8192", "messages": [{"role": "user", "content": prompt}]},
                         timeout=30
                     )
                     result = resp.json()
                     ai_response = result["choices"][0]["message"]["content"]
                     if len(ai_response) > 4000:
                         ai_response = ai_response[:4000] + "...\n\n(Truncated)"
-                    _telegram_send_message(chat_id, f"🧠 <b>AI Response:</b>\n\n{ai_response}")
-                    _memory_save(
-                        f"telegram_chat:{user_id}:{int(time.time())}",
-                        {"prompt": prompt, "response": ai_response}
-                    )
+                    _telegram_send_message(chat_id, f"AI Response:\n\n{ai_response}")
+                    _memory_save(f"telegram_chat:{user_id}:{int(time.time())}", {"prompt": prompt, "response": ai_response})
                 except Exception as e:
-                    _telegram_send_message(chat_id, f"❌ AI Error: {str(e)[:100]}")
+                    _telegram_send_message(chat_id, f"AI Error: {str(e)[:100]}")
             else:
-                _telegram_send_message(chat_id, "❌ Groq API key missing")
+                _telegram_send_message(chat_id, "Groq API key missing")
             return {"status": "ok"}
 
-        # /broadcast (admin only)
         elif text.startswith("/broadcast "):
             admin_id = int(os.getenv("ADMIN_USER_ID", "0"))
             if user_id != admin_id:
-                _telegram_send_message(chat_id, "❌ Admin only command")
+                _telegram_send_message(chat_id, "Admin only command")
                 return {"status": "ok"}
             broadcast_text = text.replace("/broadcast ", "").strip()
             sent = 0
             for uid in USER_PREFERENCES.keys():
-                _telegram_send_message(uid, f"📢 <b>Broadcast</b>\n\n{broadcast_text}")
+                _telegram_send_message(uid, f"Broadcast\n\n{broadcast_text}")
                 sent += 1
-            _telegram_send_message(chat_id, f"✅ Broadcast sent to {sent} users")
+            _telegram_send_message(chat_id, f"Broadcast sent to {sent} users")
             return {"status": "ok"}
 
-        # Default: AI response
         else:
             if GROQ_API_KEY and text:
                 try:
                     resp = requests.post(
                         "https://api.groq.com/openai/v1/chat/completions",
-                        headers={
-                            "Authorization": f"Bearer {GROQ_API_KEY}",
-                            "Content-Type": "application/json"
-                        },
-                        json={
-                            "model": "llama3-8b-8192",
-                            "messages": [{"role": "user", "content": text}]
-                        },
+                        headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"},
+                        json={"model": "llama3-8b-8192", "messages": [{"role": "user", "content": text}]},
                         timeout=30
                     )
                     result = resp.json()
@@ -1354,102 +1117,15 @@ async def telegram_webhook(request: Request):
                     if len(ai_response) > 4000:
                         ai_response = ai_response[:4000] + "...\n\n(Truncated)"
                     _telegram_send_message(chat_id, ai_response)
-                    _memory_save(
-                        f"telegram_chat:{user_id}:{int(time.time())}",
-                        {"prompt": text, "response": ai_response}
-                    )
+                    _memory_save(f"telegram_chat:{user_id}:{int(time.time())}", {"prompt": text, "response": ai_response})
                 except Exception as e:
-                    _telegram_send_message(chat_id, f"❌ AI Error: {str(e)[:100]}")
-            return {"status": "ok"}
-
-        # Handle voice messages
-        if "voice" in message:
-            voice = message["voice"]
-            file_id = voice["file_id"]
-            
-            try:
-                # Get file path from Telegram
-                file_resp = requests.get(
-                    f"{TELEGRAM_API_BASE}/getFile?file_id={file_id}",
-                    timeout=10
-                )
-                file_data = file_resp.json()
-                
-                if file_data.get("ok"):
-                    file_path = file_data["result"]["file_path"]
-                    file_url = f"https://api.telegram.org/file/bot{TELEGRAM_TOKEN}/{file_path}"
-                    
-                    # Download audio
-                    audio_resp = requests.get(file_url, timeout=15)
-                    audio_bytes = audio_resp.content
-                    
-                    # Transcribe with Whisper
-                    model = _get_whisper_model()
-                    if model:
-                        with tempfile.NamedTemporaryFile(suffix=".ogg", delete=True) as tmp:
-                            tmp.write(audio_bytes)
-                            tmp.flush()
-                            segments, info = model.transcribe(tmp.name)
-                            transcript = " ".join(seg.text.strip() for seg in segments)
-                        
-                        # Send transcript
-                        transcript_msg = "🎙️ Transcript:" + chr(10) + transcript + chr(10) + chr(10) + "🧠 AI soch raha hai..."
-                        _telegram_send_message(chat_id, transcript_msg)
-                        
-                        # Get AI response
-                        if GROQ_API_KEY:
-                            ai_resp = requests.post(
-                                "https://api.groq.com/openai/v1/chat/completions",
-                                headers={
-                                    "Authorization": f"Bearer {GROQ_API_KEY}",
-                                    "Content-Type": "application/json"
-                                },
-                                json={
-                                    "model": "llama3-8b-8192",
-                                    "messages": [{"role": "user", "content": transcript}]
-                                },
-                                timeout=30
-                            )
-                            ai_result = ai_resp.json()
-                            ai_text = ai_result["choices"][0]["message"]["content"]
-                            
-                            # Send TTS response
-                            try:
-                                from gtts import gTTS
-                                tts_text = ai_text[:500] if len(ai_text) > 500 else ai_text
-                                tts = gTTS(text=tts_text, lang="hi", slow=False)
-                                mp3_fp = io.BytesIO()
-                                tts.write_to_fp(mp3_fp)
-                                mp3_fp.seek(0)
-                                tts_b64 = base64.b64encode(mp3_fp.read()).decode("utf-8")
-                                _telegram_send_voice(chat_id, tts_b64, "🧠 AI Response (Hindi)")
-                            except Exception as tts_e:
-                                ai_msg = "🧠 AI Response:" + chr(10) + chr(10) + ai_text
-                                _telegram_send_message(chat_id, ai_msg)
-                        
-                        # Save to memory
-                        _memory_save(
-                            f"telegram_voice:{user_id}:{int(time.time())}",
-                            {"transcript": transcript, "response": ai_text if GROQ_API_KEY else None}
-                        )
-                    else:
-                        _telegram_send_message(chat_id, "❌ Whisper model not available")
-                else:
-                    _telegram_send_message(chat_id, "❌ Could not download voice file")
-            except Exception as e:
-                logger.error(f"Voice processing error: {e}")
-                err_msg = "❌ Voice processing error: " + str(e)[:100]
-                _telegram_send_message(chat_id, err_msg)
-            
+                    _telegram_send_message(chat_id, f"AI Error: {str(e)[:100]}")
             return {"status": "ok"}
 
     except Exception as e:
         logger.error(f"Telegram webhook error: {e}")
         return {"status": "error", "message": str(e)}
 
-# ═══════════════════════════════════════════════════════
-# 🦁 NEWS SCHEDULER — 4 AM Daily
-# ═══════════════════════════════════════════════════════
 NEWS_SCHEDULE_ACTIVE = False
 
 @app.post("/api/news/schedule/start")
@@ -1467,41 +1143,32 @@ async def _news_scheduler_task():
         next_run = now.replace(hour=4, minute=0, second=0, microsecond=0)
         if now >= next_run:
             next_run += timedelta(days=1)
-        
         wait_seconds = (next_run - now).total_seconds()
         logger.info(f"News scheduler: Next run in {wait_seconds/3600:.1f} hours")
-        
-        # Sleep until next check (max 1 hour)
         await asyncio.sleep(min(wait_seconds, 3600))
-        
         now = datetime.now()
         if now.hour == 4 and now.minute < 5:
-            logger.info("🌅 Running 4 AM news broadcast...")
+            logger.info("Running 4 AM news broadcast...")
             try:
                 if NEWSDATA_API_KEY:
                     url = f"https://newsdata.io/api/1/latest?apikey={NEWSDATA_API_KEY}&q=india&size=10"
                     resp = requests.get(url, timeout=15)
                     news_data = resp.json()
                     articles = news_data.get("results", [])[:5]
-                    news_text = "📰 <b>4 AM Daily News</b>\n\n🦁 Singh Ji AI\n"
+                    news_text = "4 AM Daily News\n\nSingh Ji AI\n"
                     for i, article in enumerate(articles, 1):
-                        news_text += f"\n{i}. <b>{article.get('title', 'No title')}</b>\n"
+                        news_text += f"\n{i}. {article.get('title', 'No title')}\n"
                         desc = article.get('description', 'No description')[:100]
                         news_text += f"   {desc}...\n"
-                    
                     for uid in USER_PREFERENCES.keys():
                         try:
                             _telegram_send_message(uid, news_text)
-                        except:
+                        except Exception:
                             pass
-                    
-                    logger.info(f"✅ News sent to {len(USER_PREFERENCES)} users")
+                    logger.info(f"News sent to {len(USER_PREFERENCES)} users")
             except Exception as e:
                 logger.error(f"News scheduler error: {e}")
 
-# ═══════════════════════════════════════════════════════
-# 🦁 ADMIN MODULE
-# ═══════════════════════════════════════════════════════
 @app.get("/api/admin/")
 async def admin_root(request: Request):
     if not _check_admin_auth(request):
@@ -1531,21 +1198,13 @@ async def admin_broadcast(request: Request):
     message = data.get("message", "")
     sent = 0
     for uid in USER_PREFERENCES.keys():
-        _telegram_send_message(uid, f"📢 <b>Admin Broadcast</b>\n\n{message}")
+        _telegram_send_message(uid, f"Admin Broadcast\n\n{message}")
         sent += 1
     return {"broadcast": True, "sent_to": sent}
 
-# ═══════════════════════════════════════════════════════
-# 🦁 PAYMENT — Razorpay Real
-# ═══════════════════════════════════════════════════════
 @app.get("/api/payment/")
 async def payment_root():
-    return {
-        "module": "Payment Gateway",
-        "status": "ON_HOLD" if not AVAILABLE_KEYS["RAZORPAY"] else "ACTIVE",
-        "upi_id": "jp200883@sbi",
-        "note": "Activate at 1000+ daily users"
-    }
+    return {"module": "Payment Gateway", "status": "ON_HOLD" if not AVAILABLE_KEYS["RAZORPAY"] else "ACTIVE", "upi_id": "jp200883@sbi", "note": "Activate at 1000+ daily users"}
 
 @app.post("/api/payment/create-order")
 async def payment_create_order(request: Request):
@@ -1558,48 +1217,24 @@ async def payment_create_order(request: Request):
     try:
         import razorpay
         client = razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET))
-        order = client.order.create({
-            "amount": amount,
-            "currency": currency,
-            "receipt": receipt,
-            "payment_capture": 1
-        })
+        order = client.order.create({"amount": amount, "currency": currency, "receipt": receipt, "payment_capture": 1})
         return {"status": "success", "order": order, "source": "RAZORPAY_LIVE"}
     except Exception as e:
         return {"error": str(e)}
 
-# ═══════════════════════════════════════════════════════
-# 🦁 GMAIL — OAuth2
-# ═══════════════════════════════════════════════════════
 @app.get("/api/gmail/")
 async def gmail_root():
-    return {
-        "module": "Gmail",
-        "status": "active" if AVAILABLE_KEYS["GMAIL"] else "missing_credentials"
-    }
+    return {"module": "Gmail", "status": "active" if AVAILABLE_KEYS["GMAIL"] else "missing_credentials"}
 
 @app.get("/api/gmail/auth-url")
 async def gmail_auth_url():
     if not GMAIL_CLIENT_ID:
         return {"error": "GMAIL_CLIENT_ID missing"}
-    redirect_uri = os.getenv(
-        "GMAIL_REDIRECT_URI",
-        "https://singhji-ai.github.io/oauth/callback"
-    )
+    redirect_uri = os.getenv("GMAIL_REDIRECT_URI", "https://singhji-ai.github.io/oauth/callback")
     scope = "https://www.googleapis.com/auth/gmail.send"
-    url = (
-        f"https://accounts.google.com/o/oauth2/v2/auth"
-        f"?client_id={GMAIL_CLIENT_ID}"
-        f"&redirect_uri={redirect_uri}"
-        f"&scope={scope}"
-        f"&response_type=code"
-        f"&access_type=offline"
-    )
+    url = f"https://accounts.google.com/o/oauth2/v2/auth?client_id={GMAIL_CLIENT_ID}&redirect_uri={redirect_uri}&scope={scope}&response_type=code&access_type=offline"
     return {"auth_url": url}
 
-# ═══════════════════════════════════════════════════════
-# 🦁 RUN
-# ═══════════════════════════════════════════════════════
 if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
