@@ -111,6 +111,16 @@ try:
 except Exception as e:
     logger.warning(f"Supabase client init failed: {e}")
     SUPABASE_CLIENT = None
+    ADMIN_API_KEY = os.getenv("ADMIN_API_KEY")
+
+def _check_admin_auth(request: Request):
+    """Returns True if request has valid admin key, else False."""
+    if not ADMIN_API_KEY:
+        # No key configured on server = admin routes stay open (dev mode).
+        # Set ADMIN_API_KEY in Railway to lock these down.
+        return True
+    provided = request.headers.get("X-Admin-Key") or request.query_params.get("admin_key")
+    return provided == ADMIN_API_KEY
 
 TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
