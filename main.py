@@ -20,6 +20,7 @@ from pathlib import Path
 from datetime import datetime, timedelta
 import requests
 import logging
+from modules.telegram_bot.handler import router as telegram_router
 from collections import defaultdict, deque
 import threading
 
