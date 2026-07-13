@@ -1125,39 +1125,6 @@ async def telegram_webhook(request: Request):
         logger.error(f"Telegram: {e}")
         return {"status": "ok"}
 
-# ═══════════════════════════════════════════════════════
-# 🦁 TRISHUL MODULE
-# ═══════════════════════════════════════════════════════
-@app.get("/api/trishul/")
-async def trishul_root():
-    return {"module": "Trishul Memory", "status": "active", "records": len(TRISHUL_MEMORY)}
-
-@app.post("/api/trishul/store")
-async def trishul_store(request: Request):
-    data = await request.json()
-    key = data.get("key", str(datetime.now().timestamp()))
-    TRISHUL_MEMORY[key] = {
-        "value": data.get("value", data),
-        "timestamp": datetime.now().isoformat(),
-        "tags": data.get("tags", [])
-    }
-    return {"saved": True, "key": key, "total": len(TRISHUL_MEMORY)}
-
-@app.get("/api/trishul/recall/{key}")
-async def trishul_recall(key: str):
-    return {"key": key, "data": TRISHUL_MEMORY.get(key), "exists": key in TRISHUL_MEMORY}
-
-@app.get("/api/trishul/search")
-async def trishul_search(q: str = ""):
-    results = {k: v for k, v in TRISHUL_MEMORY.items() if q.lower() in str(v).lower()}
-    return {"query": q, "results": results, "count": len(results)}
-
-@app.delete("/api/trishul/delete/{key}")
-async def trishul_delete(key: str):
-    if key in TRISHUL_MEMORY:
-        del TRISHUL_MEMORY[key]
-        return {"deleted": True}
-    return {"deleted": False, "error": "Key not found"}
 
 # ═══════════════════════════════════════════════════════
 # 🦁 AAVISHKAR MODULE
