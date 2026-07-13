@@ -744,16 +744,46 @@ async def news_latest():
     return {"status": "demo", "news": [{"title": "Singh Ji AI News", "description": "Add CURRENTS_API_KEY"}]}
 
 # ═══════════════════════════════════════════════════════
-# 🦁 MANDI MODULE
+# 🦁 MANDI MODULE — Real Agmarknet (data.gov.in) prices
 # ═══════════════════════════════════════════════════════
+MANDI_RESOURCE_ID = "9ef84268-d588-465a-a308-a864a43d0070"
+MANDI_BASE_URL = f"https://api.data.gov.in/resource/{MANDI_RESOURCE_ID}"
+
 @app.get("/api/mandi/")
 async def mandi_root():
-    return {"module": "Mandi", "status": "active"}
+    return {"module": "Mandi", "status": "active" if AVAILABLE_KEYS.get("MANDI") else "missing_key"}
 
 @app.get("/api/mandi/{state}")
-async def mandi_state(state: str):
-    return {"state": state, "commodities": ["Wheat", "Rice", "Corn", "Soybean", "Cotton"]}
+async def mandi_state(state: str, commodity: str = None, district: str = None, limit: int = 50):
+    if not MANDI_API_KEY:
+        return {"state": state, "error": "MANDI_API_KEY not set", "source": "DEMO",
+                "commodities": ["Wheat", "Rice", "Corn", "Soybean", "Cotton"]}
+    try:
+        params = {
+            "api-key": MANDI_API_KEY,
+            "format": "json",
+            "limit": limit,
+            "filters[state.keyword]": state,
+        }
+        if commodity:
+            params["filters[commodity.keyword]"] = commodity
+        if district:
+            params["filters[district.keyword]"] = district
 
+        resp = requests.get(MANDI_BASE_URL, params=params, timeout=15)
+        data = resp.json()
+        records = data.get("records", [])
+        return {
+            "state": state,
+            "commodity_filter": commodity,
+            "district_filter": district,
+            "count": len(records),
+            "records": records,
+            "source": "AGMARKNET_LIVE",
+        }
+    except Exception as e:
+        logger.warning(f"Mandi API error: {e}")
+        return {"state": state, "error": str(e), "source": "ERROR"}
 # ═══════════════════════════════════════════════════════
 # 🦁 PLANT ID MODULE
 # ═══════════════════════════════════════════════════════
@@ -767,12 +797,46 @@ async def plant_identify(request: Request):
     return {"status": "pending", "image": data.get("image_url", "none")}
 
 # ═══════════════════════════════════════════════════════
-# 🦁 PAYMENT MODULE
+# 🦁 PLANT ID MODULE — Real plant.id API (image → species)
 # ═══════════════════════════════════════════════════════
-@app.get("/api/payment/")
-async def payment_root():
-    return {"module": "Payment Gateway", "status": "ON_HOLD", "activate_at": "1000+ daily users", "upi_id": "jp200883@sbi"}
+@app.get("/api/plant/")
+async def plant_root():
+    return {"module": "Plant ID", "status": "active" if AVAILABLE_KEYS.get("PLANT_ID") else "missing_key"}
 
+@app.post("/api/plant/identify")
+async def plant_identify(request: Request):
+    """Expects JSON: {"image_base64": "..."} — base64-encoded plant photo (no data-uri prefix)."""
+    if not PLANT_ID_API:
+        return {"error": "PLANT_ID_API not set", "status": "demo"}
+    data = await request.json()
+    image_b64 = data.get("image_base64", "")
+    if not image_b64:
+        return {"error": "image_base64 is required"}
+
+    try:
+        resp = requests.post(
+            "https://api.plant.id/v3/identification",
+            params={"details": "url,common_names,description"},
+            headers={"Api-Key": PLANT_ID_API, "Content-Type": "application/json"},
+            json={"images": [image_b64]},
+            timeout=30,
+        )
+        result = resp.json()
+        suggestions = result.get("result", {}).get("classification", {}).get("suggestions", [])
+        top = suggestions[0] if suggestions else None
+        return {
+            "status": "success",
+            "is_plant": result.get("result", {}).get("is_plant", {}).get("binary"),
+            "top_match": {
+                "name": top.get("name"),
+                "probability": top.get("probability"),
+                "common_names": top.get("details", {}).get("common_names"),
+            } if top else None,
+            "all_suggestions": suggestions[:5],
+        }
+    except Exception as e:
+        logger.warning(f"Plant ID error: {e}")
+        return {"status": "error", "error": str(e)}
 # ═══════════════════════════════════════════════════════
 # 🦁 TRISHUL MODULE (Supabase-backed, dict fallback)
 # ═══════════════════════════════════════════════════════
