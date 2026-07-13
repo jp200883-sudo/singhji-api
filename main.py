@@ -111,6 +111,65 @@ except Exception as e:
     logger.warning(f"Supabase client init failed: {e}")
     SUPABASE_CLIENT = None
 
+
+# ═══════════════════════════════════════════════════════
+# 🦁 CACHE SYSTEM — Supabase-backed with TTL
+# ═══════════════════════════════════════════════════════
+import hashlib
+
+CACHE_TTL = {
+    "weather": 1800,      # 30 minutes
+    "mandi": 21600,       # 6 hours
+    "ai_chat": 3600,      # 1 hour
+    "news": 900,          # 15 minutes
+    "default": 300,       # 5 minutes
+}
+
+def _cache_key(prefix: str, *args) -> str:
+    """Generate cache key from prefix + args"""
+    raw = f"{prefix}:{':'.join(str(a) for a in args)}"
+    return hashlib.md5(raw.encode()).hexdigest()
+
+def _cache_get(key: str):
+    """Get cached value if not expired"""
+    if not SUPABASE_CLIENT:
+        return None
+    try:
+        resp = SUPABASE_CLIENT.table("cache_store").select("*").eq("key", key).execute()
+        if resp.data:
+            entry = resp.data[0]
+            if entry["expires_at"] and datetime.now().isoformat() < entry["expires_at"]:
+                return entry["value"]
+            SUPABASE_CLIENT.table("cache_store").delete().eq("key", key).execute()
+    except Exception as e:
+        logger.warning(f"Cache get error: {e}")
+    return None
+
+def _cache_set(key: str, value: dict, ttl: int = None):
+    """Store value in cache with TTL"""
+    if not SUPABASE_CLIENT:
+        return
+    ttl = ttl or CACHE_TTL.get("default")
+    expires_at = (datetime.now().timestamp() + ttl)
+    try:
+        SUPABASE_CLIENT.table("cache_store").upsert({
+            "key": key,
+            "value": value,
+            "expires_at": datetime.fromtimestamp(expires_at).isoformat(),
+            "created_at": datetime.now().isoformat()
+        }).execute()
+    except Exception as e:
+        logger.warning(f"Cache set error: {e}")
+
+def _cache_delete(key: str):
+    """Delete cache entry"""
+    if not SUPABASE_CLIENT:
+        return
+    try:
+        SUPABASE_CLIENT.table("cache_store").delete().eq("key", key).execute()
+    except Exception as e:
+        logger.warning(f"Cache delete error: {e}")
+
 # ═══════════════════════════════════════════════════════
 # 🦁 ADMIN AUTH — protects /api/admin/* and admin-level routes
 # Set ADMIN_API_KEY in Railway to lock these down. If unset,
@@ -667,17 +726,25 @@ async def weather_root():
 
 @app.get("/api/weather/{city}")
 async def weather_city(city: str):
+    cache_key = _cache_key("weather", city)
+    cached = _cache_get(cache_key)
+    if cached:
+        cached["source"] = "CACHE"
+        return cached
+
     if OPENWEATHER_API_KEY:
         try:
             url = f"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={OPENWEATHER_API_KEY}&units=metric"
             resp = requests.get(url, timeout=10)
             data = resp.json()
             if resp.status_code == 200:
-                return {
+                result = {
                     "city": city, "temp": data["main"]["temp"],
                     "humidity": data["main"]["humidity"],
                     "desc": data["weather"][0]["description"]
                 }
+                _cache_set(cache_key, result, CACHE_TTL["weather"])
+                return result
         except Exception as e:
             logger.warning(f"Weather error: {e}")
     return {"city": city, "temp": 32.0, "humidity": 65, "desc": "demo", "source": "DEMO"}
@@ -711,6 +778,12 @@ async def mandi_root():
 
 @app.get("/api/mandi/{state}")
 async def mandi_state(state: str, commodity: str = None, district: str = None, limit: int = 50):
+    cache_key = _cache_key("mandi", state, commodity or "all", district or "all", limit)
+    cached = _cache_get(cache_key)
+    if cached:
+        cached["source"] = "CACHE"
+        return cached
+
     if not MANDI_API_KEY:
         return {"state": state, "error": "MANDI_API_KEY not set", "source": "DEMO",
                 "commodities": ["Wheat", "Rice", "Corn", "Soybean", "Cotton"]}
@@ -728,7 +801,7 @@ async def mandi_state(state: str, commodity: str = None, district: str = None, l
         resp = requests.get(MANDI_BASE_URL, params=params, timeout=15)
         data = resp.json()
         records = data.get("records", [])
-        return {
+        result = {
             "state": state,
             "commodity_filter": commodity,
             "district_filter": district,
@@ -736,6 +809,8 @@ async def mandi_state(state: str, commodity: str = None, district: str = None, l
             "records": records,
             "source": "AGMARKNET_LIVE",
         }
+        _cache_set(cache_key, result, CACHE_TTL["mandi"])
+        return result
     except Exception as e:
         logger.warning(f"Mandi API error: {e}")
         return {"state": state, "error": str(e), "source": "ERROR"}
@@ -1159,6 +1234,17 @@ async def aavishkar_generate(request: Request):
     prompt = data.get("prompt", "")
     model = data.get("model", "groq")
 
+    # Skip cache for personal queries
+    personal_keywords = ["password", "otp", "secret", "private", "personal", "aadhar", "pan", "bank", "card", "cvv", "pin"]
+    is_personal = any(kw in prompt.lower() for kw in personal_keywords)
+
+    if not is_personal:
+        cache_key = _cache_key("ai_chat", model, prompt[:100])
+        cached = _cache_get(cache_key)
+        if cached:
+            cached["source"] = "CACHE"
+            return cached
+
     if model == "groq" and GROQ_API_KEY:
         try:
             resp = requests.post("https://api.groq.com/openai/v1/chat/completions",
@@ -1166,7 +1252,11 @@ async def aavishkar_generate(request: Request):
                 json={"model": "llama3-8b-8192", "messages": [{"role": "user", "content": prompt}]},
                 timeout=30)
             result = resp.json()
-            return {"status": "success", "model": "groq", "response": result["choices"][0]["message"]["content"]}
+            response_text = result["choices"][0]["message"]["content"]
+            result_data = {"status": "success", "model": "groq", "response": response_text}
+            if not is_personal:
+                _cache_set(cache_key, result_data, CACHE_TTL["ai_chat"])
+            return result_data
         except Exception as e:
             logger.warning(f"Groq failed: {e}")
 
@@ -1176,7 +1266,10 @@ async def aavishkar_generate(request: Request):
             resp = requests.post(url, json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=30)
             result = resp.json()
             text = result["candidates"][0]["content"]["parts"][0]["text"]
-            return {"status": "success", "model": "gemini", "response": text}
+            result_data = {"status": "success", "model": "gemini", "response": text}
+            if not is_personal:
+                _cache_set(cache_key, result_data, CACHE_TTL["ai_chat"])
+            return result_data
         except Exception as e:
             logger.warning(f"Gemini failed: {e}")
 
