@@ -653,22 +653,43 @@ async def status():
     }
 
 # ═══════════════════════════════════════════════════════
-# 🦁 MEMORY MODULE
+# 🦁 MEMORY MODULE (Supabase-backed, dict fallback)
 # ═══════════════════════════════════════════════════════
 @app.get("/api/memory/")
 async def memory_list():
-    return {"status": "Memory Active", "records": len(MEMORY_STORE)}
+    if SUPABASE_CLIENT:
+        try:
+            resp = SUPABASE_CLIENT.table("memory_store").select("key", count="exact").execute()
+            return {"status": "Memory Active (Supabase)", "records": resp.count or len(resp.data)}
+        except Exception as e:
+            logger.warning(f"Supabase memory_list error: {e}")
+    return {"status": "Memory Active (RAM fallback)", "records": len(MEMORY_STORE)}
 
 @app.get("/api/memory/{key}")
 async def memory_get(key: str):
+    if SUPABASE_CLIENT:
+        try:
+            resp = SUPABASE_CLIENT.table("memory_store").select("*").eq("key", key).execute()
+            if resp.data:
+                return {"key": key, "data": resp.data[0]["value"], "exists": True}
+            return {"key": key, "data": None, "exists": False}
+        except Exception as e:
+            logger.warning(f"Supabase memory_get error: {e}")
     return {"key": key, "data": MEMORY_STORE.get(key), "exists": key in MEMORY_STORE}
 
 @app.post("/api/memory/")
 async def memory_save(request: Request):
     data = await request.json()
     key = data.get("key", str(datetime.now().timestamp()))
-    MEMORY_STORE[key] = data.get("value", data)
-    return {"saved": True, "key": key}
+    value = data.get("value", data)
+    if SUPABASE_CLIENT:
+        try:
+            SUPABASE_CLIENT.table("memory_store").upsert({"key": key, "value": value}).execute()
+            return {"saved": True, "key": key, "store": "supabase"}
+        except Exception as e:
+            logger.warning(f"Supabase memory_save error: {e}")
+    MEMORY_STORE[key] = value
+    return {"saved": True, "key": key, "store": "ram_fallback"}
 
 # ═══════════════════════════════════════════════════════
 # 🦁 WEATHER MODULE
@@ -742,75 +763,68 @@ async def payment_root():
     return {"module": "Payment Gateway", "status": "ON_HOLD", "activate_at": "1000+ daily users", "upi_id": "jp200883@sbi"}
 
 # ═══════════════════════════════════════════════════════
-# 🦁 TRANSLATE MODULE (AI4Bharat IndicTrans2 via Cloudflare Workers AI)
-# No approval needed — works today, all 22 scheduled Indian languages.
+# 🦁 TRISHUL MODULE (Supabase-backed, dict fallback)
 # ═══════════════════════════════════════════════════════
-INDIC_LANG_MAP = {
-    "hi": "hindi", "en": "english", "bn": "bengali", "gu": "gujarati",
-    "kn": "kannada", "ml": "malayalam", "mr": "marathi", "or": "oriya",
-    "pa": "punjabi", "ta": "tamil", "te": "telugu", "ur": "urdu",
-    "as": "assamese", "sa": "sanskrit", "ne": "nepali", "sd": "sindhi",
-    "ks": "kashmiri", "kok": "konkani", "mai": "maithili", "mni": "manipuri",
-    "brx": "bodo", "doi": "dogri", "sat": "santali",
-}
+@app.get("/api/trishul/")
+async def trishul_root():
+    if SUPABASE_CLIENT:
+        try:
+            resp = SUPABASE_CLIENT.table("trishul_memory").select("key", count="exact").execute()
+            return {"module": "Trishul Memory", "status": "active (Supabase)", "records": resp.count or len(resp.data)}
+        except Exception as e:
+            logger.warning(f"Supabase trishul_root error: {e}")
+    return {"module": "Trishul Memory", "status": "active (RAM fallback)", "records": len(TRISHUL_MEMORY)}
 
-@app.get("/api/translate/")
-async def translate_root():
-    return {
-        "module": "Translate (AI4Bharat IndicTrans2)",
-        "status": "active" if AVAILABLE_KEYS.get("CF") else "missing_cf_credentials",
-        "supported_languages": list(INDIC_LANG_MAP.keys()),
-        "note": "No government approval needed — works via Cloudflare Workers AI"
-    }
-
-@app.post("/api/translate/")
-async def translate_text(request: Request):
-    if not (CF_ACCOUNT_ID and CF_API_TOKEN):
-        return {"error": "CF_ACCOUNT_ID / CF_API_TOKEN not set"}
+@app.post("/api/trishul/store")
+async def trishul_store(request: Request):
     data = await request.json()
-    text = data.get("text", "")
-    source_lang = data.get("source_lang", "hi")
-    target_lang = data.get("target_lang", "en")
+    key = data.get("key", str(datetime.now().timestamp()))
+    value = data.get("value", data)
+    tags = data.get("tags", [])
+    if SUPABASE_CLIENT:
+        try:
+            SUPABASE_CLIENT.table("trishul_memory").upsert({"key": key, "value": value, "tags": tags}).execute()
+            return {"saved": True, "key": key, "store": "supabase"}
+        except Exception as e:
+            logger.warning(f"Supabase trishul_store error: {e}")
+    TRISHUL_MEMORY[key] = {"value": value, "timestamp": datetime.now().isoformat(), "tags": tags}
+    return {"saved": True, "key": key, "store": "ram_fallback", "total": len(TRISHUL_MEMORY)}
 
-    if not text:
-        return {"error": "text is required"}
+@app.get("/api/trishul/recall/{key}")
+async def trishul_recall(key: str):
+    if SUPABASE_CLIENT:
+        try:
+            resp = SUPABASE_CLIENT.table("trishul_memory").select("*").eq("key", key).execute()
+            if resp.data:
+                return {"key": key, "data": resp.data[0], "exists": True}
+            return {"key": key, "data": None, "exists": False}
+        except Exception as e:
+            logger.warning(f"Supabase trishul_recall error: {e}")
+    return {"key": key, "data": TRISHUL_MEMORY.get(key), "exists": key in TRISHUL_MEMORY}
 
-    src = INDIC_LANG_MAP.get(source_lang, source_lang)
-    tgt = INDIC_LANG_MAP.get(target_lang, target_lang)
+@app.get("/api/trishul/search")
+async def trishul_search(q: str = ""):
+    if SUPABASE_CLIENT:
+        try:
+            resp = SUPABASE_CLIENT.table("trishul_memory").select("*").ilike("value", f"%{q}%").execute()
+            return {"query": q, "results": resp.data, "count": len(resp.data)}
+        except Exception as e:
+            logger.warning(f"Supabase trishul_search error: {e}")
+    results = {k: v for k, v in TRISHUL_MEMORY.items() if q.lower() in str(v).lower()}
+    return {"query": q, "results": results, "count": len(results)}
 
-    try:
-        url = f"https://api.cloudflare.com/client/v4/accounts/{CF_ACCOUNT_ID}/ai/run/@cf/ai4bharat/indictrans2-en-indic-1B"
-        resp = requests.post(
-            url,
-            headers={"Authorization": f"Bearer {CF_API_TOKEN}"},
-            json={"text": text, "source_lang": src, "target_lang": tgt},
-            timeout=30,
-        )
-        result = resp.json()
-        if result.get("success"):
-            return {
-                "status": "success",
-                "original": text,
-                "translated": result.get("result", {}).get("translated_text", ""),
-                "source_lang": source_lang,
-                "target_lang": target_lang,
-            }
-        return {"status": "error", "detail": result.get("errors", result)}
-    except Exception as e:
-        logger.warning(f"Translate error: {e}")
-        return {"status": "error", "error": str(e)}
-
-# ═══════════════════════════════════════════════════════
-# 🦁 ADMIN MODULE
-# ═══════════════════════════════════════════════════════
-@app.get("/api/admin/")
-async def admin_root():
-    return {"module": "Admin", "modules": len(MODULES), "agents": SYSTEM_LOAD["active_agents"], "available_keys": AVAILABLE_KEYS}
-
-@app.get("/api/admin/stats")
-async def admin_stats():
-    return {"modules": len(MODULES), "agents_active": SYSTEM_LOAD["active_agents"], "available_keys": AVAILABLE_KEYS, "timestamp": datetime.now().isoformat()}
-
+@app.delete("/api/trishul/delete/{key}")
+async def trishul_delete(key: str):
+    if SUPABASE_CLIENT:
+        try:
+            SUPABASE_CLIENT.table("trishul_memory").delete().eq("key", key).execute()
+            return {"deleted": True, "store": "supabase"}
+        except Exception as e:
+            logger.warning(f"Supabase trishul_delete error: {e}")
+    if key in TRISHUL_MEMORY:
+        del TRISHUL_MEMORY[key]
+        return {"deleted": True, "store": "ram_fallback"}
+    return {"deleted": False, "error": "Key not found"}
 # ═══════════════════════════════════════════════════════
 # 🦁 FACEBOOK MODULE
 # ═══════════════════════════════════════════════════════
