@@ -31,7 +31,7 @@ try:
     from miniprogram.developer import DeveloperPortal
     MINIPROGRAM_AVAILABLE = True
 except ImportError as e:
-    logger.warning(f"Mini-Program modules not available: {e}")
+    logger.warning(f"Mini-Program modules not available: {e} — using fallback demo classes")
     MINIPROGRAM_AVAILABLE = False
     class MiniAuth:
         @staticmethod
@@ -53,8 +53,24 @@ except ImportError as e:
 
     class MiniPayment:
         @staticmethod
-        def process(*args, **kwargs):
-            return {"status": "demo", "message": "Payment gateway on hold"}
+        def process(amount, user_id, merchant_id, method, metadata=None):
+            return {
+                "status": "demo",
+                "message": "Payment gateway on hold — activate at 1000+ users",
+                "amount": amount,
+                "user_id": user_id,
+                "merchant_id": merchant_id,
+                "method": method,
+                "upi_id": "jp200883@sbi",
+                "commission_rate": 0.0,
+                "timestamp": datetime.now().isoformat()
+            }
+
+        @staticmethod
+        def get_commission(amount, method):
+            rates = {"upi": 0.0, "card": 0.02, "netbanking": 0.01}
+            rate = rates.get(method, 0.0)
+            return {"amount": amount, "method": method, "rate": rate, "commission": round(amount * rate, 2)}
 
     class MiniStorage:
         @staticmethod
