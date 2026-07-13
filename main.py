@@ -101,6 +101,17 @@ RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY") or os.getenv("SUPABASE_KEY")
+
+# ═══════════════════════════════════════════════════════
+# 🦁 SUPABASE CLIENT INIT
+# ═══════════════════════════════════════════════════════
+try:
+    from supabase import create_client
+    SUPABASE_CLIENT = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY) if (SUPABASE_URL and SUPABASE_SERVICE_KEY) else None
+except Exception as e:
+    logger.warning(f"Supabase client init failed: {e}")
+    SUPABASE_CLIENT = None
+
 TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 TWILIO_SID = os.getenv("TWILIO_SID")
