@@ -46,7 +46,7 @@ logger = logging.getLogger(__name__)
 # ═══════════════════════════════════════════════════════
 
 class Config:
-    TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
+    TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_TOKEN", "")
     GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
     API_BASE_URL = os.getenv("API_BASE_URL", "https://singhji-api-production-85ca.up.railway.app")
     WEBHOOK_URL = os.getenv("WEBHOOK_URL", "https://singhji-api-production-85ca.up.railway.app/modules/telegram_bot/webhook")
