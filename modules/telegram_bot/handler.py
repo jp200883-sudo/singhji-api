@@ -1,3 +1,13 @@
+import logging
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    CallbackQueryHandler,
+    ContextTypes,
+    MessageHandler,
+    filters
+)
 - Be respectful, especially to elders
 - Give simple answers to technical questions
 - Have knowledge about agriculture, farming, rural India
