@@ -254,17 +254,11 @@ MODULES = {
     "whisper": {"needs_key": None, "active": True},
 }
 
-# ═══════════════════════════════════════════════════════
-# 🦁 RATE LIMITER — per-IP, in-memory sliding window
-# Global default limit on all /api/, /modules/, /telegram/ paths.
-# Stricter limit on expensive/misuse-prone paths (voice, AI chat,
-# bhashini, plant id).
-# ═══════════════════════════════════════════════════════
 _rate_lock = threading.Lock()
 _rate_buckets = defaultdict(deque)
 
-RATE_LIMIT_GLOBAL = (60, 60)   # 60 requests / 60 seconds per IP
-RATE_LIMIT_STRICT = (8, 60)    # 8 requests / 60 seconds per IP
+RATE_LIMIT_GLOBAL = (60, 60)
+RATE_LIMIT_STRICT = (8, 60)
 STRICT_PATH_PREFIXES = (
     "/api/chat",
     "/api/whisper/",
@@ -282,7 +276,6 @@ def _client_ip(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 def _rate_check(key: str, max_calls: int, window_seconds: int) -> bool:
-    """Returns True if the caller should be BLOCKED (limit exceeded)."""
     now = time.time()
     with _rate_lock:
         dq = _rate_buckets[key]
@@ -294,15 +287,10 @@ def _rate_check(key: str, max_calls: int, window_seconds: int) -> bool:
         return False
 
 def _is_rate_limited(request: Request, bucket: str, max_calls: int, window_seconds: int) -> bool:
-    """IP-based check, for the global HTTP middleware."""
     ip = _client_ip(request)
     return _rate_check(f"{bucket}:{ip}", max_calls, window_seconds)
 
-# Telegram webhook traffic all arrives from Telegram's own servers (same
-# IP range for every user), so IP-based limiting would throttle the whole
-# bot at once. Instead we rate-limit per Telegram user_id, checked inside
-# the webhook handler itself — see RATE_LIMIT_TELEGRAM_USER below.
-RATE_LIMIT_TELEGRAM_USER = (15, 60)  # 15 messages / 60 seconds per Telegram user
+RATE_LIMIT_TELEGRAM_USER = (15, 60)
 
 
 @asynccontextmanager
@@ -335,9 +323,6 @@ app.add_middleware(
 from modules.kisaan_doctor.handler import router as kisaan_router
 app.include_router(kisaan_router, prefix="/modules/kisaan_doctor")
 
-# ═══════════════════════════════════════════════════════
-# 🦁 TELEGRAM BOT ROUTER ATTACH (v8.2 handler.py ke saath)
-# ═══════════════════════════════════════════════════════
 app.include_router(telegram_router, prefix="/modules/telegram_bot")
 
 @app.middleware("http")
@@ -495,10 +480,7 @@ async def mandi_state(state: str, commodity: str = None, limit: int = 50):
         params = {"api-key": MANDI_API_KEY, "format": "json", "limit": limit, "filters[state.keyword]": state}
         if commodity:
             params["filters[commodity.keyword]"] = commodity
-      try:
-    resp = requests.get(MANDI_BASE_URL, params=params, timeout=30)
-except requests.exceptions.Timeout:
-    resp = requests.get(MANDI_BASE_URL, params=params, timeout=30)
+        resp = requests.get(MANDI_BASE_URL, params=params, timeout=45)
         data = resp.json()
         result = {"state": state, "commodity_filter": commodity, "count": len(data.get("records", [])), "records": data.get("records", []), "source": "AGMARKNET_LIVE"}
         _cache_set(cache_key, result, CACHE_TTL["mandi"])
@@ -910,10 +892,6 @@ async def telegram_webhook(request: Request):
             _telegram_send_message(chat_id, "Thoda slow karo! 1 minute mein try karo.")
             return {"status": "ok"}
 
-        # Voice messages have no "text" field, so they must be handled
-        # here, BEFORE the text-based if/elif chain below — every branch
-        # of that chain ends in an early return, so voice would never be
-        # reached if checked after it.
         if "voice" in message:
             voice = message["voice"]
             file_id = voice["file_id"]
@@ -1037,7 +1015,7 @@ async def telegram_webhook(request: Request):
             if MANDI_API_KEY:
                 try:
                     params = {"api-key": MANDI_API_KEY, "format": "json", "limit": 10, "filters[state.keyword]": state}
-                    resp = requests.get(MANDI_BASE_URL, params=params, timeout=15)
+                    resp = requests.get(MANDI_BASE_URL, params=params, timeout=45)
                     data = resp.json()
                     records = data.get("records", [])
                     mandi_text = f"Mandi Bhav - {state}\n\n"
