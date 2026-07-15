@@ -1827,6 +1827,7 @@ async def setup_application() -> Application:
     ]
     await application.bot.set_my_commands(commands)
 
+    # ✅ ALL HANDLERS REGISTERED HERE
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("modules", modules_command))
@@ -1852,7 +1853,7 @@ async def setup_application() -> Application:
 # FASTAPI ROUTER — ✅ CORRECTED TO APIRouter
 # ═══════════════════════════════════════════════════════
 
-router = APIRouter()  # ✅ FIXED: Previously was FastAPI()
+router = APIRouter()
 
 # ═══════════════════════════════════════════════════════
 # WEBHOOK ROUTES
