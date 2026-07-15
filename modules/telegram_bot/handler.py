@@ -2095,4 +2095,4 @@ async def shutdown_event():
             await application.shutdown()
             logger.info("Bot shutdown complete!")
         except Exception as e:
-            logger.error(f"Shutdown error: {e}")
+           await update.message.reply_text("❌ Error aa gaya, dobara try karo.")
