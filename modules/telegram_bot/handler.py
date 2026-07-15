@@ -1,178 +1,3 @@
-"""
-🦁 SINGH JI AI — TELEGRAM BOT HANDLER (Production Ready - FIXED v8.2)
-modules/telegram_bot/handler.py
-Version: v8.2 Ultimate — Conversation Flow + Language + Payment Fixed
-"""
-
-from fastapi import APIRouter, Request, HTTPException
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand
-from telegram.ext import (
-    Application, CommandHandler, CallbackQueryHandler, 
-    ContextTypes, MessageHandler, filters, ConversationHandler
-)
-from telegram.constants import ParseMode
-import requests
-import json
-import os
-import io
-import time
-import logging
-import hmac
-import hashlib
-import asyncio
-from datetime import datetime, timedelta
-from collections import OrderedDict
-from typing import Optional, Dict, Any
-from functools import wraps
-
-router = APIRouter()
-
-# ═══════════════════════════════════════════════════════
-# LOGGING SETUP
-# ═══════════════════════════════════════════════════════
-
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('singhji_bot.log'),
-        logging.StreamHandler()
-    ]
-)
-logger = logging.getLogger(__name__)
-
-# ═══════════════════════════════════════════════════════
-# CONFIGURATION
-# ═══════════════════════════════════════════════════════
-
-class Config:
-    TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_TOKEN", "")
-    GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
-    API_BASE_URL = os.getenv("API_BASE_URL", "https://singhji-api-production-85ca.up.railway.app")
-    WEBHOOK_URL = os.getenv("WEBHOOK_URL", "https://singhji-api-production-85ca.up.railway.app/modules/telegram_bot/webhook")
-    WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "singh_ji_secret_token_2024")
-    ENVIRONMENT = os.getenv("ENVIRONMENT", "production")
-    RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID", "")
-    RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET", "")
-    ADMIN_KEY = os.getenv("ADMIN_KEY", "singhji_admin_2024")
-    MAX_MESSAGE_LENGTH = 4000
-    RATE_LIMIT_MAX = int(os.getenv("RATE_LIMIT_MAX", "30"))
-    RATE_LIMIT_WINDOW = int(os.getenv("RATE_LIMIT_WINDOW", "60"))
-    MEMORY_MAX_SIZE = int(os.getenv("MEMORY_MAX_SIZE", "1000"))
-    MEMORY_TTL = int(os.getenv("MEMORY_TTL", "86400"))
-
-config = Config()
-
-# ═══════════════════════════════════════════════════════
-# FIX #1: CONVERSATION STATE MANAGER (NEW!)
-# ═══════════════════════════════════════════════════════
-
-class ConversationState:
-    """All possible conversation states"""
-    IDLE = "idle"
-    WEATHER_CITY = "weather_city"
-    MANDI_STATE = "mandi_state"
-    TAX_INCOME = "tax_income"
-    GOLD_CITY = "gold_city"
-    FUEL_CITY = "fuel_city"
-    CURRENCY_PAIR = "currency_pair"
-    SEARCH_QUERY = "search_query"
-
-class ConversationManager:
-    """Track user conversation flow"""
-    def __init__(self):
-        self.states: Dict[int, Dict] = {}
-        self.ttl = 300  # 5 minutes timeout
-
-    def set_state(self, user_id: int, state: str, data: Dict = None):
-        self.states[user_id] = {
-            "state": state,
-            "data": data or {},
-            "timestamp": time.time()
-        }
-        logger.info(f"User {user_id} state: {state}")
-
-    def get_state(self, user_id: int) -> Dict:
-        if user_id in self.states:
-            if time.time() - self.states[user_id]["timestamp"] > self.ttl:
-                self.clear_state(user_id)
-                return {"state": ConversationState.IDLE, "data": {}}
-            return self.states[user_id]
-        return {"state": ConversationState.IDLE, "data": {}}
-
-    def clear_state(self, user_id: int):
-        if user_id in self.states:
-            del self.states[user_id]
-
-    def is_active(self, user_id: int) -> bool:
-        return self.get_state(user_id)["state"] != ConversationState.IDLE
-
-conversation_mgr = ConversationManager()
-
-# ═══════════════════════════════════════════════════════
-# FIX #2: LANGUAGE MANAGER (NEW!)
-# ═══════════════════════════════════════════════════════
-
-class LanguageManager:
-    """Actually use user's language preference!"""
-
-    def __init__(self):
-        self.user_langs: Dict[int, str] = {}
-        self.lang_names = {
-            "hi": "Hindi (Hinglish)",
-            "en": "English",
-            "ta": "Tamil",
-            "te": "Telugu",
-            "mr": "Marathi",
-            "bn": "Bengali",
-            "gu": "Gujarati",
-            "pa": "Punjabi"
-        }
-
-    def set_lang(self, user_id: int, lang: str):
-        if lang in self.lang_names:
-            self.user_langs[user_id] = lang
-            # Save to Supabase for persistence
-            try:
-                requests.post(
-                    f"{config.API_BASE_URL}/api/memory/",
-                    json={"key": f"user_lang_{user_id}", "value": {"language": lang}},
-                    timeout=5
-                )
-            except:
-                pass
-            return True
-        return False
-
-    def get_lang(self, user_id: int) -> str:
-        return self.user_langs.get(user_id, "hi")
-
-    def get_lang_name(self, user_id: int) -> str:
-        return self.lang_names.get(self.get_lang(user_id), "Hindi")
-
-    def get_system_prompt(self, user_id: int) -> str:
-        lang = self.get_lang(user_id)
-
-        prompts = {
-            "hi": """Tu Singh Ji AI hai - India ka sabse powerful AI assistant!
-Personality:
-- Friendly, helpful, aur thoda funny
-- HINGLISH mein baat kar (Hindi words in Devanagari + English technical terms in Roman)
-- Emojis use kar for better expression
-- Respectful rah, especially elders ke saath
-- Technical questions ka simple jawab de
-- Agriculture, farming, rural India ki knowledge hai
-Rules:
-- Kabhi bhi harmful advice mat dena
-- Paiso ki advice responsibly dena
-- Privacy respect karna
-- Happy rehna!""",
-
-            "en": """You are Singh Ji AI - India's most powerful AI assistant!
-Personality:
-- Friendly, helpful, and slightly funny
-- Speak in clear, simple English
-- Use emojis for better expression
 - Be respectful, especially to elders
 - Give simple answers to technical questions
 - Have knowledge about agriculture, farming, rural India
@@ -1635,7 +1460,7 @@ Rule: Bad Touch = Uncomfortable + Scared + Secret
         elif data == "bachpan_report":
             text = """📝 *REPORT INCIDENT* 📝
 
-शिकायत दर्ज करने के लिए:
+शिकायत दर्ज करनें के लिए:
 
 1️⃣ 1098 पर कॉल करें
 2️⃣ नजदीकी पुलिस स्टेशन जाएं
@@ -1671,7 +1496,7 @@ Rule: Bad Touch = Uncomfortable + Scared + Secret
 
 🛡️ *स्वर्णिम मंत्र:*
 "मेरा शरीर मेरा है"
-"मैं मदद माँग सकता हूँ"
+"मैं मदद मांग सकता हूँ"
 
 ⚡ *Singh Ji AI Ultra v8.3*"""
             keyboard = InlineKeyboardMarkup([
@@ -1700,21 +1525,10 @@ Rule: Bad Touch = Uncomfortable + Scared + Secret
 # ERROR HANDLER
 # ═══════════════════════════════════════════════════════
 
-async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
-    logger.error(f"Exception while handling an update: {context.error}", exc_info=context.error)
-    analytics.track_error()
 
-    if update and isinstance(update, Update) and update.effective_message:
-        try:
-            await update.effective_message.reply_text(
-                "Oops! Kuch unexpected error ho gaya! Team ko bata diya hai. Jaldi fix karenge! Tab tak /start karo.",
-                parse_mode=ParseMode.MARKDOWN
-            )
-        except:
-            pass
-            
-
-# BACHPAN COMMAND — Add this in handler.py
+# ═══════════════════════════════════════════════════════
+# 🛡️ BACHPAN COMMAND — Child Safety
+# ═══════════════════════════════════════════════════════
 
 @error_handler_decorator
 async def bachpan_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1744,7 +1558,7 @@ async def bachpan_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 🛡️ *स्वर्णिम मंत्र:*
 "मेरा शरीर मेरा है"
-"मैं मदद माँग सकता हूँ"
+"मैं मदद मांग सकता हूँ"
 
 ⚡ *Singh Ji AI Ultra v8.3*"""
 
@@ -1759,7 +1573,25 @@ async def bachpan_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(bachpan_text, parse_mode=ParseMode.MARKDOWN, reply_markup=keyboard)
 
-# Callback handler mein add karo:
+async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    logger.error(f"Exception while handling an update: {context.error}", exc_info=context.error)
+    analytics.track_error()
+
+    if update and isinstance(update, Update) and update.effective_message:
+        try:
+            await update.effective_message.reply_text(
+                "Oops! Kuch unexpected error ho gaya! Team ko bata diya hai. Jaldi fix karenge! Tab tak /start karo.",
+                parse_mode=ParseMode.MARKDOWN
+            )
+        except:
+            pass
+
+# ═══════════════════════════════════════════════════════
+# APPLICATION SETUP
+# ═══════════════════════════════════════════════════════
+
+application = None
+
 async def setup_application() -> Application:
     global application
 
@@ -1795,6 +1627,7 @@ async def setup_application() -> Application:
     application.add_handler(CommandHandler("status", status_command))
     application.add_handler(CommandHandler("settings", settings_command))
     application.add_handler(CommandHandler("about", about_command))
+    application.add_handler(CommandHandler("bachpan", bachpan_command))
 
     application.add_handler(MessageHandler(filters.VOICE, voice_handler))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_chat_handler))
@@ -2132,3 +1965,11 @@ if __name__ == "__main__":
         reload=config.ENVIRONMENT == "development",
         log_level="info"
     )
+root@cd1fd475637b:/app# grep -n "async def voice_handler\|MessageHandler(filters" modules/telegram_bot/handler.py
+1156:async def voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+1640:    application.add_handler(MessageHandler(filters.VOICE, voice_handler))
+1641:    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_chat_handler))
+root@cd1fd475637b:/app# grep -n "async def use_module_command\|CommandHandler(\"use\"" modules/telegram_bot/handler.py
+934:async def use_module_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+1633:    application.add_handler(CommandHandler("use", use_module_command))
+root@cd1fd475637b:/app# 
