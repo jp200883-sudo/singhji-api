@@ -1856,13 +1856,14 @@ async def setup_application() -> Application:
 router = APIRouter()
 
 # ═══════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════
 # WEBHOOK ROUTES
 # ═══════════════════════════════════════════════════════
 
 def verify_webhook_secret(request: Request) -> bool:
     if config.ENVIRONMENT == "development":
         return True
-
+    ...
     secret_token = request.headers.get("X-Telegram-Bot-Api-Secret-Token")
     expected = config.WEBHOOK_SECRET
 
