@@ -322,6 +322,8 @@ app.add_middleware(
 )
 from modules.kisaan_doctor.handler import router as kisaan_router
 app.include_router(kisaan_router, prefix="/modules/kisaan_doctor")
+from modules.sarkari_yojana.handler import router as yojana_router
+app.include_router(yojana_router, prefix="/modules/sarkari_yojana")
 
 app.include_router(telegram_router, prefix="/modules/telegram_bot")
 
