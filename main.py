@@ -332,6 +332,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+from modules.kisaan_doctor.handler import router as kisaan_router
+app.include_router(kisaan_router, prefix="/modules/kisaan_doctor")
 
 # ═══════════════════════════════════════════════════════
 # 🦁 TELEGRAM BOT ROUTER ATTACH (v8.2 handler.py ke saath)
