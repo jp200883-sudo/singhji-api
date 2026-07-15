@@ -5,6 +5,7 @@ import io
 import hmac
 import hashlib
 import asyncio
+import time
 import requests
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, List
@@ -54,7 +55,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # ═══════════════════════════════════════════════════════
-# CONVERSATION STATE MANAGER - FIXED!
+# CONVERSATION STATE MANAGER
 # ═══════════════════════════════════════════════════════
 
 class ConversationState:
@@ -92,7 +93,7 @@ class ConversationManager:
 conversation_mgr = ConversationManager()
 
 # ═══════════════════════════════════════════════════════
-# LANGUAGE MANAGER - FIXED!
+# LANGUAGE MANAGER
 # ═══════════════════════════════════════════════════════
 
 class LanguageManager:
@@ -1239,7 +1240,7 @@ async def voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 # ═══════════════════════════════════════════════════════
-# TEXT CHAT HANDLER (FIXED: Conversation Flow!)
+# TEXT CHAT HANDLER
 # ═══════════════════════════════════════════════════════
 
 @error_handler_decorator
@@ -1376,7 +1377,7 @@ async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYP
         )
 
 # ═══════════════════════════════════════════════════════
-# CALLBACK QUERY HANDLER (FIXED: Conversation states!)
+# CALLBACK QUERY HANDLER
 # ═══════════════════════════════════════════════════════
 
 @error_handler_decorator
@@ -1389,7 +1390,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         if data == "main_menu":
-            conversation_mgr.clear_state(user.id)  # Clear any active conversation
+            conversation_mgr.clear_state(user.id)
             await query.edit_message_text(
                 "🏠 Main Menu\n\nKya karna chahte ho?",
                 parse_mode=ParseMode.MARKDOWN,
@@ -1427,7 +1428,6 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 ]])
             )
 
-        # Set conversation state for button clicks!
         elif data == "quick_weather":
             conversation_mgr.set_state(user.id, ConversationState.WEATHER_CITY)
             await query.edit_message_text(
@@ -1464,7 +1464,6 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 ]])
             )
 
-        # Settings
         elif data == "settings":
             await query.edit_message_text(
                 "⚙️ Settings\n\nPreferences customize karo:",
@@ -1487,7 +1486,6 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 reply_markup=KeyboardBuilder.settings_menu(user.id)
             )
 
-        # Language selection!
         elif data == "change_language":
             await query.edit_message_text(
                 "🌐 Select Language\n\nApni bhasha chuno:\n\nCurrent: " + lang_mgr.get_lang_name(user.id),
@@ -1533,7 +1531,6 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 ]])
             )
 
-        # Voice mode
         elif data == "voice_mode":
             await query.edit_message_text(
                 "🎤 Voice Mode\n\nVoice message bhejo aur main sunuga!\nFir bolke jawab dunga!\n\nTry karo:\n- Mausam kaisa hai?\n- News sunao\n- Gold rate batao\n- Kya haal hai?\n\nYa text se bhi puch sakte ho!",
@@ -1543,7 +1540,6 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 ]])
             )
 
-        # Bot stats
         elif data == "bot_stats" or data == "refresh_status":
             summary = analytics.get_summary()
 
@@ -1556,7 +1552,6 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 ]])
             )
 
-        # AI Mode toggle
         elif data == "mode_ai":
             current_mode = ai_brain.current_modes.get(user.id, "default")
             modes = ["default", "technical", "farming", "business"]
@@ -1575,7 +1570,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 ]])
             )
 
-        # 🛡️ BACHPAN CALLBACKS — Child Safety
+        # 🛡️ BACHPAN CALLBACKS
         elif data == "bachpan_helplines":
             text = """📞 *HELPLINES* 📞
 
@@ -1814,6 +1809,15 @@ async def telegram_webhook(request: Request):
         logger.error(f"Webhook error: {e}", exc_info=True)
         return {"ok": False, "error": str(e)[:200]}
 
+@router.get("/")
+async def root():
+    return {
+        "status": "running",
+        "bot": "Singh Ji AI v8.3",
+        "timestamp": datetime.now().isoformat(),
+        "modules": len(ACTIVE_MODULES)
+    }
+
 @router.get("/health")
 async def health_check():
     return {
@@ -1932,7 +1936,7 @@ async def broadcast_message(request: Request):
         raise HTTPException(status_code=500, detail=str(e))
 
 # ═══════════════════════════════════════════════════════
-# PAYMENT WEBHOOK (NEW!)
+# PAYMENT WEBHOOK
 # ═══════════════════════════════════════════════════════
 
 @router.post("/payment/verify")
@@ -2028,7 +2032,7 @@ async def payment_status(order_id: str):
     }
 
 # ═══════════════════════════════════════════════════════
-# STARTUP/SHUTDOWN EVENTS - FIXED!
+# STARTUP/SHUTDOWN EVENTS
 # ═══════════════════════════════════════════════════════
 
 @router.on_event("startup")
@@ -2055,19 +2059,3 @@ async def shutdown_event():
             logger.info("Bot shutdown complete!")
         except Exception as e:
             logger.error(f"Shutdown error: {e}")
-
-# ═══════════════════════════════════════════════════════
-# MAIN ENTRY POINT
-# ═══════════════════════════════════════════════════════
-
-if __name__ == "__main__":
-    import uvicorn
-
-    port = int(os.getenv("PORT", "8000"))
-    uvicorn.run(
-        "handler:router",
-        host="0.0.0.0",
-        port=port,
-        reload=config.ENVIRONMENT == "development",
-        log_level="info"
-    )
