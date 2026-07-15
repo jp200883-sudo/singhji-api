@@ -13,7 +13,10 @@ from functools import wraps
 from collections import OrderedDict
 
 from fastapi import FastAPI, Request, HTTPException
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand, ParseMode
+
+# ✅ CORRECT IMPORTS for python-telegram-bot v20+
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand
+from telegram.constants import ParseMode  # ← ParseMode yahan se import karo!
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -337,45 +340,89 @@ class BotAnalytics:
 analytics = BotAnalytics()
 
 # ═══════════════════════════════════════════════════════
-# DECORATORS
+# 🌾 KISAAN DOCTOR — Photo Handler
 # ═══════════════════════════════════════════════════════
 
-def rate_limit_check(func):
-    @wraps(func)
-    async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
-        user = update.effective_user
+@error_handler_decorator
+@rate_limit_check
+async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    analytics.track_message(user.id, "photo")
 
-        if not await rate_limiter.is_allowed(user.id):
-            await update.message.reply_text(
-                "🚫 Rate Limit! Thoda slow karo! 1 minute mein try karo!",
-                parse_mode=ParseMode.MARKDOWN
-            )
+    processing_msg = await update.message.reply_text("📸 Photo check kar raha hoon...")
+
+    try:
+        photo = update.message.photo[-1]
+        file = await context.bot.get_file(photo.file_id)
+        photo_url = file.file_path
+
+        response = requests.post(
+            f"{config.API_BASE_URL}/modules/kisaan_doctor/diagnose",
+            json={"photo_url": photo_url},
+            timeout=30
+        )
+        result = response.json()
+
+        if result.get("error"):
+            await processing_msg.edit_text(f"❌ Error: {result['error'][:200]}")
             return
 
-        return await func(update, context, *args, **kwargs)
-    return wrapper
+        if result.get("healthy"):
+            await processing_msg.edit_text("✅ Paudha swasth hai! Koi bimari nahi mili.")
+        else:
+            text = f"🦠 Bimari: {result.get('disease_name', 'Unknown')}\n"
+            text += f"Confidence: {result.get('confidence', 0)}%\n\n"
+            if result.get("treatment_chemical"):
+                text += f"💊 Chemical: {', '.join(result['treatment_chemical'][:3])}\n"
+            if result.get("treatment_biological"):
+                text += f"🌿 Biological: {', '.join(result['treatment_biological'][:3])}\n"
+            await processing_msg.edit_text(text)
 
-def error_handler_decorator(func):
-    @wraps(func)
-    async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
-        try:
-            return await func(update, context, *args, **kwargs)
-        except Exception as e:
-            logger.error(f"Error in {func.__name__}: {e}", exc_info=True)
-            analytics.track_error()
+    except Exception as e:
+        logger.error(f"Photo handler error: {e}")
+        await processing_msg.edit_text("❌ Photo process nahi ho payi! Dobara try karo.")
 
-            error_msg = "❌ Error! Kuch problem ho gayi! Admin ko bata diya hai. Thodi der mein try karo!"
+# ═══════════════════════════════════════════════════════
+# 🏛️ SARKARI YOJANA — Command
+# ═══════════════════════════════════════════════════════
 
-            try:
-                if update.message:
-                    await update.message.reply_text(error_msg, parse_mode=ParseMode.MARKDOWN)
-                elif update.callback_query:
-                    await update.callback_query.message.reply_text(error_msg, parse_mode=ParseMode.MARKDOWN)
-            except:
-                pass
+@error_handler_decorator
+async def yojana_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    args = context.args
+    analytics.track_message(update.effective_user.id, "command")
 
-            raise
-    return wrapper
+    if len(args) < 3:
+        await update.message.reply_text(
+            "Usage: /yojana <age> <income> <occupation>\nExample: /yojana 45 150000 farmer",
+            parse_mode=ParseMode.MARKDOWN
+        )
+        return
+
+    try:
+        age, income, occupation = int(args[0]), int(args[1]), args[2]
+
+        response = requests.post(
+            f"{config.API_BASE_URL}/modules/sarkari_yojana/check-eligibility",
+            json={"age": age, "income": income, "occupation": occupation},
+            timeout=15
+        )
+        result = response.json()
+
+        if result.get("eligible_count", 0) == 0:
+            await update.message.reply_text("❌ Filhaal koi scheme match nahi hui.")
+            return
+
+        text = f"🏛️ {result['eligible_count']} schemes mile!\n\n"
+        for s in result["schemes"]:
+            text += f"✅ {s['name']}\nAmount: Rs {s['amount']} ({s['frequency']})\nNext step: {s['next_step']}\n\n"
+
+        await update.message.reply_text(text[:4000], parse_mode=ParseMode.MARKDOWN)
+
+    except ValueError:
+        await update.message.reply_text("❌ Age aur income number mein bhejo.\nExample: /yojana 45 150000 farmer")
+    except Exception as e:
+        logger.error(f"Yojana command error: {e}")
+        await update.message.reply_text("❌ Error aa gaya, dobara try karo.")er
 
 # ═══════════════════════════════════════════════════════
 # AI BRAIN SYSTEM
@@ -533,179 +580,6 @@ ACTIVE_MODULES = {
     "Claw 7": "claw_7", "Voice CMD": "voice_cmd", "Voice TTS": "voice_tts",
     "Init": "init", "Singh Ji AI Ultra": "singhji_ultra",
 }
-
-# ═══════════════════════════════════════════════════════
-# API HELPERS
-# ═══════════════════════════════════════════════════════
-
-async def fetch_and_send_weather(update: Update, city: str):
-    """Fetch weather and send to user"""
-    try:
-        response = requests.get(
-            f"{config.API_BASE_URL}/modules/weather/",
-            params={"city": city},
-            timeout=15
-        )
-
-        if response.status_code == 200:
-            data = response.json()
-            temp = data.get("temperature", "N/A")
-            condition = data.get("condition", "N/A")
-            humidity = data.get("humidity", "N/A")
-
-            await update.message.reply_text(
-                f"🌤️ Weather in {city.title()}\n\n"
-                f"🌡️ Temperature: {temp}°C\n"
-                f"☁️ Condition: {condition}\n"
-                f"💧 Humidity: {humidity}%\n\n"
-                f"Singh Ji AI - Har pal saath!",
-                parse_mode=ParseMode.MARKDOWN,
-                reply_markup=KeyboardBuilder.main_menu()
-            )
-        else:
-            await update.message.reply_text(
-                f"❌ {city} ka weather nahi mila! Sahi city name try karo!",
-                parse_mode=ParseMode.MARKDOWN
-            )
-    except Exception as e:
-        logger.error(f"Weather fetch error: {e}")
-        await update.message.reply_text(
-            "❌ Weather service down! Baad mein try karo!",
-            parse_mode=ParseMode.MARKDOWN
-        )
-
-async def fetch_and_send_mandi(update: Update, state: str):
-    """Fetch mandi rates and send to user"""
-    try:
-        response = requests.get(
-            f"{config.API_BASE_URL}/modules/mandi/",
-            params={"state": state},
-            timeout=15
-        )
-
-        if response.status_code == 200:
-            data = response.json()
-            rates = data.get("rates", [])
-
-            if rates:
-                msg = f"🌾 Mandi Rates - {state.title()}\n\n"
-                for rate in rates[:10]:
-                    msg += f"- {rate.get('commodity', 'N/A')}: Rs.{rate.get('price', 'N/A')}/quintal\n"
-
-                await update.message.reply_text(
-                    msg,
-                    parse_mode=ParseMode.MARKDOWN,
-                    reply_markup=KeyboardBuilder.main_menu()
-                )
-            else:
-                await update.message.reply_text(
-                    f"❌ {state.title()} ke liye koi data nahi mila!",
-                    parse_mode=ParseMode.MARKDOWN
-                )
-        else:
-            await update.message.reply_text(
-                f"❌ {state} ka data nahi mila!",
-                parse_mode=ParseMode.MARKDOWN
-            )
-    except Exception as e:
-        logger.error(f"Mandi fetch error: {e}")
-        await update.message.reply_text(
-            "❌ Mandi service down! Baad mein try karo!",
-            parse_mode=ParseMode.MARKDOWN
-        )
-
-async def calculate_and_send_tax(update: Update, income: float):
-    """Calculate tax and send to user"""
-    try:
-        response = requests.get(
-            f"{config.API_BASE_URL}/modules/tax/",
-            params={"income": income},
-            timeout=15
-        )
-
-        if response.status_code == 200:
-            data = response.json()
-            tax = data.get("tax", 0)
-            regime = data.get("regime", "N/A")
-
-            await update.message.reply_text(
-                f"💰 Tax Calculation\n\n"
-                f"Income: Rs.{income:,.0f}\n"
-                f"Tax: Rs.{tax:,.0f}\n"
-                f"Regime: {regime}\n\n"
-                f"⚠️ Ye estimate hai, CA se confirm karo!",
-                parse_mode=ParseMode.MARKDOWN,
-                reply_markup=KeyboardBuilder.main_menu()
-            )
-        else:
-            await update.message.reply_text(
-                "❌ Tax calculation failed!",
-                parse_mode=ParseMode.MARKDOWN
-            )
-    except Exception as e:
-        logger.error(f"Tax calc error: {e}")
-        await update.message.reply_text(
-            "❌ Tax service down! Baad mein try karo!",
-            parse_mode=ParseMode.MARKDOWN
-        )
-
-async def fetch_and_send_gold(update: Update, city: str = "India"):
-    """Fetch gold rate and send"""
-    try:
-        response = requests.get(
-            f"{config.API_BASE_URL}/modules/goldrate/",
-            params={"city": city},
-            timeout=15
-        )
-
-        if response.status_code == 200:
-            data = response.json()
-            gold_24k = data.get("gold_24k", "N/A")
-            gold_22k = data.get("gold_22k", "N/A")
-            silver = data.get("silver", "N/A")
-
-            await update.message.reply_text(
-                f"🥇 Gold Rate - {city.title()}\n\n"
-                f"24K: Rs.{gold_24k}/10g\n"
-                f"22K: Rs.{gold_22k}/10g\n"
-                f"Silver: Rs.{silver}/kg\n\n"
-                f"Rate change hote rehte hain!",
-                parse_mode=ParseMode.MARKDOWN,
-                reply_markup=KeyboardBuilder.main_menu()
-            )
-        else:
-            await update.message.reply_text("❌ Gold rate nahi mila!", parse_mode=ParseMode.MARKDOWN)
-    except Exception as e:
-        logger.error(f"Gold fetch error: {e}")
-        await update.message.reply_text("❌ Gold service down!", parse_mode=ParseMode.MARKDOWN)
-
-async def fetch_and_send_fuel(update: Update, city: str):
-    """Fetch fuel prices and send"""
-    try:
-        response = requests.get(
-            f"{config.API_BASE_URL}/modules/fuel/",
-            params={"city": city},
-            timeout=15
-        )
-
-        if response.status_code == 200:
-            data = response.json()
-            petrol = data.get("petrol", "N/A")
-            diesel = data.get("diesel", "N/A")
-
-            await update.message.reply_text(
-                f"⛽ Fuel Prices - {city.title()}\n\n"
-                f"Petrol: Rs.{petrol}/L\n"
-                f"Diesel: Rs.{diesel}/L\n\n"
-                f"Aaj ka rate!",
-                parse_mode=ParseMode.MARKDOWN,
-                reply_markup=KeyboardBuilder.main_menu()
-            )
-        else:
-            await update.message.reply_text("❌ Fuel price nahi mila!", parse_mode=ParseMode.MARKDOWN)
-    except Exception as e:
-        logger.error(f"Fuel fetch error: {e}")
-        await update.message.reply_text("❌ Fuel service down!", parse_mode=ParseMode.MARKDOWN)
 
 # ═══════════════════════════════════════════════════════
 # KEYBOARD BUILDERS
@@ -1179,7 +1053,6 @@ async def voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         voice_file = await update.message.voice.get_file()
         voice_bytes = await voice_file.download_as_bytearray()
 
-        # Groq Whisper API se transcribe
         transcript = ""
         try:
             resp = requests.post(
@@ -1205,7 +1078,6 @@ async def voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             return
 
-        # AI se jawab lo
         ai_response = await ai_brain.get_response(
             transcript,
             user.id,
@@ -1214,7 +1086,6 @@ async def voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await processing_msg.delete()
 
-        # Direct voice reply
         voice_reply = await tts_engine.text_to_speech(ai_response["text"], user.id)
 
         if voice_reply:
@@ -1223,13 +1094,11 @@ async def voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 caption=f"🎙️ {transcript[:50]}... → {ai_response['text'][:50]}..."
             )
         else:
-            # Fallback to text only if TTS fails
             await update.message.reply_text(
                 f"🎙️ *Aapne kaha:* {transcript}\n\n*Singh Ji:* {ai_response['text']}",
                 parse_mode=ParseMode.MARKDOWN
             )
 
-        # Save memory
         user_memory.set(user.id, f"Voice: {transcript[:50]}... | AI: {ai_response['text'][:50]}...", 
                        metadata={"type": "voice_chat"})
 
@@ -1259,7 +1128,6 @@ async def text_chat_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # Check if user is in a conversation flow!
     conv_state = conversation_mgr.get_state(user.id)
 
     if conv_state["state"] == ConversationState.WEATHER_CITY:
@@ -1315,12 +1183,10 @@ async def text_chat_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         conversation_mgr.clear_state(user.id)
         return
 
-    # Group chat handling
     if chat_type in ['group', 'supergroup']:
         await handle_group_message(update, context)
         return
 
-    # Normal AI chat
     await update.message.chat.send_action(action="typing")
 
     ai_response = await ai_brain.get_response(
@@ -1346,7 +1212,6 @@ async def text_chat_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
 
 async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """FIXED: No random replies - only respond when mentioned or replied!"""
     message = update.message
     user = update.effective_user
     bot_username = context.bot.username
@@ -1772,6 +1637,178 @@ async def setup_application() -> Application:
 # ═══════════════════════════════════════════════════════
 
 router = FastAPI(title="Singh Ji AI Telegram Bot", version="8.3")
+
+# ═══════════════════════════════════════════════════════
+# API HELPERS (MOVED HERE TO AVOID CIRCULAR IMPORT)
+# ═══════════════════════════════════════════════════════
+
+async def fetch_and_send_weather(update: Update, city: str):
+    try:
+        response = requests.get(
+            f"{config.API_BASE_URL}/modules/weather/",
+            params={"city": city},
+            timeout=15
+        )
+
+        if response.status_code == 200:
+            data = response.json()
+            temp = data.get("temperature", "N/A")
+            condition = data.get("condition", "N/A")
+            humidity = data.get("humidity", "N/A")
+
+            await update.message.reply_text(
+                f"🌤️ Weather in {city.title()}\n\n"
+                f"🌡️ Temperature: {temp}°C\n"
+                f"☁️ Condition: {condition}\n"
+                f"💧 Humidity: {humidity}%\n\n"
+                f"Singh Ji AI - Har pal saath!",
+                parse_mode=ParseMode.MARKDOWN,
+                reply_markup=KeyboardBuilder.main_menu()
+            )
+        else:
+            await update.message.reply_text(
+                f"❌ {city} ka weather nahi mila! Sahi city name try karo!",
+                parse_mode=ParseMode.MARKDOWN
+            )
+    except Exception as e:
+        logger.error(f"Weather fetch error: {e}")
+        await update.message.reply_text(
+            "❌ Weather service down! Baad mein try karo!",
+            parse_mode=ParseMode.MARKDOWN
+        )
+
+async def fetch_and_send_mandi(update: Update, state: str):
+    try:
+        response = requests.get(
+            f"{config.API_BASE_URL}/modules/mandi/",
+            params={"state": state},
+            timeout=15
+        )
+
+        if response.status_code == 200:
+            data = response.json()
+            rates = data.get("rates", [])
+
+            if rates:
+                msg = f"🌾 Mandi Rates - {state.title()}\n\n"
+                for rate in rates[:10]:
+                    msg += f"- {rate.get('commodity', 'N/A')}: Rs.{rate.get('price', 'N/A')}/quintal\n"
+
+                await update.message.reply_text(
+                    msg,
+                    parse_mode=ParseMode.MARKDOWN,
+                    reply_markup=KeyboardBuilder.main_menu()
+                )
+            else:
+                await update.message.reply_text(
+                    f"❌ {state.title()} ke liye koi data nahi mila!",
+                    parse_mode=ParseMode.MARKDOWN
+                )
+        else:
+            await update.message.reply_text(
+                f"❌ {state} ka data nahi mila!",
+                parse_mode=ParseMode.MARKDOWN
+            )
+    except Exception as e:
+        logger.error(f"Mandi fetch error: {e}")
+        await update.message.reply_text(
+            "❌ Mandi service down! Baad mein try karo!",
+            parse_mode=ParseMode.MARKDOWN
+        )
+
+async def calculate_and_send_tax(update: Update, income: float):
+    try:
+        response = requests.get(
+            f"{config.API_BASE_URL}/modules/tax/",
+            params={"income": income},
+            timeout=15
+        )
+
+        if response.status_code == 200:
+            data = response.json()
+            tax = data.get("tax", 0)
+            regime = data.get("regime", "N/A")
+
+            await update.message.reply_text(
+                f"💰 Tax Calculation\n\n"
+                f"Income: Rs.{income:,.0f}\n"
+                f"Tax: Rs.{tax:,.0f}\n"
+                f"Regime: {regime}\n\n"
+                f"⚠️ Ye estimate hai, CA se confirm karo!",
+                parse_mode=ParseMode.MARKDOWN,
+                reply_markup=KeyboardBuilder.main_menu()
+            )
+        else:
+            await update.message.reply_text(
+                "❌ Tax calculation failed!",
+                parse_mode=ParseMode.MARKDOWN
+            )
+    except Exception as e:
+        logger.error(f"Tax calc error: {e}")
+        await update.message.reply_text(
+            "❌ Tax service down! Baad mein try karo!",
+            parse_mode=ParseMode.MARKDOWN
+        )
+
+async def fetch_and_send_gold(update: Update, city: str = "India"):
+    try:
+        response = requests.get(
+            f"{config.API_BASE_URL}/modules/goldrate/",
+            params={"city": city},
+            timeout=15
+        )
+
+        if response.status_code == 200:
+            data = response.json()
+            gold_24k = data.get("gold_24k", "N/A")
+            gold_22k = data.get("gold_22k", "N/A")
+            silver = data.get("silver", "N/A")
+
+            await update.message.reply_text(
+                f"🥇 Gold Rate - {city.title()}\n\n"
+                f"24K: Rs.{gold_24k}/10g\n"
+                f"22K: Rs.{gold_22k}/10g\n"
+                f"Silver: Rs.{silver}/kg\n\n"
+                f"Rate change hote rehte hain!",
+                parse_mode=ParseMode.MARKDOWN,
+                reply_markup=KeyboardBuilder.main_menu()
+            )
+        else:
+            await update.message.reply_text("❌ Gold rate nahi mila!", parse_mode=ParseMode.MARKDOWN)
+    except Exception as e:
+        logger.error(f"Gold fetch error: {e}")
+        await update.message.reply_text("❌ Gold service down!", parse_mode=ParseMode.MARKDOWN)
+
+async def fetch_and_send_fuel(update: Update, city: str):
+    try:
+        response = requests.get(
+            f"{config.API_BASE_URL}/modules/fuel/",
+            params={"city": city},
+            timeout=15
+        )
+
+        if response.status_code == 200:
+            data = response.json()
+            petrol = data.get("petrol", "N/A")
+            diesel = data.get("diesel", "N/A")
+
+            await update.message.reply_text(
+                f"⛽ Fuel Prices - {city.title()}\n\n"
+                f"Petrol: Rs.{petrol}/L\n"
+                f"Diesel: Rs.{diesel}/L\n\n"
+                f"Aaj ka rate!",
+                parse_mode=ParseMode.MARKDOWN,
+                reply_markup=KeyboardBuilder.main_menu()
+            )
+        else:
+            await update.message.reply_text("❌ Fuel price nahi mila!", parse_mode=ParseMode.MARKDOWN)
+    except Exception as e:
+        logger.error(f"Fuel fetch error: {e}")
+        await update.message.reply_text("❌ Fuel service down!", parse_mode=ParseMode.MARKDOWN)
+
+# ═══════════════════════════════════════════════════════
+# WEBHOOK ROUTES
+# ═══════════════════════════════════════════════════════
 
 def verify_webhook_secret(request: Request) -> bool:
     if config.ENVIRONMENT == "development":
