@@ -1861,7 +1861,7 @@ router = APIRouter()
 # ═══════════════════════════════════════════════════════
 
 def verify_webhook_secret(request: Request) -> bool:
-    if config.ENVIRONMENT == "development":
+  
         return True
     ...
     secret_token = request.headers.get("X-Telegram-Bot-Api-Secret-Token")
