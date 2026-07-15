@@ -143,6 +143,7 @@ def _check_memory_limit():
         for k in keys_to_remove:
             del MEMORY_STORE[k]
         logger.info(f"Memory cleaned: removed {len(keys_to_remove)} old entries")
+
 USER_PREFERENCES = {}
 
 def _memory_save(key, value, table="memory_store"):
@@ -331,6 +332,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ═══════════════════════════════════════════════════════
+# 🦁 TELEGRAM BOT ROUTER ATTACH (v8.2 handler.py ke saath)
+# ═══════════════════════════════════════════════════════
+app.include_router(telegram_router, prefix="/modules/telegram_bot")
 
 @app.middleware("http")
 async def rate_limit_middleware(request: Request, call_next):
