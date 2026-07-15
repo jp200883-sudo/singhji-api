@@ -21,18 +21,32 @@ async def diagnose_plant(request: Request):
             headers={"Api-Key": PLANT_ID_API, "Content-Type": "application/json"},
             json={
                 "images": [photo_url],
-                "modifiers": ["crops_fast", "similar_images"],
+                "modifiers": ["health_only", "similar_images"],
                 "disease_details": ["cause", "common_names", "treatment"]
             },
             timeout=15
         )
-        # DEBUG MODE — asli response dekhne ke liye
-        return {
-            "debug_status_code": response.status_code,
-            "debug_url_used": PLANT_ID_URL,
-            "debug_key_present": bool(PLANT_ID_API),
-            "debug_response_text": response.text[:800]
-        }
+        result = response.json()
+
+        if response.status_code != 200:
+            return {"error": f"Plant.id error: {result.get('error') or response.text[:200]}"}
+
+        health = result.get("health_assessment", {})
+        if not health.get("is_healthy", True):
+            diseases = health.get("diseases", [])
+            if diseases:
+                top = diseases[0]
+                treatment = top.get("disease_details", {}).get("treatment", {})
+                return {
+                    "healthy": False,
+                    "disease_name": top.get("name"),
+                    "confidence": round(top.get("probability", 0) * 100, 1),
+                    "treatment_chemical": treatment.get("chemical", []),
+                    "treatment_biological": treatment.get("biological", []),
+                    "treatment_prevention": treatment.get("prevention", [])
+                }
+
+        return {"healthy": True, "message": "Paudha swasth hai"}
 
     except Exception as e:
         return {"error": str(e)}
