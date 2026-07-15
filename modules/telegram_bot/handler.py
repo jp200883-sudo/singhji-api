@@ -1,5 +1,18 @@
 import logging
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+import os
+import json
+import io
+import hmac
+import hashlib
+import asyncio
+import requests
+from datetime import datetime, timedelta
+from typing import Dict, Any, Optional, List
+from functools import wraps
+from collections import OrderedDict
+
+from fastapi import FastAPI, Request, HTTPException
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand, ParseMode
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -8,43 +21,146 @@ from telegram.ext import (
     MessageHandler,
     filters
 )
+
+# ═══════════════════════════════════════════════════════
+# CONFIGURATION
+# ═══════════════════════════════════════════════════════
+
+class Config:
+    def __init__(self):
+        self.TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
+        self.GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+        self.RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET", "")
+        self.API_BASE_URL = os.getenv("API_BASE_URL", "https://singhji.ai/api")
+        self.WEBHOOK_URL = os.getenv("WEBHOOK_URL", "")
+        self.WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "singhji_webhook_secret_2024")
+        self.ADMIN_KEY = os.getenv("ADMIN_KEY", "singhji_admin_2024")
+        self.ENVIRONMENT = os.getenv("ENVIRONMENT", "production")
+        self.RATE_LIMIT_MAX = int(os.getenv("RATE_LIMIT_MAX", "30"))
+        self.RATE_LIMIT_WINDOW = int(os.getenv("RATE_LIMIT_WINDOW", "60"))
+        self.MEMORY_MAX_SIZE = int(os.getenv("MEMORY_MAX_SIZE", "1000"))
+        self.MEMORY_TTL = int(os.getenv("MEMORY_TTL", "86400"))
+
+config = Config()
+
+# ═══════════════════════════════════════════════════════
+# LOGGING
+# ═══════════════════════════════════════════════════════
+
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
+logger = logging.getLogger(__name__)
+
+# ═══════════════════════════════════════════════════════
+# CONVERSATION STATE MANAGER - FIXED!
+# ═══════════════════════════════════════════════════════
+
+class ConversationState:
+    NONE = "none"
+    WEATHER_CITY = "weather_city"
+    MANDI_STATE = "mandi_state"
+    TAX_INCOME = "tax_income"
+    GOLD_CITY = "gold_city"
+    FUEL_CITY = "fuel_city"
+    CURRENCY_PAIR = "currency_pair"
+    SEARCH_QUERY = "search_query"
+
+class ConversationManager:
+    def __init__(self):
+        self.states: Dict[int, str] = {}
+        self.data: Dict[int, Dict] = {}
+
+    def set_state(self, user_id: int, state: str, data: Dict = None):
+        self.states[user_id] = state
+        if data:
+            self.data[user_id] = data
+        else:
+            self.data[user_id] = {}
+
+    def get_state(self, user_id: int) -> Dict[str, Any]:
+        return {
+            "state": self.states.get(user_id, ConversationState.NONE),
+            "data": self.data.get(user_id, {})
+        }
+
+    def clear_state(self, user_id: int):
+        self.states.pop(user_id, None)
+        self.data.pop(user_id, None)
+
+conversation_mgr = ConversationManager()
+
+# ═══════════════════════════════════════════════════════
+# LANGUAGE MANAGER - FIXED!
+# ═══════════════════════════════════════════════════════
+
+class LanguageManager:
+    def __init__(self):
+        self.lang_names = {
+            "hi": "🇮🇳 Hindi",
+            "en": "🇬🇧 English",
+            "ta": "🇮🇳 Tamil",
+            "te": "🇮🇳 Telugu",
+            "mr": "🇮🇳 Marathi",
+            "bn": "🇮🇳 Bengali",
+            "gu": "🇮🇳 Gujarati",
+            "pa": "🇮🇳 Punjabi"
+        }
+        self.user_langs: Dict[int, str] = {}
+
+    def get_system_prompt(self, user_id: int) -> str:
+        lang = self.user_langs.get(user_id, "hi")
+        
+        prompts = {
+            "hi": """You are Singh Ji AI - India's most powerful AI assistant!
+Respond in Hinglish (Hindi + English mixed). Be friendly, helpful, and respectful.
+Use simple language that everyone can understand.
+Rules:
+- Never give harmful advice
+- Give financial advice responsibly
+- Respect privacy
+- Stay positive!
 - Be respectful, especially to elders
 - Give simple answers to technical questions
-- Have knowledge about agriculture, farming, rural India
+- Have knowledge about agriculture, farming, rural India""",
+
+            "en": """You are Singh Ji AI - India's most powerful AI assistant!
+Respond in English. Be friendly, helpful, and respectful.
+Use simple English that everyone can understand.
 Rules:
 - Never give harmful advice
 - Give financial advice responsibly
 - Respect privacy
 - Stay positive!""",
 
-            "ta": """You are Singh Ji AI - India\'s most powerful AI assistant!
+            "ta": """You are Singh Ji AI - India's most powerful AI assistant!
 Respond in Tamil language. Be friendly, helpful, and respectful.
 Use simple Tamil that everyone can understand.""",
 
-            "te": """You are Singh Ji AI - India\'s most powerful AI assistant!
+            "te": """You are Singh Ji AI - India's most powerful AI assistant!
 Respond in Telugu language. Be friendly, helpful, and respectful.
 Use simple Telugu that everyone can understand.""",
 
-            "mr": """You are Singh Ji AI - India\'s most powerful AI assistant!
+            "mr": """You are Singh Ji AI - India's most powerful AI assistant!
 Respond in Marathi language. Be friendly, helpful, and respectful.
 Use simple Marathi that everyone can understand.""",
 
-            "bn": """You are Singh Ji AI - India\'s most powerful AI assistant!
+            "bn": """You are Singh Ji AI - India's most powerful AI assistant!
 Respond in Bengali language. Be friendly, helpful, and respectful.
 Use simple Bengali that everyone can understand.""",
 
-            "gu": """You are Singh Ji AI - India\'s most powerful AI assistant!
+            "gu": """You are Singh Ji AI - India's most powerful AI assistant!
 Respond in Gujarati language. Be friendly, helpful, and respectful.
 Use simple Gujarati that everyone can understand.""",
 
-            "pa": """You are Singh Ji AI - India\'s most powerful AI assistant!
+            "pa": """You are Singh Ji AI - India's most powerful AI assistant!
 Respond in Punjabi language. Be friendly, helpful, and respectful.
 Use simple Punjabi that everyone can understand."""
         }
         return prompts.get(lang, prompts["hi"])
 
     def get_all_langs_keyboard(self):
-        """Build language selection keyboard"""
         keyboard = []
         row = []
         for code, name in self.lang_names.items():
@@ -54,8 +170,18 @@ Use simple Punjabi that everyone can understand."""
                 row = []
         if row:
             keyboard.append(row)
-        keyboard.append([InlineKeyboardButton("Back", callback_data="settings")])
+        keyboard.append([InlineKeyboardButton("🔙 Back", callback_data="settings")])
         return InlineKeyboardMarkup(keyboard)
+
+    def set_lang(self, user_id: int, lang_code: str) -> bool:
+        if lang_code in self.lang_names:
+            self.user_langs[user_id] = lang_code
+            return True
+        return False
+
+    def get_lang_name(self, user_id: int) -> str:
+        lang = self.user_langs.get(user_id, "hi")
+        return self.lang_names.get(lang, "Hindi")
 
 lang_mgr = LanguageManager()
 
@@ -220,7 +346,7 @@ def rate_limit_check(func):
 
         if not await rate_limiter.is_allowed(user.id):
             await update.message.reply_text(
-                "Rate Limit! Thoda slow karo! 1 minute mein try karo! Ya premium user ban jao!",
+                "🚫 Rate Limit! Thoda slow karo! 1 minute mein try karo!",
                 parse_mode=ParseMode.MARKDOWN
             )
             return
@@ -237,7 +363,7 @@ def error_handler_decorator(func):
             logger.error(f"Error in {func.__name__}: {e}", exc_info=True)
             analytics.track_error()
 
-            error_msg = "Error! Kuch problem ho gayi! Admin ko bata diya hai. Thodi der mein try karo! Ya /help karo!"
+            error_msg = "❌ Error! Kuch problem ho gayi! Admin ko bata diya hai. Thodi der mein try karo!"
 
             try:
                 if update.message:
@@ -251,7 +377,7 @@ def error_handler_decorator(func):
     return wrapper
 
 # ═══════════════════════════════════════════════════════
-# AI BRAIN SYSTEM (FIXED: Language aware!)
+# AI BRAIN SYSTEM
 # ═══════════════════════════════════════════════════════
 
 class AIBrain:
@@ -268,7 +394,6 @@ class AIBrain:
         memory_data = user_memory.get(user_id)
         context = memory_data.get("content", "")
 
-        # FIX #2: Use user's language preference!
         system_prompt = lang_mgr.get_system_prompt(user_id)
 
         intent = self._detect_intent(user_text)
@@ -313,9 +438,9 @@ Current Context:
             logger.error(f"Groq API error: {e}")
 
             if "rate" in str(e).lower():
-                return {"text": "Thoda busy hoon! 1 minute mein try karo!", "error": True}
+                return {"text": "⏳ Thoda busy hoon! 1 minute mein try karo!", "error": True}
             elif "auth" in str(e).lower():
-                return {"text": "AI dimag restart karna padega! Admin ko batao!", "error": True}
+                return {"text": "🔑 AI dimag restart karna padega! Admin ko batao!", "error": True}
             else:
                 return {"text": f"Arre {user_name}, network issue! Text se bolo kya chahiye!", "error": True}
 
@@ -409,7 +534,7 @@ ACTIVE_MODULES = {
 }
 
 # ═══════════════════════════════════════════════════════
-# API HELPERS (FIXED: Conversation flow ke liye!)
+# API HELPERS
 # ═══════════════════════════════════════════════════════
 
 async def fetch_and_send_weather(update: Update, city: str):
@@ -428,23 +553,23 @@ async def fetch_and_send_weather(update: Update, city: str):
             humidity = data.get("humidity", "N/A")
 
             await update.message.reply_text(
-                f"Weather in {city.title()}\n\n"
-                f"Temperature: {temp}C\n"
-                f"Condition: {condition}\n"
-                f"Humidity: {humidity}%\n\n"
+                f"🌤️ Weather in {city.title()}\n\n"
+                f"🌡️ Temperature: {temp}°C\n"
+                f"☁️ Condition: {condition}\n"
+                f"💧 Humidity: {humidity}%\n\n"
                 f"Singh Ji AI - Har pal saath!",
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=KeyboardBuilder.main_menu()
             )
         else:
             await update.message.reply_text(
-                f"{city} ka weather nahi mila! Sahi city name try karo!",
+                f"❌ {city} ka weather nahi mila! Sahi city name try karo!",
                 parse_mode=ParseMode.MARKDOWN
             )
     except Exception as e:
         logger.error(f"Weather fetch error: {e}")
         await update.message.reply_text(
-            "Weather service down! Baad mein try karo!",
+            "❌ Weather service down! Baad mein try karo!",
             parse_mode=ParseMode.MARKDOWN
         )
 
@@ -462,7 +587,7 @@ async def fetch_and_send_mandi(update: Update, state: str):
             rates = data.get("rates", [])
 
             if rates:
-                msg = f"Mandi Rates - {state.title()}\n\n"
+                msg = f"🌾 Mandi Rates - {state.title()}\n\n"
                 for rate in rates[:10]:
                     msg += f"- {rate.get('commodity', 'N/A')}: Rs.{rate.get('price', 'N/A')}/quintal\n"
 
@@ -473,18 +598,18 @@ async def fetch_and_send_mandi(update: Update, state: str):
                 )
             else:
                 await update.message.reply_text(
-                    f"{state.title()} ke liye koi data nahi mila!",
+                    f"❌ {state.title()} ke liye koi data nahi mila!",
                     parse_mode=ParseMode.MARKDOWN
                 )
         else:
             await update.message.reply_text(
-                f"{state} ka data nahi mila!",
+                f"❌ {state} ka data nahi mila!",
                 parse_mode=ParseMode.MARKDOWN
             )
     except Exception as e:
         logger.error(f"Mandi fetch error: {e}")
         await update.message.reply_text(
-            "Mandi service down! Baad mein try karo!",
+            "❌ Mandi service down! Baad mein try karo!",
             parse_mode=ParseMode.MARKDOWN
         )
 
@@ -503,23 +628,23 @@ async def calculate_and_send_tax(update: Update, income: float):
             regime = data.get("regime", "N/A")
 
             await update.message.reply_text(
-                f"Tax Calculation\n\n"
+                f"💰 Tax Calculation\n\n"
                 f"Income: Rs.{income:,.0f}\n"
                 f"Tax: Rs.{tax:,.0f}\n"
                 f"Regime: {regime}\n\n"
-                f"Ye estimate hai, CA se confirm karo!",
+                f"⚠️ Ye estimate hai, CA se confirm karo!",
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=KeyboardBuilder.main_menu()
             )
         else:
             await update.message.reply_text(
-                "Tax calculation failed!",
+                "❌ Tax calculation failed!",
                 parse_mode=ParseMode.MARKDOWN
             )
     except Exception as e:
         logger.error(f"Tax calc error: {e}")
         await update.message.reply_text(
-            "Tax service down! Baad mein try karo!",
+            "❌ Tax service down! Baad mein try karo!",
             parse_mode=ParseMode.MARKDOWN
         )
 
@@ -539,7 +664,7 @@ async def fetch_and_send_gold(update: Update, city: str = "India"):
             silver = data.get("silver", "N/A")
 
             await update.message.reply_text(
-                f"Gold Rate - {city.title()}\n\n"
+                f"🥇 Gold Rate - {city.title()}\n\n"
                 f"24K: Rs.{gold_24k}/10g\n"
                 f"22K: Rs.{gold_22k}/10g\n"
                 f"Silver: Rs.{silver}/kg\n\n"
@@ -548,10 +673,10 @@ async def fetch_and_send_gold(update: Update, city: str = "India"):
                 reply_markup=KeyboardBuilder.main_menu()
             )
         else:
-            await update.message.reply_text("Gold rate nahi mila!", parse_mode=ParseMode.MARKDOWN)
+            await update.message.reply_text("❌ Gold rate nahi mila!", parse_mode=ParseMode.MARKDOWN)
     except Exception as e:
         logger.error(f"Gold fetch error: {e}")
-        await update.message.reply_text("Gold service down!", parse_mode=ParseMode.MARKDOWN)
+        await update.message.reply_text("❌ Gold service down!", parse_mode=ParseMode.MARKDOWN)
 
 async def fetch_and_send_fuel(update: Update, city: str):
     """Fetch fuel prices and send"""
@@ -568,7 +693,7 @@ async def fetch_and_send_fuel(update: Update, city: str):
             diesel = data.get("diesel", "N/A")
 
             await update.message.reply_text(
-                f"Fuel Prices - {city.title()}\n\n"
+                f"⛽ Fuel Prices - {city.title()}\n\n"
                 f"Petrol: Rs.{petrol}/L\n"
                 f"Diesel: Rs.{diesel}/L\n\n"
                 f"Aaj ka rate!",
@@ -576,10 +701,10 @@ async def fetch_and_send_fuel(update: Update, city: str):
                 reply_markup=KeyboardBuilder.main_menu()
             )
         else:
-            await update.message.reply_text("Fuel price nahi mila!", parse_mode=ParseMode.MARKDOWN)
+            await update.message.reply_text("❌ Fuel price nahi mila!", parse_mode=ParseMode.MARKDOWN)
     except Exception as e:
         logger.error(f"Fuel fetch error: {e}")
-        await update.message.reply_text("Fuel service down!", parse_mode=ParseMode.MARKDOWN)
+        await update.message.reply_text("❌ Fuel service down!", parse_mode=ParseMode.MARKDOWN)
 
 # ═══════════════════════════════════════════════════════
 # KEYBOARD BUILDERS
@@ -589,16 +714,16 @@ class KeyboardBuilder:
     @staticmethod
     def main_menu():
         keyboard = [
-            [InlineKeyboardButton("AI Chat", callback_data="mode_ai"),
-             InlineKeyboardButton("Weather", callback_data="quick_weather")],
-            [InlineKeyboardButton("News", callback_data="quick_news"),
-             InlineKeyboardButton("Gold Rate", callback_data="quick_gold")],
-            [InlineKeyboardButton("All Modules", callback_data="list_modules"),
-             InlineKeyboardButton("Settings", callback_data="settings")],
-            [InlineKeyboardButton("Voice Mode", callback_data="voice_mode"),
-             InlineKeyboardButton("Stats", callback_data="bot_stats")],
-            [InlineKeyboardButton("Help", callback_data="help"),
-             InlineKeyboardButton("About", callback_data="about")]
+            [InlineKeyboardButton("🤖 AI Chat", callback_data="mode_ai"),
+             InlineKeyboardButton("🌤️ Weather", callback_data="quick_weather")],
+            [InlineKeyboardButton("📰 News", callback_data="quick_news"),
+             InlineKeyboardButton("🥇 Gold Rate", callback_data="quick_gold")],
+            [InlineKeyboardButton("📦 All Modules", callback_data="list_modules"),
+             InlineKeyboardButton("⚙️ Settings", callback_data="settings")],
+            [InlineKeyboardButton("🎤 Voice Mode", callback_data="voice_mode"),
+             InlineKeyboardButton("📊 Stats", callback_data="bot_stats")],
+            [InlineKeyboardButton("🛡️ Bachpan", callback_data="bachpan_back"),
+             InlineKeyboardButton("ℹ️ About", callback_data="about")]
         ]
         return InlineKeyboardMarkup(keyboard)
 
@@ -608,12 +733,12 @@ class KeyboardBuilder:
         current_lang = lang_mgr.get_lang_name(user_id)
 
         keyboard = [
-            [InlineKeyboardButton(f"Voice: {voice_status}", callback_data="toggle_voice")],
-            [InlineKeyboardButton(f"Language: {current_lang}", callback_data="change_language")],
-            [InlineKeyboardButton("Memory: Clear", callback_data="clear_memory"),
-             InlineKeyboardButton("Memory Stats", callback_data="memory_stats")],
-            [InlineKeyboardButton("Notifications: ON", callback_data="toggle_notify")],
-            [InlineKeyboardButton("Back to Menu", callback_data="main_menu")]
+            [InlineKeyboardButton(f"🔊 Voice: {voice_status}", callback_data="toggle_voice")],
+            [InlineKeyboardButton(f"🌐 Language: {current_lang}", callback_data="change_language")],
+            [InlineKeyboardButton("🧹 Memory: Clear", callback_data="clear_memory"),
+             InlineKeyboardButton("📊 Memory Stats", callback_data="memory_stats")],
+            [InlineKeyboardButton("🔔 Notifications: ON", callback_data="toggle_notify")],
+            [InlineKeyboardButton("🔙 Back to Menu", callback_data="main_menu")]
         ]
         return InlineKeyboardMarkup(keyboard)
 
@@ -633,14 +758,14 @@ class KeyboardBuilder:
 
         nav_buttons = []
         if page > 1:
-            nav_buttons.append(InlineKeyboardButton("Previous", callback_data=f"modules_page_{page-1}"))
+            nav_buttons.append(InlineKeyboardButton("⬅️ Previous", callback_data=f"modules_page_{page-1}"))
         if page < total_pages:
-            nav_buttons.append(InlineKeyboardButton("Next", callback_data=f"modules_page_{page+1}"))
+            nav_buttons.append(InlineKeyboardButton("Next ➡️", callback_data=f"modules_page_{page+1}"))
 
         if nav_buttons:
             keyboard.append(nav_buttons)
 
-        keyboard.append([InlineKeyboardButton("Main Menu", callback_data="main_menu")])
+        keyboard.append([InlineKeyboardButton("🔙 Main Menu", callback_data="main_menu")])
 
         return InlineKeyboardMarkup(keyboard)
 
@@ -660,33 +785,35 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                    metadata={"chat_type": chat_type, "first_seen": datetime.now().isoformat()})
 
     welcome_text = f"""
-SINGH JI AI ULTRA v8.2
+🌟 *SINGH JI AI ULTRA v8.3* 🌟
 
 Welcome {user.first_name}!
 
-India ka sabse powerful AI assistant!
+🇮🇳 India ka sabse powerful AI assistant!
 
-{len(ACTIVE_MODULES)} Active Modules
-Voice Commands Support
-Memory System
-AI Chat with Groq
-Group Chat Support
-Text-to-Speech
-Multi-Language Support
+✅ {len(ACTIVE_MODULES)} Active Modules
+🎤 Voice Commands Support
+🧠 Memory System
+🤖 AI Chat with Groq
+👥 Group Chat Support
+🔊 Text-to-Speech
+🌐 Multi-Language Support
 
-Quick Start:
-- Text bhejo - AI jawab dega
-- Voice message bhejo - Sunega aur bolega
-- Button dabao - Weather, News, Gold direct!
-- /settings - Language change karo
+*Quick Start:*
+- 📝 Text bhejo - AI jawab dega
+- 🎙️ Voice message bhejo - Sunega aur bolega
+- 🖲️ Button dabao - Weather, News, Gold direct!
+- ⚙️ /settings - Language change karo
 
-Pro Tips:
-- "Mausam kaisa hai Delhi mein?"
-- "Gold rate batao"
-- "Kisaan ke liye sarkari yojana"
-- Bas message bhejo, baaki main dekh lunga!
+*Pro Tips:*
+🌤️ "Mausam kaisa hai Delhi mein?"
+🥇 "Gold rate batao"
+🌾 "Kisaan ke liye sarkari yojana"
+🛡️ /bachpan - Child safety helplines
 
-Singh Ji AI - Har Indian ka AI saathi!
+Bas message bhejo, baaki main dekh lunga!
+
+*Singh Ji AI - Har Indian ka AI saathi!* 🇮🇳
     """
 
     await update.message.reply_text(
@@ -700,16 +827,16 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     analytics.track_message(update.effective_user.id, "command")
 
     help_text = f"""
-SINGH JI AI HELP CENTER
+📚 *SINGH JI AI HELP CENTER* 📚
 
-Main Features:
+*Main Features:*
 
-AI Chat:
+🤖 *AI Chat:*
 - Normal text bhejo - AI jawab dega
 - Voice message bhejo - Sunega aur bolega
 - Context aware hai - pichli baat yaad rakhta hai
 
-Commands:
+*Commands:*
 /start - Welcome message
 /help - Yeh help
 /modules - Sab {len(ACTIVE_MODULES)} modules
@@ -720,32 +847,33 @@ Commands:
 /settings - Settings (Language change!)
 /about - Bot ke baare mein
 /stats - Usage statistics
+/bachpan - Child safety helplines 🛡️
 
-Quick Modules:
+*Quick Modules:*
 /weather <city> - Mausam
 /news - Latest news
 /goldrate - Gold rate
 /currency - Currency rates
 /fuel - Petrol/diesel price
 
-Voice Features:
+*Voice Features:*
 - Voice message bhejo
 - "Mausam kaisa hai?"
 - "News sunao"
 - "Gold rate batao"
 
-Settings:
+*Settings:*
 - Voice ON/OFF
 - Language change (Hindi, English, Tamil, Telugu, etc.)
 - Memory management
 - Notifications
 
-Support:
+*Support:*
 Email: support@singhji.ai
 Web: singhji.ai
 Telegram: @SinghJiAI
 
-Singh Ji AI - Always learning, always helping!
+*Singh Ji AI - Always learning, always helping!* 🚀
     """
 
     await update.message.reply_text(
@@ -759,7 +887,7 @@ async def modules_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     analytics.track_message(update.effective_user.id, "command")
 
     await update.message.reply_text(
-        f"{len(ACTIVE_MODULES)} Active Modules\n\nModule select karo:",
+        f"📦 {len(ACTIVE_MODULES)} Active Modules\n\nModule select karo:",
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=KeyboardBuilder.modules_keyboard(1)
     )
@@ -787,7 +915,7 @@ async def use_module_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
         similar = [m for m in valid_modules if module in m][:5]
         suggestion = "\n".join([f"- /{m}" for m in similar])
         await update.message.reply_text(
-            f"Module {module} nahi mila!\n\nSimilar modules:\n{suggestion}\n\nSab modules: /modules",
+            f"❌ Module {module} nahi mila!\n\nSimilar modules:\n{suggestion}\n\nSab modules: /modules",
             parse_mode=ParseMode.MARKDOWN
         )
         return
@@ -795,7 +923,7 @@ async def use_module_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
     analytics.track_module_usage(module)
 
     processing_msg = await update.message.reply_text(
-        f"{module.upper()} module use kar raha hoon...",
+        f"⏳ {module.upper()} module use kar raha hoon...",
         parse_mode=ParseMode.MARKDOWN
     )
 
@@ -814,19 +942,19 @@ async def use_module_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 formatted_data = formatted_data[:3500] + "\n... (truncated)"
 
             await processing_msg.edit_text(
-                f"{module.upper()} Result:\n\n```json\n{formatted_data}\n```",
+                f"📊 {module.upper()} Result:\n\n```json\n{formatted_data}\n```",
                 parse_mode=ParseMode.MARKDOWN
             )
         else:
             await processing_msg.edit_text(
-                f"Module error! Status: {response.status_code}",
+                f"❌ Module error! Status: {response.status_code}",
                 parse_mode=ParseMode.MARKDOWN
             )
 
     except requests.Timeout:
-        await processing_msg.edit_text("Module timeout! Baad mein try karo!")
+        await processing_msg.edit_text("⏳ Module timeout! Baad mein try karo!")
     except Exception as e:
-        await processing_msg.edit_text(f"Error: {str(e)[:100]}")
+        await processing_msg.edit_text(f"❌ Error: {str(e)[:100]}")
 
 @error_handler_decorator
 async def remember_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -846,7 +974,7 @@ async def remember_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     })
 
     await update.message.reply_text(
-        f"Yaad rakh liya!\n\nMemory: {text}\n\nKabhi bhi /recall se puch sakte ho!\nClear karne ke liye: /settings",
+        f"✅ Yaad rakh liya!\n\nMemory: {text}\n\nKabhi bhi /recall se puch sakte ho!\nClear karne ke liye: /settings",
         parse_mode=ParseMode.MARKDOWN
     )
 
@@ -865,7 +993,7 @@ async def recall_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         time_str = "Unknown"
 
     await update.message.reply_text(
-        f"Tumhari Memory:\n\n{content}\n\nLast Updated: {time_str}\nMetadata: {json.dumps(metadata, indent=2)}\n\nNaya memory: /remember <text>\nClear: /settings",
+        f"🧠 Tumhari Memory:\n\n{content}\n\nLast Updated: {time_str}\nMetadata: {json.dumps(metadata, indent=2)}\n\nNaya memory: /remember <text>\nClear: /settings",
         parse_mode=ParseMode.MARKDOWN
     )
 
@@ -873,51 +1001,51 @@ async def recall_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         response = requests.get(f"{config.API_BASE_URL}/health", timeout=10)
-        api_status = "Online" if response.status_code == 200 else "Offline"
+        api_status = "Online ✅" if response.status_code == 200 else "Offline ❌"
     except:
-        api_status = "Offline"
+        api_status = "Offline ❌"
 
     memory_stats = user_memory.stats
     analytics_summary = analytics.get_summary()
 
     status_text = f"""
-SYSTEM STATUS
+📊 *SYSTEM STATUS*
 
-Core Services:
-Bot: Running
-AI: Online ({config.GROQ_API_KEY[:10]}...)
-Voice: Enabled
-Memory: Active
-Language: Multi-lang
+*Core Services:*
+🤖 Bot: Running
+🧠 AI: Online ({config.GROQ_API_KEY[:10]}...)
+🔊 Voice: Enabled
+💾 Memory: Active
+🌐 Language: Multi-lang
 
-API Status:
-API: {api_status}
-Rate Limiter: Active
+*API Status:*
+🔌 API: {api_status}
+⏱️ Rate Limiter: Active
 
-Memory Stats:
-Users in Memory: {memory_stats['total_users']}
-Max Size: {memory_stats['max_size']}
-TTL: {memory_stats['ttl_hours']} hours
+*Memory Stats:*
+👥 Users in Memory: {memory_stats['total_users']}
+📦 Max Size: {memory_stats['max_size']}
+⏰ TTL: {memory_stats['ttl_hours']} hours
 
-Bot Stats:
-Total Messages: {analytics_summary['total_messages']}
-Unique Users: {analytics_summary['unique_users']}
-Uptime: {analytics_summary['uptime']}
-Errors: {analytics_summary['errors']}
+*Bot Stats:*
+📝 Total Messages: {analytics_summary['total_messages']}
+👤 Unique Users: {analytics_summary['unique_users']}
+⏱️ Uptime: {analytics_summary['uptime']}
+❌ Errors: {analytics_summary['errors']}
 
-Top Modules:
+*Top Modules:*
 {chr(10).join([f"- {mod}: {count}" for mod, count in analytics_summary['top_modules'][:5]])}
 
-Environment: {config.ENVIRONMENT}
-Version: v8.2 Fixed
+*Environment:* {config.ENVIRONMENT}
+*Version:* v8.3 Fixed
     """
 
     await update.message.reply_text(
         status_text,
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=InlineKeyboardMarkup([[
-            InlineKeyboardButton("Refresh", callback_data="refresh_status"),
-            InlineKeyboardButton("Full Stats", callback_data="bot_stats")
+            InlineKeyboardButton("🔄 Refresh", callback_data="refresh_status"),
+            InlineKeyboardButton("📊 Full Stats", callback_data="bot_stats")
         ]])
     )
 
@@ -926,7 +1054,7 @@ async def settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
 
     await update.message.reply_text(
-        "Settings\n\nApni preferences customize karo:",
+        "⚙️ Settings\n\nApni preferences customize karo:",
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=KeyboardBuilder.settings_menu(user.id)
     )
@@ -934,25 +1062,26 @@ async def settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 @error_handler_decorator
 async def about_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     about_text = """
-SINGH JI AI ULTRA
+🌟 *SINGH JI AI ULTRA* 🌟
 
-Version: 8.2 Fixed
+Version: 8.3 Fixed
 Created: 2024
 Platform: Railway
 
-Tech Stack:
+*Tech Stack:*
 - Python + FastAPI
 - Groq AI (Llama 3.1)
 - Telegram Bot API
 - gTTS Voice Engine
 - Supabase (Coming Soon)
 
-New in v8.2:
-- Conversation Flow (Button -> Reply works!)
-- Multi-Language Support
-- Payment Webhook Ready
+*New in v8.3:*
+✅ Conversation Flow (Button -> Reply works!)
+✅ Multi-Language Support
+✅ Payment Webhook Ready
+✅ Bachpan Child Safety Module
 
-Capabilities:
+*Capabilities:*
 - 95 Active Modules
 - Voice Recognition
 - Text-to-Speech
@@ -960,20 +1089,20 @@ Capabilities:
 - Rate Limiting
 - Analytics
 
-Mission:
+*Mission:*
 Har Indian tak AI ki shakti pahunchana!
 Kisaan, vyapari, student - sab ke liye!
 
-Developer: JITENDRA SINGH
+*Developer:* JITENDRA SINGH
 Contact: @SinghJiAI
 
-Singh Ji AI - Desh ka AI, Desh ke liye!
+*Singh Ji AI - Desh ka AI, Desh ke liye!* 🇮🇳
     """
 
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("Website", url="https://singhji.ai"),
-         InlineKeyboardButton("Channel", url="https://t.me/SinghJiAI")],
-        [InlineKeyboardButton("Main Menu", callback_data="main_menu")]
+        [InlineKeyboardButton("🌐 Website", url="https://singhji.ai"),
+         InlineKeyboardButton("📢 Channel", url="https://t.me/SinghJiAI")],
+        [InlineKeyboardButton("🔙 Main Menu", callback_data="main_menu")]
     ])
 
     await update.message.reply_text(
@@ -981,6 +1110,53 @@ Singh Ji AI - Desh ka AI, Desh ke liye!
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=keyboard
     )
+
+# ═══════════════════════════════════════════════════════
+# 🛡️ BACHPAN COMMAND — Child Safety
+# ═══════════════════════════════════════════════════════
+
+@error_handler_decorator
+async def bachpan_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    analytics.track_message(user.id, "command")
+
+    bachpan_text = """🛡️ *BACHPAN — बच्चों की सुरक्षा* 🛡️
+
+🇮🇳 *सरकारी हेल्पलाइन (100% REAL):*
+
+📞 *1098* — चाइल्डलाइन (24x7, FREE)
+📞 *100* — पुलिस (24x7, FREE)
+📞 *181* — महिला हेल्पलाइन
+📞 *108* — एम्बुलेंस
+📞 *1930* — साइबर क्राइम
+📞 *1800-572-1929* — NCPCR
+
+🟢 *अच्छा स्पर्श:*
+• सुरक्षित, खुशी, आराम
+• माँ-बाप का प्यार
+• डॉक्टर की जाँच
+
+🔴 *बुरा स्पर्श:*
+• असहज, डर, गुप्त
+• अंडरवियर के अंदर
+• अकेले में कोई छूए
+
+🛡️ *स्वर्णिम मंत्र:*
+"मेरा शरीर मेरा है"
+"मैं मदद मांग सकता हूँ"
+
+⚡ *Singh Ji AI Ultra v8.3*"""
+
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("📞 Helplines", callback_data="bachpan_helplines"),
+         InlineKeyboardButton("🟢 Good Touch", callback_data="bachpan_good")],
+        [InlineKeyboardButton("🔴 Bad Touch", callback_data="bachpan_bad"),
+         InlineKeyboardButton("🚨 Emergency", callback_data="bachpan_emergency")],
+        [InlineKeyboardButton("📝 Report", callback_data="bachpan_report"),
+         InlineKeyboardButton("🔙 Menu", callback_data="main_menu")]
+    ])
+
+    await update.message.reply_text(bachpan_text, parse_mode=ParseMode.MARKDOWN, reply_markup=keyboard)
 
 # ═══════════════════════════════════════════════════════
 # VOICE MESSAGE HANDLER
@@ -1002,7 +1178,7 @@ async def voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         voice_file = await update.message.voice.get_file()
         voice_bytes = await voice_file.download_as_bytearray()
 
-        # 🔥 FIX: Groq Whisper API se transcribe (no local faster-whisper!)
+        # Groq Whisper API se transcribe
         transcript = ""
         try:
             resp = requests.post(
@@ -1037,7 +1213,7 @@ async def voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await processing_msg.delete()
 
-        # 🔥 FIX: Direct voice reply — text nahi!
+        # Direct voice reply
         voice_reply = await tts_engine.text_to_speech(ai_response["text"], user.id)
 
         if voice_reply:
@@ -1048,7 +1224,7 @@ async def voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             # Fallback to text only if TTS fails
             await update.message.reply_text(
-                f"🎙️ **Aapne kaha:** {transcript}\n\n**Singh Ji:** {ai_response['text']}",
+                f"🎙️ *Aapne kaha:* {transcript}\n\n*Singh Ji:* {ai_response['text']}",
                 parse_mode=ParseMode.MARKDOWN
             )
 
@@ -1077,12 +1253,12 @@ async def text_chat_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if len(user_text) > 1000:
         await update.message.reply_text(
-            "Message thoda lamba hai! 1000 characters se kam mein bolo!\nYa voice message bhejo",
+            "📝 Message thoda lamba hai! 1000 characters se kam mein bolo!\nYa voice message bhejo",
             reply_to_message_id=update.message.message_id
         )
         return
 
-    # FIX #1: Check if user is in a conversation flow!
+    # Check if user is in a conversation flow!
     conv_state = conversation_mgr.get_state(user.id)
 
     if conv_state["state"] == ConversationState.WEATHER_CITY:
@@ -1103,7 +1279,7 @@ async def text_chat_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await calculate_and_send_tax(update, income)
         except ValueError:
             await update.message.reply_text(
-                "Galat number! Sirf digits bhejo (jaise: 500000)",
+                "❌ Galat number! Sirf digits bhejo (jaise: 500000)",
                 parse_mode=ParseMode.MARKDOWN
             )
         conversation_mgr.clear_state(user.id)
@@ -1123,7 +1299,7 @@ async def text_chat_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif conv_state["state"] == ConversationState.CURRENCY_PAIR:
         await update.message.reply_text(
-            f"Currency rate for {user_text} fetch kar raha hoon...",
+            f"💰 Currency rate for {user_text} fetch kar raha hoon...",
             parse_mode=ParseMode.MARKDOWN
         )
         conversation_mgr.clear_state(user.id)
@@ -1132,7 +1308,7 @@ async def text_chat_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif conv_state["state"] == ConversationState.SEARCH_QUERY:
         query = user_text.strip()
         await update.message.reply_text(
-            f"{query} ke liye search kar raha hoon...",
+            f"🔍 {query} ke liye search kar raha hoon...",
             parse_mode=ParseMode.MARKDOWN
         )
         conversation_mgr.clear_state(user.id)
@@ -1164,7 +1340,7 @@ async def text_chat_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if voice_bytes:
             await update.message.reply_voice(
                 voice=io.BytesIO(voice_bytes),
-                caption="Bolke sunao!",
+                caption="🔊 Bolke sunao!",
                 reply_to_message_id=sent_message.message_id
             )
 
@@ -1215,7 +1391,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if data == "main_menu":
             conversation_mgr.clear_state(user.id)  # Clear any active conversation
             await query.edit_message_text(
-                "Main Menu\n\nKya karna chahte ho?",
+                "🏠 Main Menu\n\nKya karna chahte ho?",
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=KeyboardBuilder.main_menu()
             )
@@ -1228,7 +1404,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         elif data == "list_modules":
             await query.edit_message_text(
-                f"{len(ACTIVE_MODULES)} Active Modules\n\nModule select karo:",
+                f"📦 {len(ACTIVE_MODULES)} Active Modules\n\nModule select karo:",
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=KeyboardBuilder.modules_keyboard(1)
             )
@@ -1236,7 +1412,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         elif data.startswith("modules_page_"):
             page = int(data.split("_")[-1])
             await query.edit_message_text(
-                f"Modules (Page {page})\n\nModule select karo:",
+                f"📦 Modules (Page {page})\n\nModule select karo:",
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=KeyboardBuilder.modules_keyboard(page)
             )
@@ -1244,21 +1420,21 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         elif data.startswith("use_module_"):
             module = data.replace("use_module_", "")
             await query.edit_message_text(
-                f"{module.upper()} Module\n\nUsage: /use {module} <query>\n\nExample: /use {module} test",
+                f"🔧 {module.upper()} Module\n\nUsage: /use {module} <query>\n\nExample: /use {module} test",
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=InlineKeyboardMarkup([[
-                    InlineKeyboardButton("Modules List", callback_data="list_modules")
+                    InlineKeyboardButton("📦 Modules List", callback_data="list_modules")
                 ]])
             )
 
-        # FIX #1: Set conversation state for button clicks!
+        # Set conversation state for button clicks!
         elif data == "quick_weather":
             conversation_mgr.set_state(user.id, ConversationState.WEATHER_CITY)
             await query.edit_message_text(
-                "Weather\n\nKaunsa city?\nExample: Delhi, Mumbai, Patna",
+                "🌤️ Weather\n\nKaunsa city?\nExample: Delhi, Mumbai, Patna",
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=InlineKeyboardMarkup([[
-                    InlineKeyboardButton("Cancel", callback_data="main_menu")
+                    InlineKeyboardButton("❌ Cancel", callback_data="main_menu")
                 ]])
             )
 
@@ -1267,31 +1443,31 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 response = requests.get(f"{config.API_BASE_URL}/modules/news/", timeout=10)
                 news_data = response.json()
                 await query.edit_message_text(
-                    f"Latest News\n\n{json.dumps(news_data, indent=2)[:3000]}",
+                    f"📰 Latest News\n\n{json.dumps(news_data, indent=2)[:3000]}",
                     parse_mode=ParseMode.MARKDOWN
                 )
             except:
                 await query.edit_message_text(
-                    "News fetch nahi ho payi!\n/use news se try karo",
+                    "❌ News fetch nahi ho payi!\n/use news se try karo",
                     reply_markup=InlineKeyboardMarkup([[
-                        InlineKeyboardButton("Back", callback_data="main_menu")
+                        InlineKeyboardButton("🔙 Back", callback_data="main_menu")
                     ]])
                 )
 
         elif data == "quick_gold":
             conversation_mgr.set_state(user.id, ConversationState.GOLD_CITY)
             await query.edit_message_text(
-                "Gold Rate\n\nKaunsa city? (ya 'India' for national rate)\nExample: Delhi, Mumbai",
+                "🥇 Gold Rate\n\nKaunsa city? (ya 'India' for national rate)\nExample: Delhi, Mumbai",
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=InlineKeyboardMarkup([[
-                    InlineKeyboardButton("Cancel", callback_data="main_menu")
+                    InlineKeyboardButton("❌ Cancel", callback_data="main_menu")
                 ]])
             )
 
         # Settings
         elif data == "settings":
             await query.edit_message_text(
-                "Settings\n\nPreferences customize karo:",
+                "⚙️ Settings\n\nPreferences customize karo:",
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=KeyboardBuilder.settings_menu(user.id)
             )
@@ -1306,15 +1482,15 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 status = "OFF"
 
             await query.edit_message_text(
-                f"Voice: {status}",
+                f"🔊 Voice: {status}",
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=KeyboardBuilder.settings_menu(user.id)
             )
 
-        # FIX #2: Language selection!
+        # Language selection!
         elif data == "change_language":
             await query.edit_message_text(
-                "Select Language\n\nApni bhasha chuno:\n\nCurrent: " + lang_mgr.get_lang_name(user.id),
+                "🌐 Select Language\n\nApni bhasha chuno:\n\nCurrent: " + lang_mgr.get_lang_name(user.id),
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=lang_mgr.get_all_langs_keyboard()
             )
@@ -1324,24 +1500,24 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if lang_mgr.set_lang(user.id, lang_code):
                 tts_engine.set_language(user.id, lang_code)
                 await query.edit_message_text(
-                    f"Language set to: {lang_mgr.get_lang_name(user.id)}\n\nAb main isi bhasha mein jawab dunga!",
+                    f"✅ Language set to: {lang_mgr.get_lang_name(user.id)}\n\nAb main isi bhasha mein jawab dunga!",
                     parse_mode=ParseMode.MARKDOWN,
                     reply_markup=InlineKeyboardMarkup([[
-                        InlineKeyboardButton("Back to Settings", callback_data="settings")
+                        InlineKeyboardButton("⚙️ Back to Settings", callback_data="settings")
                     ]])
                 )
             else:
                 await query.edit_message_text(
-                    "Invalid language!",
+                    "❌ Invalid language!",
                     reply_markup=InlineKeyboardMarkup([[
-                        InlineKeyboardButton("Try Again", callback_data="change_language")
+                        InlineKeyboardButton("🔄 Try Again", callback_data="change_language")
                     ]])
                 )
 
         elif data == "clear_memory":
             user_memory.delete(user.id)
             await query.edit_message_text(
-                "Memory clear kar di!",
+                "🧹 Memory clear kar di!",
                 reply_markup=KeyboardBuilder.settings_menu(user.id)
             )
 
@@ -1350,20 +1526,20 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             stats = user_memory.stats
 
             await query.edit_message_text(
-                f"Memory Stats\n\nYour Memory: {memory_data['content'][:100]}...\nLast Updated: {memory_data['timestamp']}\n\nTotal Users: {stats['total_users']}\nMax Size: {stats['max_size']}\nTTL: {stats['ttl_hours']} hours",
+                f"🧠 Memory Stats\n\nYour Memory: {memory_data['content'][:100]}...\nLast Updated: {memory_data['timestamp']}\n\nTotal Users: {stats['total_users']}\nMax Size: {stats['max_size']}\nTTL: {stats['ttl_hours']} hours",
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=InlineKeyboardMarkup([[
-                    InlineKeyboardButton("Back", callback_data="settings")
+                    InlineKeyboardButton("🔙 Back", callback_data="settings")
                 ]])
             )
 
         # Voice mode
         elif data == "voice_mode":
             await query.edit_message_text(
-                "Voice Mode\n\nVoice message bhejo aur main sunuga!\nFir bolke jawab dunga!\n\nTry karo:\n- Mausam kaisa hai?\n- News sunao\n- Gold rate batao\n- Kya haal hai?\n\nYa text se bhi puch sakte ho!",
+                "🎤 Voice Mode\n\nVoice message bhejo aur main sunuga!\nFir bolke jawab dunga!\n\nTry karo:\n- Mausam kaisa hai?\n- News sunao\n- Gold rate batao\n- Kya haal hai?\n\nYa text se bhi puch sakte ho!",
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=InlineKeyboardMarkup([[
-                    InlineKeyboardButton("Main Menu", callback_data="main_menu")
+                    InlineKeyboardButton("🏠 Main Menu", callback_data="main_menu")
                 ]])
             )
 
@@ -1372,11 +1548,11 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             summary = analytics.get_summary()
 
             await query.edit_message_text(
-                f"Bot Statistics\n\nTotal Messages: {summary['total_messages']}\nUnique Users: {summary['unique_users']}\nActive 24h: {summary['active_users_24h']}\nVoice: {summary['voice_messages']}\nText: {summary['text_messages']}\nCommands: {summary['commands']}\nErrors: {summary['errors']}\nUptime: {summary['uptime']}\n\nTop 5 Modules:\n" + "\n".join([f"- {m}: {c}" for m, c in summary['top_modules'][:5]]),
+                f"📊 Bot Statistics\n\nTotal Messages: {summary['total_messages']}\nUnique Users: {summary['unique_users']}\nActive 24h: {summary['active_users_24h']}\nVoice: {summary['voice_messages']}\nText: {summary['text_messages']}\nCommands: {summary['commands']}\nErrors: {summary['errors']}\nUptime: {summary['uptime']}\n\nTop 5 Modules:\n" + "\n".join([f"- {m}: {c}" for m, c in summary['top_modules'][:5]]),
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=InlineKeyboardMarkup([[
-                    InlineKeyboardButton("Refresh", callback_data="bot_stats"),
-                    InlineKeyboardButton("Menu", callback_data="main_menu")
+                    InlineKeyboardButton("🔄 Refresh", callback_data="bot_stats"),
+                    InlineKeyboardButton("🏠 Menu", callback_data="main_menu")
                 ]])
             )
 
@@ -1390,20 +1566,16 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             ai_brain.current_modes[user.id] = next_mode
 
-            mode_emojis = {"default": "", "technical": "", "farming": "", "business": ""}
-
             await query.edit_message_text(
-                f"AI Mode: {next_mode.upper()}\n\nAb main {next_mode} mode mein jawab dunga!",
+                f"🤖 AI Mode: {next_mode.upper()}\n\nAb main {next_mode} mode mein jawab dunga!",
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=InlineKeyboardMarkup([[
-                    InlineKeyboardButton("Change Mode", callback_data="mode_ai"),
-                    InlineKeyboardButton("Menu", callback_data="main_menu")
+                    InlineKeyboardButton("🔄 Change Mode", callback_data="mode_ai"),
+                    InlineKeyboardButton("🏠 Menu", callback_data="main_menu")
                 ]])
             )
 
-        # ═══════════════════════════════════════════════════════
         # 🛡️ BACHPAN CALLBACKS — Child Safety
-        # ═══════════════════════════════════════════════════════
         elif data == "bachpan_helplines":
             text = """📞 *HELPLINES* 📞
 
@@ -1523,9 +1695,9 @@ Rule: Bad Touch = Uncomfortable + Scared + Secret
         logger.error(f"Callback error: {e}")
         try:
             await query.edit_message_text(
-                "Kuch error ho gaya! /start karo fir se.",
+                "❌ Kuch error ho gaya! /start karo fir se.",
                 reply_markup=InlineKeyboardMarkup([[
-                    InlineKeyboardButton("Restart", callback_data="main_menu")
+                    InlineKeyboardButton("🔄 Restart", callback_data="main_menu")
                 ]])
             )
         except:
@@ -1535,54 +1707,6 @@ Rule: Bad Touch = Uncomfortable + Scared + Secret
 # ERROR HANDLER
 # ═══════════════════════════════════════════════════════
 
-
-# ═══════════════════════════════════════════════════════
-# 🛡️ BACHPAN COMMAND — Child Safety
-# ═══════════════════════════════════════════════════════
-
-@error_handler_decorator
-async def bachpan_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    analytics.track_message(user.id, "command")
-
-    bachpan_text = """🛡️ *BACHPAN — बच्चों की सुरक्षा* 🛡️
-
-🇮🇳 *सरकारी हेल्पलाइन (100% REAL):*
-
-📞 *1098* — चाइल्डलाइन (24x7, FREE)
-📞 *100* — पुलिस (24x7, FREE)
-📞 *181* — महिला हेल्पलाइन
-📞 *108* — एम्बुलेंस
-📞 *1930* — साइबर क्राइम
-📞 *1800-572-1929* — NCPCR
-
-🟢 *अच्छा स्पर्श:*
-• सुरक्षित, खुशी, आराम
-• माँ-बाप का प्यार
-• डॉक्टर की जाँच
-
-🔴 *बुरा स्पर्श:*
-• असहज, डर, गुप्त
-• अंडरवियर के अंदर
-• अकेले में कोई छूए
-
-🛡️ *स्वर्णिम मंत्र:*
-"मेरा शरीर मेरा है"
-"मैं मदद मांग सकता हूँ"
-
-⚡ *Singh Ji AI Ultra v8.3*"""
-
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("📞 Helplines", callback_data="bachpan_helplines"),
-         InlineKeyboardButton("🟢 Good Touch", callback_data="bachpan_good")],
-        [InlineKeyboardButton("🔴 Bad Touch", callback_data="bachpan_bad"),
-         InlineKeyboardButton("🚨 Emergency", callback_data="bachpan_emergency")],
-        [InlineKeyboardButton("📝 Report", callback_data="bachpan_report"),
-         InlineKeyboardButton("🔙 Menu", callback_data="main_menu")]
-    ])
-
-    await update.message.reply_text(bachpan_text, parse_mode=ParseMode.MARKDOWN, reply_markup=keyboard)
-
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     logger.error(f"Exception while handling an update: {context.error}", exc_info=context.error)
     analytics.track_error()
@@ -1590,7 +1714,7 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
     if update and isinstance(update, Update) and update.effective_message:
         try:
             await update.effective_message.reply_text(
-                "Oops! Kuch unexpected error ho gaya! Team ko bata diya hai. Jaldi fix karenge! Tab tak /start karo.",
+                "❌ Oops! Kuch unexpected error ho gaya! Team ko bata diya hai. Jaldi fix karenge! Tab tak /start karo.",
                 parse_mode=ParseMode.MARKDOWN
             )
         except:
@@ -1625,6 +1749,7 @@ async def setup_application() -> Application:
         BotCommand("settings", "Settings"),
         BotCommand("about", "About Singh Ji AI"),
         BotCommand("stats", "Usage statistics"),
+        BotCommand("bachpan", "Child safety helplines 🛡️"),
     ]
     await application.bot.set_my_commands(commands)
 
@@ -1648,8 +1773,10 @@ async def setup_application() -> Application:
     return application
 
 # ═══════════════════════════════════════════════════════
-# WEBHOOK HANDLERS
+# FASTAPI ROUTER
 # ═══════════════════════════════════════════════════════
+
+router = FastAPI(title="Singh Ji AI Telegram Bot", version="8.3")
 
 def verify_webhook_secret(request: Request) -> bool:
     if config.ENVIRONMENT == "development":
@@ -1666,18 +1793,15 @@ def verify_webhook_secret(request: Request) -> bool:
 
 @router.post("/webhook")
 async def telegram_webhook(request: Request):
-    """FIXED: No application.start() in webhook mode!"""
     global application
 
     if not verify_webhook_secret(request):
         raise HTTPException(status_code=403, detail="Unauthorized")
 
     try:
-        # FIX: Only initialize once, NEVER start() in webhook mode!
         if application is None:
             application = await setup_application()
             await application.initialize()
-            # REMOVED: await application.start() - causes duplicate handlers!
             logger.info("Bot initialized via webhook!")
 
         data = await request.json()
@@ -1694,7 +1818,7 @@ async def telegram_webhook(request: Request):
 async def health_check():
     return {
         "status": "healthy",
-        "bot": "Singh Ji AI v8.2",
+        "bot": "Singh Ji AI v8.3",
         "timestamp": datetime.now().isoformat(),
         "modules": len(ACTIVE_MODULES),
         "token_set": bool(config.TELEGRAM_BOT_TOKEN),
@@ -1710,11 +1834,9 @@ async def health_check():
 
 @router.get("/setup-webhook")
 async def setup_webhook():
-    """FIXED: No application.start() in webhook mode!"""
     try:
         app = await setup_application()
         await app.initialize()
-        # REMOVED: await app.start() - webhook mode mein nahi chahiye!
 
         await app.bot.set_webhook(
             url=config.WEBHOOK_URL,
@@ -1744,10 +1866,8 @@ async def delete_webhook():
     try:
         if application:
             await application.bot.delete_webhook(drop_pending_updates=True)
-            global app_instance
-            app_instance = None
 
-        return {"status": "success", "message": "Webhook deleted. Bot stopped."}
+        return {"status": "success", "message": "Webhook deleted."}
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
@@ -1796,7 +1916,7 @@ async def broadcast_message(request: Request):
             try:
                 await application.bot.send_message(
                     chat_id=user_id,
-                    text=f"Broadcast from Singh Ji AI\n\n{message}",
+                    text=f"📢 Broadcast from Singh Ji AI\n\n{message}",
                     parse_mode=ParseMode.MARKDOWN
                 )
                 sent_count += 1
@@ -1812,12 +1932,11 @@ async def broadcast_message(request: Request):
         raise HTTPException(status_code=500, detail=str(e))
 
 # ═══════════════════════════════════════════════════════
-# FIX #3: PAYMENT WEBHOOK (NEW!)
+# PAYMENT WEBHOOK (NEW!)
 # ═══════════════════════════════════════════════════════
 
 @router.post("/payment/verify")
 async def verify_payment(request: Request):
-    """Razorpay payment verification webhook"""
     try:
         data = await request.json()
 
@@ -1828,7 +1947,6 @@ async def verify_payment(request: Request):
         if not all([razorpay_order_id, razorpay_payment_id, razorpay_signature]):
             return {"status": "failed", "error": "Missing required fields"}
 
-        # Verify signature
         secret = config.RAZORPAY_KEY_SECRET
         message = f"{razorpay_order_id}|{razorpay_payment_id}"
         expected_signature = hmac.new(
@@ -1841,11 +1959,7 @@ async def verify_payment(request: Request):
             logger.warning(f"Invalid payment signature for order: {razorpay_order_id}")
             return {"status": "failed", "error": "Invalid signature"}
 
-        # Payment successful! Update order status
         logger.info(f"Payment verified! Order: {razorpay_order_id}, Payment: {razorpay_payment_id}")
-
-        # TODO: Update order in database
-        # await update_order_status(razorpay_order_id, "paid", razorpay_payment_id)
 
         return {
             "status": "success",
@@ -1860,13 +1974,10 @@ async def verify_payment(request: Request):
 
 @router.post("/payment/webhook")
 async def razorpay_webhook(request: Request):
-    """Razorpay automatic webhook for payment events"""
     try:
-        # Get webhook signature from headers
         webhook_signature = request.headers.get("X-Razorpay-Signature", "")
         body = await request.body()
 
-        # Verify webhook signature
         secret = config.RAZORPAY_KEY_SECRET
         expected_signature = hmac.new(
             secret.encode(),
@@ -1888,12 +1999,9 @@ async def razorpay_webhook(request: Request):
             payment = payload.get("payment", {}).get("entity", {})
             order_id = payment.get("order_id")
             payment_id = payment.get("id")
-            amount = payment.get("amount", 0) / 100  # Convert paise to rupees
+            amount = payment.get("amount", 0) / 100
 
             logger.info(f"Payment captured! Order: {order_id}, Amount: Rs.{amount}")
-
-            # TODO: Update order status, send confirmation, etc.
-            # await process_successful_payment(order_id, payment_id, amount)
 
             return {"status": "success", "event": event}
 
@@ -1902,9 +2010,6 @@ async def razorpay_webhook(request: Request):
             order_id = payment.get("order_id")
 
             logger.warning(f"Payment failed! Order: {order_id}")
-
-            # TODO: Handle failed payment
-            # await process_failed_payment(order_id)
 
             return {"status": "success", "event": event}
 
@@ -1916,27 +2021,18 @@ async def razorpay_webhook(request: Request):
 
 @router.get("/payment/status/{order_id}")
 async def payment_status(order_id: str):
-    """Check payment status for an order"""
-    try:
-        # TODO: Fetch from database
-        # status = await get_order_status(order_id)
-
-        return {
-            "order_id": order_id,
-            "status": "pending",  # or "paid", "failed"
-            "timestamp": datetime.now().isoformat()
-        }
-    except Exception as e:
-        logger.error(f"Payment status error: {e}")
-        return {"status": "error", "message": str(e)}
+    return {
+        "order_id": order_id,
+        "status": "pending",
+        "timestamp": datetime.now().isoformat()
+    }
 
 # ═══════════════════════════════════════════════════════
-# STARTUP/SHUTDOWN EVENTS - FIXED: No polling in production!
+# STARTUP/SHUTDOWN EVENTS - FIXED!
 # ═══════════════════════════════════════════════════════
 
 @router.on_event("startup")
 async def startup_event():
-    """FIXED: Only polling in development, NEVER in production!"""
     if config.ENVIRONMENT == "development":
         try:
             app = await setup_application()
@@ -1975,11 +2071,3 @@ if __name__ == "__main__":
         reload=config.ENVIRONMENT == "development",
         log_level="info"
     )
-root@cd1fd475637b:/app# grep -n "async def voice_handler\|MessageHandler(filters" modules/telegram_bot/handler.py
-1156:async def voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-1640:    application.add_handler(MessageHandler(filters.VOICE, voice_handler))
-1641:    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_chat_handler))
-root@cd1fd475637b:/app# grep -n "async def use_module_command\|CommandHandler(\"use\"" modules/telegram_bot/handler.py
-934:async def use_module_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-1633:    application.add_handler(CommandHandler("use", use_module_command))
-root@cd1fd475637b:/app# 
