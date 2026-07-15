@@ -13,7 +13,8 @@ from functools import wraps
 from typing import Dict, List, Any, Optional
 from enum import Enum
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand, ParseMode
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand
+from telegram.constants import ParseMode
 from telegram.ext import (
     Application,
     CommandHandler,
