@@ -1862,8 +1862,8 @@ router = APIRouter()
 
 def verify_webhook_secret(request: Request) -> bool:
   
-        return True
-    ...
+        return True    # ← ← ← YEH BAHUT AAGE HAI!
+    ...            
     secret_token = request.headers.get("X-Telegram-Bot-Api-Secret-Token")
     expected = config.WEBHOOK_SECRET
 
