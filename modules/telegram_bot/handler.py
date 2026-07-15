@@ -1596,7 +1596,9 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
             pass
             
 
-        # 🔥 BACHPAN CALLBACKS — button_callback ke ANDAR add karo!
+      # button_callback function ke ANDAR — except se pehle:
+
+        # 🔥 BACHPAN CALLBACKS — button_callback ke ANDAR
         elif data == "bachpan_helplines":
             text = """📞 *HELPLINES* 📞
 1098 — चाइल्डलाइन
@@ -1643,7 +1645,6 @@ Rule: Good Touch = Safe + Happy + Comfortable"""
             await query.edit_message_text(text, parse_mode=ParseMode.MARKDOWN, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="bachpan_back")]]))
 
         elif data == "bachpan_back":
-            # Bachpan menu wapas dikhana
             bachpan_text = """🛡️ *BACHPAN — बच्चों की सुरक्षा* 🛡️
 📞 *1098* — चाइल्डलाइन (24x7, FREE)
 📞 *100* — पुलिस (24x7, FREE)
