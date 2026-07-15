@@ -495,7 +495,10 @@ async def mandi_state(state: str, commodity: str = None, limit: int = 50):
         params = {"api-key": MANDI_API_KEY, "format": "json", "limit": limit, "filters[state.keyword]": state}
         if commodity:
             params["filters[commodity.keyword]"] = commodity
-        resp = requests.get(MANDI_BASE_URL, params=params, timeout=15)
+      try:
+    resp = requests.get(MANDI_BASE_URL, params=params, timeout=30)
+except requests.exceptions.Timeout:
+    resp = requests.get(MANDI_BASE_URL, params=params, timeout=30)
         data = resp.json()
         result = {"state": state, "commodity_filter": commodity, "count": len(data.get("records", [])), "records": data.get("records", []), "source": "AGMARKNET_LIVE"}
         _cache_set(cache_key, result, CACHE_TTL["mandi"])
