@@ -1566,6 +1566,124 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 ]])
             )
 
+        # ═══════════════════════════════════════════════════════
+        # 🛡️ BACHPAN CALLBACKS — Child Safety
+        # ═══════════════════════════════════════════════════════
+        elif data == "bachpan_helplines":
+            text = """📞 *HELPLINES* 📞
+
+1098 — चाइल्डलाइन
+100 — पुलिस  
+181 — महिला हेल्पलाइन
+108 — एम्बुलेंस
+1930 — साइबर क्राइम
+1800-572-1929 — NCPCR
+9152987821 — आत्महत्या रोकथाम
+
+सभी FREE और 24x7!"""
+            await query.edit_message_text(text, parse_mode=ParseMode.MARKDOWN, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="bachpan_back")]]))
+
+        elif data == "bachpan_good":
+            text = """🟢 *GOOD TOUCH* 🟢
+
+✅ सुरक्षित महसूस कराता है
+✅ खुशी देता है
+✅ आरामदायक है
+
+Examples:
+• माँ-बाप का गले लगाना
+• डॉक्टर की जाँच (मम्मी-पापा के सामने)
+• दोस्त का हाई-फाइव
+• नानी-दादी का आशीर्वाद
+
+Rule: Good Touch = Safe + Happy + Comfortable"""
+            await query.edit_message_text(text, parse_mode=ParseMode.MARKDOWN, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="bachpan_back")]]))
+
+        elif data == "bachpan_bad":
+            text = """🔴 *BAD TOUCH* 🔴
+
+❌ असहज महसूस कराता है
+❌ डरावना लगता है
+❌ गुप्त रखने को कहे
+
+Examples:
+• अंडरवियर/बनियान के अंदर कोई छूए
+• जबरदस्ती गले लगाना
+• अकेले में छूने की कोशिश
+• अश्लील वीडियो दिखाना
+
+Rule: Bad Touch = Uncomfortable + Scared + Secret
+
+🚨 *तुरंत मम्मी-पापा को बताओ!*"""
+            await query.edit_message_text(text, parse_mode=ParseMode.MARKDOWN, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="bachpan_back")]]))
+
+        elif data == "bachpan_emergency":
+            text = """🚨 *EMERGENCY STEPS* 🚨
+
+1️⃣ चिल्लाओ — जोर से 'बचाओ' बोलो
+2️⃣ भागो — सुरक्षित जगह की ओर
+3️⃣ बताओ — मम्मी-पापा, टीचर, पुलिस
+4️⃣ 1098 पर कॉल करो
+5️⃣ कभी डरो मत — तुम्हारी कोई गलती नहीं!
+
+📞 *1098 — Childline*
+📞 *100 — Police*
+
+*तुम बहादुर हो!* 💪"""
+            await query.edit_message_text(text, parse_mode=ParseMode.MARKDOWN, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="bachpan_back")]]))
+
+        elif data == "bachpan_report":
+            text = """📝 *REPORT INCIDENT* 📝
+
+शिकायत दर्ज करने के लिए:
+
+1️⃣ 1098 पर कॉल करें
+2️⃣ नजदीकी पुलिस स्टेशन जाएं
+3️⃣ NCPCR e-Box: ncpcr.gov.in
+4️⃣ POCSO Act के तहत कार्रवाई
+
+*24 घंटे में कार्रवाई होगी*
+
+*तुम्हारी आवाज़ सुनी जाएगी!* 🛡️"""
+            await query.edit_message_text(text, parse_mode=ParseMode.MARKDOWN, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="bachpan_back")]]))
+
+        elif data == "bachpan_back":
+            bachpan_text = """🛡️ *BACHPAN — बच्चों की सुरक्षा* 🛡️
+
+🇮🇳 *सरकारी हेल्पलाइन (100% REAL):*
+
+📞 *1098* — चाइल्डलाइन (24x7, FREE)
+📞 *100* — पुलिस (24x7, FREE)
+📞 *181* — महिला हेल्पलाइन
+📞 *108* — एम्बुलेंस
+📞 *1930* — साइबर क्राइम
+📞 *1800-572-1929* — NCPCR
+
+🟢 *अच्छा स्पर्श:*
+• सुरक्षित, खुशी, आराम
+• माँ-बाप का प्यार
+• डॉक्टर की जाँच
+
+🔴 *बुरा स्पर्श:*
+• असहज, डर, गुप्त
+• अंडरवियर के अंदर
+• अकेले में कोई छूए
+
+🛡️ *स्वर्णिम मंत्र:*
+"मेरा शरीर मेरा है"
+"मैं मदद माँग सकता हूँ"
+
+⚡ *Singh Ji AI Ultra v8.3*"""
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton("📞 Helplines", callback_data="bachpan_helplines"),
+                 InlineKeyboardButton("🟢 Good Touch", callback_data="bachpan_good")],
+                [InlineKeyboardButton("🔴 Bad Touch", callback_data="bachpan_bad"),
+                 InlineKeyboardButton("🚨 Emergency", callback_data="bachpan_emergency")],
+                [InlineKeyboardButton("📝 Report", callback_data="bachpan_report"),
+                 InlineKeyboardButton("🔙 Menu", callback_data="main_menu")]
+            ])
+            await query.edit_message_text(bachpan_text, parse_mode=ParseMode.MARKDOWN, reply_markup=keyboard)
+
     except Exception as e:
         logger.error(f"Callback error: {e}")
         try:
@@ -1596,76 +1714,52 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
             pass
             
 
-      # button_callback function ke ANDAR — except se pehle:
+# BACHPAN COMMAND — Add this in handler.py
 
-        # 🔥 BACHPAN CALLBACKS — button_callback ke ANDAR
-        elif data == "bachpan_helplines":
-            text = """📞 *HELPLINES* 📞
-1098 — चाइल्डलाइन
-100 — पुलिस  
-181 — महिला हेल्पलाइन
-108 — एम्बुलेंस
-1930 — साइबर क्राइम
-1800-572-1929 — NCPCR
-9152987821 — आत्महत्या रोकथाम
-सभी FREE और 24x7!"""
-            await query.edit_message_text(text, parse_mode=ParseMode.MARKDOWN, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="bachpan_back")]]))
+@error_handler_decorator
+async def bachpan_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    analytics.track_message(user.id, "command")
 
-        elif data == "bachpan_good":
-            text = """🟢 *GOOD TOUCH* 🟢
-✅ सुरक्षित महसूस कराता है
-✅ खुशी देता है
-✅ आरामदायक है
-Rule: Good Touch = Safe + Happy + Comfortable"""
-            await query.edit_message_text(text, parse_mode=ParseMode.MARKDOWN, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="bachpan_back")]]))
+    bachpan_text = """🛡️ *BACHPAN — बच्चों की सुरक्षा* 🛡️
 
-        elif data == "bachpan_bad":
-            text = """🔴 *BAD TOUCH* 🔴
-❌ असहज महसूस कराता है
-❌ डरावना लगता है
-❌ गुप्त रखने को कहे
-🚨 *तुरंत मम्मी-पापा को बताओ!*"""
-            await query.edit_message_text(text, parse_mode=ParseMode.MARKDOWN, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="bachpan_back")]]))
+🇮🇳 *सरकारी हेल्पलाइन (100% REAL):*
 
-        elif data == "bachpan_emergency":
-            text = """🚨 *EMERGENCY STEPS* 🚨
-1️⃣ चिल्लाओ — जोर से 'बचाओ' बोलो
-2️⃣ भागो — सुरक्षित जगह की ओर
-3️⃣ बताओ — मम्मी-पापा, टीचर, पुलिस
-4️⃣ 1098 पर कॉल करो
-5️⃣ कभी डरो मत — तुम्हारी कोई गलती नहीं!"""
-            await query.edit_message_text(text, parse_mode=ParseMode.MARKDOWN, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="bachpan_back")]]))
-
-        elif data == "bachpan_report":
-            text = """📝 *REPORT INCIDENT* 📝
-1️⃣ 1098 पर कॉल करें
-2️⃣ पुलिस स्टेशन जाएं
-3️⃣ NCPCR e-Box: ncpcr.gov.in
-*24 घंटे में कार्रवाई होगी*"""
-            await query.edit_message_text(text, parse_mode=ParseMode.MARKDOWN, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="bachpan_back")]]))
-
-        elif data == "bachpan_back":
-            bachpan_text = """🛡️ *BACHPAN — बच्चों की सुरक्षा* 🛡️
 📞 *1098* — चाइल्डलाइन (24x7, FREE)
 📞 *100* — पुलिस (24x7, FREE)
-🟢 *अच्छा स्पर्श* • 🔴 *बुरा स्पर्श*
-🛡️ *स्वर्णिम मंत्र:* "मेरा शरीर मेरा है"
+📞 *181* — महिला हेल्पलाइन
+📞 *108* — एम्बुलेंस
+📞 *1930* — साइबर क्राइम
+📞 *1800-572-1929* — NCPCR
+
+🟢 *अच्छा स्पर्श:*
+• सुरक्षित, खुशी, आराम
+• माँ-बाप का प्यार
+• डॉक्टर की जाँच
+
+🔴 *बुरा स्पर्श:*
+• असहज, डर, गुप्त
+• अंडरवियर के अंदर
+• अकेले में कोई छूए
+
+🛡️ *स्वर्णिम मंत्र:*
+"मेरा शरीर मेरा है"
+"मैं मदद माँग सकता हूँ"
+
 ⚡ *Singh Ji AI Ultra v8.3*"""
-            keyboard = InlineKeyboardMarkup([
-                [InlineKeyboardButton("📞 Helplines", callback_data="bachpan_helplines"),
-                 InlineKeyboardButton("🟢 Good Touch", callback_data="bachpan_good")],
-                [InlineKeyboardButton("🔴 Bad Touch", callback_data="bachpan_bad"),
-                 InlineKeyboardButton("🚨 Emergency", callback_data="bachpan_emergency")],
-                [InlineKeyboardButton("📝 Report", callback_data="bachpan_report"),
-                 InlineKeyboardButton("🔙 Menu", callback_data="main_menu")]
-            ])
-            await query.edit_message_text(bachpan_text, parse_mode=ParseMode.MARKDOWN, reply_markup=keyboard)
-# ═══════════════════════════════════════════════════════
-# APPLICATION SETUP
-# ═══════════════════════════════════════════════════════
 
-application = None
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("📞 Helplines", callback_data="bachpan_helplines"),
+         InlineKeyboardButton("🟢 Good Touch", callback_data="bachpan_good")],
+        [InlineKeyboardButton("🔴 Bad Touch", callback_data="bachpan_bad"),
+         InlineKeyboardButton("🚨 Emergency", callback_data="bachpan_emergency")],
+        [InlineKeyboardButton("📝 Report", callback_data="bachpan_report"),
+         InlineKeyboardButton("🔙 Menu", callback_data="main_menu")]
+    ])
 
+    await update.message.reply_text(bachpan_text, parse_mode=ParseMode.MARKDOWN, reply_markup=keyboard)
+
+# Callback handler mein add karo:
 async def setup_application() -> Application:
     global application
 
