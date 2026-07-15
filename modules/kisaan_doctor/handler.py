@@ -5,7 +5,7 @@ from fastapi import APIRouter, Request
 router = APIRouter()
 
 PLANT_ID_API = os.getenv("PLANT_ID_API", "")
-PLANT_ID_URL = os.getenv("PLANT_ID_URL", "https://api.plant.id/v2/health_assessment")
+PLANT_ID_URL = "https://api.plant.id/v2/health_assessment"
 
 @router.post("/diagnose")
 async def diagnose_plant(request: Request):
