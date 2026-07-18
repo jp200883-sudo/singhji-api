@@ -1,11 +1,13 @@
 """
 🦁 SINGH JI AI ULTRA v8.0 — HYBRID SYSTEM
 100% REAL | Railway Primary | All APIs Live
+(FIXED: sab external calls ab non-blocking async hain)
 """
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.concurrency import run_in_threadpool
 from contextlib import asynccontextmanager
 import os
 import sys
@@ -18,7 +20,7 @@ import io
 import tempfile
 from pathlib import Path
 from datetime import datetime, timedelta
-import requests
+import httpx
 import logging
 from modules.telegram_bot.handler import router as telegram_router
 from collections import defaultdict, deque
@@ -58,6 +60,10 @@ GMAIL_CLIENT_ID = os.getenv("GMAIL_CLIENT_ID")
 GMAIL_CLIENT_SECRET = os.getenv("GMAIL_CLIENT_SECRET")
 INSTAGRAM_ACCESS_TOKEN = os.getenv("INSTAGRAM_ACCESS_TOKEN")
 INSTAGRAM_BUSINESS_ID = os.getenv("INSTAGRAM_BUSINESS_ID")
+ADMIN_USER_ID = int(os.getenv("ADMIN_USER_ID", "0"))
+
+# Base64 payload size guard (10 MB decoded)
+MAX_B64_BYTES = 10 * 1024 * 1024
 
 AVAILABLE_KEYS = {
     "ADMIN": bool(ADMIN_API_KEY),
@@ -94,6 +100,9 @@ try:
 except Exception as e:
     logger.warning(f"Supabase init failed: {e}")
 
+# Global async HTTP client — banaya lifespan me, band bhi wahin hota hai
+HTTP_CLIENT: httpx.AsyncClient | None = None
+
 CACHE_TTL = {
     "weather": 1800,
     "mandi": 21600,
@@ -106,7 +115,11 @@ def _cache_key(prefix, *args):
     raw = f"{prefix}:{':'.join(str(a) for a in args)}"
     return hashlib.md5(raw.encode()).hexdigest()
 
-def _cache_get(key):
+# ---- Supabase sync client ko threadpool me chalane wale wrappers ----
+# supabase-py sync hai, isliye direct await nahi kar sakte — run_in_threadpool
+# se event loop block hone se bachta hai.
+
+def _cache_get_sync(key):
     if SUPABASE_CLIENT:
         try:
             resp = SUPABASE_CLIENT.table("cache_store").select("*").eq("key", key).execute()
@@ -119,7 +132,10 @@ def _cache_get(key):
             logger.warning(f"Cache get error: {e}")
     return None
 
-def _cache_set(key, value, ttl=None):
+async def _cache_get(key):
+    return await run_in_threadpool(_cache_get_sync, key)
+
+def _cache_set_sync(key, value, ttl=None):
     if not SUPABASE_CLIENT:
         return
     ttl = ttl or CACHE_TTL["default"]
@@ -134,6 +150,9 @@ def _cache_set(key, value, ttl=None):
     except Exception as e:
         logger.warning(f"Cache set error: {e}")
 
+async def _cache_set(key, value, ttl=None):
+    await run_in_threadpool(_cache_set_sync, key, value, ttl)
+
 MEMORY_STORE = {}
 MAX_MEMORY_SIZE = 1000
 
@@ -146,7 +165,7 @@ def _check_memory_limit():
 
 USER_PREFERENCES = {}
 
-def _memory_save(key, value, table="memory_store"):
+def _memory_save_sync(key, value, table="memory_store"):
     if SUPABASE_CLIENT:
         try:
             SUPABASE_CLIENT.table(table).upsert({
@@ -161,7 +180,10 @@ def _memory_save(key, value, table="memory_store"):
     MEMORY_STORE[key] = value
     return {"saved": True, "store": "ram", "key": key}
 
-def _memory_get(key, table="memory_store"):
+async def _memory_save(key, value, table="memory_store"):
+    return await run_in_threadpool(_memory_save_sync, key, value, table)
+
+def _memory_get_sync(key, table="memory_store"):
     if SUPABASE_CLIENT:
         try:
             resp = SUPABASE_CLIENT.table(table).select("*").eq("key", key).execute()
@@ -173,11 +195,48 @@ def _memory_get(key, table="memory_store"):
         return {"key": key, "data": MEMORY_STORE[key], "exists": True, "store": "ram"}
     return {"key": key, "data": None, "exists": False}
 
+async def _memory_get(key, table="memory_store"):
+    return await run_in_threadpool(_memory_get_sync, key, table)
+
 def _check_admin_auth(request):
     if not ADMIN_API_KEY:
         return True
     provided = request.headers.get("X-Admin-Key") or request.query_params.get("admin_key")
     return provided == ADMIN_API_KEY
+
+# ---- Saanjhi tax calculation (pehle do jagah duplicate thi) ----
+def _calculate_tax(income: float, regime: str = "new", deductions: float = 0):
+    if regime == "new":
+        if income <= 300000:
+            tax = 0
+        elif income <= 600000:
+            tax = (income - 300000) * 0.05
+        elif income <= 900000:
+            tax = 15000 + (income - 600000) * 0.10
+        elif income <= 1200000:
+            tax = 45000 + (income - 900000) * 0.15
+        elif income <= 1500000:
+            tax = 90000 + (income - 1200000) * 0.20
+        else:
+            tax = 150000 + (income - 1500000) * 0.30
+    else:
+        taxable = max(0, income - 50000 - deductions)
+        if taxable <= 250000:
+            tax = 0
+        elif taxable <= 500000:
+            tax = (taxable - 250000) * 0.05
+        elif taxable <= 1000000:
+            tax = 12500 + (taxable - 500000) * 0.20
+        else:
+            tax = 112500 + (taxable - 1000000) * 0.30
+    cess = tax * 0.04
+    total_tax = tax + cess
+    return {
+        "income": income, "regime": regime,
+        "tax": round(tax, 2), "cess": round(cess, 2),
+        "total": round(total_tax, 2),
+        "take_home": round(income - total_tax, 2)
+    }
 
 class _SmartSarwanSwarm:
     def __init__(self):
@@ -295,11 +354,14 @@ RATE_LIMIT_TELEGRAM_USER = (15, 60)
 
 @asynccontextmanager
 async def lifespan(app):
+    global HTTP_CLIENT
+    HTTP_CLIENT = httpx.AsyncClient(timeout=20)
     logger.info("Singh Ji AI Ultra v8.0 HYBRID Starting...")
     sync = SMART_SWARM.sync(MODULES, AVAILABLE_KEYS)
     logger.info(f"Swarm: {sync['active']}/{sync['total']} agents loaded")
     logger.info(f"Active APIs: {sum(1 for v in AVAILABLE_KEYS.values() if v)}/{len(AVAILABLE_KEYS)}")
     yield
+    await HTTP_CLIENT.aclose()
     logger.info("Singh Ji AI Ultra v8.0 Stopped!")
 
 app = FastAPI(title="Singh Ji AI Ultra v8.0 HYBRID", version="8.0.0-hybrid", lifespan=lifespan)
@@ -390,32 +452,30 @@ async def api_check():
         "NEWSDATA": (f"https://newsdata.io/api/1/latest?apikey={NEWSDATA_API_KEY or ''}&q=test", {}, "GET"),
         "TAVILY": (f"https://api.tavily.com/search?api_key={TAVILY_API_KEY or ''}&query=test&max_results=1", {}, "GET"),
     }
-    results = {}
-    live = dead = 0
-    for name, (url, headers, method) in tests.items():
+
+    async def _check_one(name, url, headers):
         if not AVAILABLE_KEYS.get(name):
-            results[name] = {"status": "MISSING", "code": None}
-            dead += 1
-            continue
+            return name, {"status": "MISSING", "code": None}
         try:
             start = time.time()
-            r = requests.get(url, headers=headers, timeout=8)
+            r = await HTTP_CLIENT.get(url, headers=headers)
             elapsed = round((time.time() - start) * 1000, 2)
             if r.status_code in [200, 401, 403]:
-                results[name] = {"status": "LIVE", "code": r.status_code, "ms": elapsed}
-                live += 1
-            else:
-                results[name] = {"status": "ERROR", "code": r.status_code, "ms": elapsed}
-                dead += 1
+                return name, {"status": "LIVE", "code": r.status_code, "ms": elapsed}
+            return name, {"status": "ERROR", "code": r.status_code, "ms": elapsed}
         except Exception as e:
-            results[name] = {"status": "FAIL", "error": str(e)[:50]}
-            dead += 1
+            return name, {"status": "FAIL", "error": str(e)[:50]}
+
+    outcomes = await asyncio.gather(*(_check_one(n, u, h) for n, (u, h, m) in tests.items()))
+    results = dict(outcomes)
+    live = sum(1 for v in results.values() if v["status"] == "LIVE")
+    dead = len(results) - live
     return {"timestamp": datetime.now().isoformat(), "summary": {"live": live, "dead": dead, "total": live + dead}, "results": results}
 
 @app.get("/api/weather/{city}")
 async def weather_city(city: str):
     cache_key = _cache_key("weather", city)
-    cached = _cache_get(cache_key)
+    cached = await _cache_get(cache_key)
     if cached:
         cached["source"] = "CACHE"
         return cached
@@ -423,7 +483,7 @@ async def weather_city(city: str):
         return {"error": "OPENWEATHER_API_KEY missing"}
     try:
         url = f"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={OPENWEATHER_API_KEY}&units=metric"
-        resp = requests.get(url, timeout=10)
+        resp = await HTTP_CLIENT.get(url)
         data = resp.json()
         if resp.status_code == 200:
             result = {
@@ -432,7 +492,7 @@ async def weather_city(city: str):
                 "wind_speed": data["wind"]["speed"], "desc": data["weather"][0]["description"],
                 "icon": data["weather"][0]["icon"], "source": "OPENWEATHER_LIVE"
             }
-            _cache_set(cache_key, result, CACHE_TTL["weather"])
+            await _cache_set(cache_key, result, CACHE_TTL["weather"])
             return result
         return {"error": data.get("message", "Unknown error"), "code": resp.status_code}
     except Exception as e:
@@ -441,25 +501,25 @@ async def weather_city(city: str):
 @app.get("/api/news/latest")
 async def news_latest(source: str = "currents"):
     cache_key = _cache_key("news", source)
-    cached = _cache_get(cache_key)
+    cached = await _cache_get(cache_key)
     if cached:
         cached["source"] = "CACHE"
         return cached
     if source == "currents" and CURRENTS_API_KEY:
         try:
-            resp = requests.get(f"https://api.currentsapi.services/v1/latest-news?apiKey={CURRENTS_API_KEY}", timeout=10)
+            resp = await HTTP_CLIENT.get(f"https://api.currentsapi.services/v1/latest-news?apiKey={CURRENTS_API_KEY}")
             data = resp.json()
             result = {"source": "CURRENTS_LIVE", "news": data.get("news", [])[:10]}
-            _cache_set(cache_key, result, CACHE_TTL["news"])
+            await _cache_set(cache_key, result, CACHE_TTL["news"])
             return result
         except Exception as e:
             return {"error": str(e)}
     if source == "newsdata" and NEWSDATA_API_KEY:
         try:
-            resp = requests.get(f"https://newsdata.io/api/1/latest?apikey={NEWSDATA_API_KEY}&q=india", timeout=10)
+            resp = await HTTP_CLIENT.get(f"https://newsdata.io/api/1/latest?apikey={NEWSDATA_API_KEY}&q=india")
             data = resp.json()
             result = {"source": "NEWSDATA_LIVE", "news": data.get("results", [])[:10]}
-            _cache_set(cache_key, result, CACHE_TTL["news"])
+            await _cache_set(cache_key, result, CACHE_TTL["news"])
             return result
         except Exception as e:
             return {"error": str(e)}
@@ -471,7 +531,7 @@ MANDI_BASE_URL = f"https://api.data.gov.in/resource/{MANDI_RESOURCE_ID}"
 @app.get("/api/mandi/{state}")
 async def mandi_state(state: str, commodity: str = None, limit: int = 50):
     cache_key = _cache_key("mandi", state, commodity or "all", limit)
-    cached = _cache_get(cache_key)
+    cached = await _cache_get(cache_key)
     if cached:
         cached["source"] = "CACHE"
         return cached
@@ -481,13 +541,17 @@ async def mandi_state(state: str, commodity: str = None, limit: int = 50):
         params = {"api-key": MANDI_API_KEY, "format": "json", "limit": limit, "filters[state.keyword]": state}
         if commodity:
             params["filters[commodity.keyword]"] = commodity
-        resp = requests.get(MANDI_BASE_URL, params=params, timeout=45)
+        resp = await HTTP_CLIENT.get(MANDI_BASE_URL, params=params, timeout=45)
         data = resp.json()
         result = {"state": state, "commodity_filter": commodity, "count": len(data.get("records", [])), "records": data.get("records", []), "source": "AGMARKNET_LIVE"}
-        _cache_set(cache_key, result, CACHE_TTL["mandi"])
+        await _cache_set(cache_key, result, CACHE_TTL["mandi"])
         return result
     except Exception as e:
         return {"error": str(e)}
+
+def _b64_too_big(b64_str: str) -> bool:
+    # base64 me har 4 char ~3 raw bytes ke barabar hote hain
+    return (len(b64_str) * 3 / 4) > MAX_B64_BYTES
 
 @app.post("/api/plant/identify")
 async def plant_identify(request: Request):
@@ -497,8 +561,10 @@ async def plant_identify(request: Request):
     image_b64 = data.get("image_base64", "")
     if not image_b64:
         return {"error": "image_base64 required"}
+    if _b64_too_big(image_b64):
+        return JSONResponse(status_code=413, content={"error": "image too large (max 10MB)"})
     try:
-        resp = requests.post(
+        resp = await HTTP_CLIENT.post(
             "https://api.plant.id/v3/identification",
             params={"details": "url,common_names,description"},
             headers={"Api-Key": PLANT_ID_API, "Content-Type": "application/json"},
@@ -518,6 +584,16 @@ async def plant_identify(request: Request):
     except Exception as e:
         return {"error": str(e)}
 
+async def _call_groq(prompt: str, timeout=30):
+    resp = await HTTP_CLIENT.post(
+        "https://api.groq.com/openai/v1/chat/completions",
+        headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"},
+        json={"model": "llama3-8b-8192", "messages": [{"role": "user", "content": prompt}]},
+        timeout=timeout
+    )
+    result = resp.json()
+    return result["choices"][0]["message"]["content"]
+
 @app.post("/api/chat")
 async def ai_chat(request: Request):
     data = await request.json()
@@ -528,27 +604,21 @@ async def ai_chat(request: Request):
     personal_kw = ["password", "otp", "secret", "aadhar", "pan", "bank", "cvv", "pin"]
     is_personal = any(kw in prompt.lower() for kw in personal_kw)
 
+    cache_key = None
     if not is_personal:
         cache_key = _cache_key("ai_chat", model, prompt[:100])
-        cached = _cache_get(cache_key)
+        cached = await _cache_get(cache_key)
         if cached:
             cached["source"] = "CACHE"
             return cached
 
     if model in ["groq", "auto"] and GROQ_API_KEY:
         try:
-            resp = requests.post(
-                "https://api.groq.com/openai/v1/chat/completions",
-                headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"},
-                json={"model": "llama3-8b-8192", "messages": [{"role": "user", "content": prompt}]},
-                timeout=30
-            )
-            result = resp.json()
-            response_text = result["choices"][0]["message"]["content"]
+            response_text = await _call_groq(prompt)
             result_data = {"status": "success", "model": "groq", "response": response_text, "source": "GROQ_LIVE"}
             if not is_personal:
-                _cache_set(cache_key, result_data, CACHE_TTL["ai_chat"])
-            _memory_save(f"chat:{user_id}:{int(time.time())}", {"prompt": prompt, "response": response_text, "model": "groq"})
+                await _cache_set(cache_key, result_data, CACHE_TTL["ai_chat"])
+            await _memory_save(f"chat:{user_id}:{int(time.time())}", {"prompt": prompt, "response": response_text, "model": "groq"})
             return result_data
         except Exception as e:
             logger.warning(f"Groq failed: {e}")
@@ -556,20 +626,20 @@ async def ai_chat(request: Request):
     if model in ["gemini", "auto"] and GEMINI_API_KEY:
         try:
             url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
-            resp = requests.post(url, json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=30)
+            resp = await HTTP_CLIENT.post(url, json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=30)
             result = resp.json()
             text = result["candidates"][0]["content"]["parts"][0]["text"]
             result_data = {"status": "success", "model": "gemini", "response": text, "source": "GEMINI_LIVE"}
             if not is_personal:
-                _cache_set(cache_key, result_data, CACHE_TTL["ai_chat"])
-            _memory_save(f"chat:{user_id}:{int(time.time())}", {"prompt": prompt, "response": text, "model": "gemini"})
+                await _cache_set(cache_key, result_data, CACHE_TTL["ai_chat"])
+            await _memory_save(f"chat:{user_id}:{int(time.time())}", {"prompt": prompt, "response": text, "model": "gemini"})
             return result_data
         except Exception as e:
             logger.warning(f"Gemini failed: {e}")
 
     if model in ["cerebras", "auto"] and CEREBRAS_API_KEY:
         try:
-            resp = requests.post(
+            resp = await HTTP_CLIENT.post(
                 "https://api.cerebras.ai/v1/chat/completions",
                 headers={"Authorization": f"Bearer {CEREBRAS_API_KEY}", "Content-Type": "application/json"},
                 json={"model": "llama-3.1-8b", "messages": [{"role": "user", "content": prompt}]},
@@ -585,14 +655,14 @@ async def ai_chat(request: Request):
 
 @app.get("/api/memory/{key}")
 async def memory_get(key: str):
-    return _memory_get(key)
+    return await _memory_get(key)
 
 @app.post("/api/memory/")
 async def memory_save(request: Request):
     data = await request.json()
     key = data.get("key", str(int(time.time())))
     value = data.get("value", data)
-    return _memory_save(key, value)
+    return await _memory_save(key, value)
 
 BHASHINI_PIPELINE_URL = "https://meity-auth.ulcacontrib.org/ulca/apis/v0/model/getModelsPipeline"
 
@@ -614,7 +684,7 @@ async def bhashini_translate(request: Request):
             "pipelineTasks": [{"taskType": "translation", "config": {"language": {"sourceLanguage": source, "targetLanguage": target}}}],
             "pipelineRequestConfig": {"pipelineId": "64392f96daac500b55c543cd"}
         }
-        resp = requests.post(BHASHINI_PIPELINE_URL, headers=headers, json=payload, timeout=15)
+        resp = await HTTP_CLIENT.post(BHASHINI_PIPELINE_URL, headers=headers, json=payload, timeout=15)
         pipeline = resp.json()
         service_id = pipeline["pipelineResponseConfig"][0]["config"][0]["serviceId"]
         compute_url = pipeline["pipelineInferenceAPIEndPoint"]["callbackUrl"]
@@ -624,7 +694,7 @@ async def bhashini_translate(request: Request):
             "pipelineTasks": [{"taskType": "translation", "config": {"language": {"sourceLanguage": source, "targetLanguage": target}, "serviceId": service_id}}],
             "inputData": {"input": [{"source": text}]}
         }
-        compute_resp = requests.post(compute_url, headers={key_name: key_value, "Content-Type": "application/json"}, json=compute_payload, timeout=20)
+        compute_resp = await HTTP_CLIENT.post(compute_url, headers={key_name: key_value, "Content-Type": "application/json"}, json=compute_payload, timeout=20)
         result = compute_resp.json()
         translated = result["pipelineResponse"][0]["output"][0]["target"]
         return {"status": "success", "original": text, "translated": translated, "source": source, "target": target, "source_api": "BHASHINI_LIVE"}
@@ -646,6 +716,18 @@ def _get_whisper_model():
             return None
     return _whisper_model
 
+def _transcribe_sync(audio_bytes: bytes, suffix: str, language=None):
+    """CPU-bhaari kaam — hamesha run_in_threadpool se bulana."""
+    model = _get_whisper_model()
+    if model is None:
+        return None
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=True) as tmp:
+        tmp.write(audio_bytes)
+        tmp.flush()
+        segments, info = model.transcribe(tmp.name, language=language)
+        transcript = " ".join(seg.text.strip() for seg in segments)
+    return transcript, info.language, info.language_probability
+
 @app.post("/api/whisper/transcribe")
 async def whisper_transcribe(request: Request):
     data = await request.json()
@@ -653,19 +735,25 @@ async def whisper_transcribe(request: Request):
     language = data.get("language")
     if not audio_b64:
         return {"error": "audio_base64 required"}
-    model = _get_whisper_model()
-    if model is None:
-        return {"error": "Whisper model not available"}
+    if _b64_too_big(audio_b64):
+        return JSONResponse(status_code=413, content={"error": "audio too large (max 10MB)"})
     try:
         audio_bytes = base64.b64decode(audio_b64)
-        with tempfile.NamedTemporaryFile(suffix=".wav", delete=True) as tmp:
-            tmp.write(audio_bytes)
-            tmp.flush()
-            segments, info = model.transcribe(tmp.name, language=language)
-            transcript = " ".join(seg.text.strip() for seg in segments)
-        return {"status": "success", "transcript": transcript, "detected_language": info.language, "language_probability": round(info.language_probability, 3), "source": "WHISPER_LOCAL"}
+        out = await run_in_threadpool(_transcribe_sync, audio_bytes, ".wav", language)
+        if out is None:
+            return {"error": "Whisper model not available"}
+        transcript, detected_lang, lang_prob = out
+        return {"status": "success", "transcript": transcript, "detected_language": detected_lang, "language_probability": round(lang_prob, 3), "source": "WHISPER_LOCAL"}
     except Exception as e:
         return {"error": str(e)}
+
+def _tts_sync(text: str, lang: str) -> bytes:
+    from gtts import gTTS
+    tts = gTTS(text=text, lang=lang, slow=False)
+    mp3_fp = io.BytesIO()
+    tts.write_to_fp(mp3_fp)
+    mp3_fp.seek(0)
+    return mp3_fp.read()
 
 @app.post("/api/tts")
 async def text_to_speech(request: Request):
@@ -675,12 +763,8 @@ async def text_to_speech(request: Request):
     if not text:
         return {"error": "text required"}
     try:
-        from gtts import gTTS
-        tts = gTTS(text=text, lang=lang, slow=False)
-        mp3_fp = io.BytesIO()
-        tts.write_to_fp(mp3_fp)
-        mp3_fp.seek(0)
-        audio_b64 = base64.b64encode(mp3_fp.read()).decode("utf-8")
+        audio_bytes = await run_in_threadpool(_tts_sync, text, lang)
+        audio_b64 = base64.b64encode(audio_bytes).decode("utf-8")
         return {"status": "success", "audio_base64": audio_b64, "lang": lang, "source": "GTTS_LIVE"}
     except Exception as e:
         return {"error": str(e)}
@@ -691,7 +775,7 @@ async def facebook_status():
         return {"error": "FACEBOOK_ACCESS_TOKEN missing"}
     try:
         url = f"https://graph.facebook.com/v25.0/{FACEBOOK_PAGE_ID}?access_token={FACEBOOK_ACCESS_TOKEN}&fields=id,name,followers_count"
-        resp = requests.get(url, timeout=10)
+        resp = await HTTP_CLIENT.get(url)
         data = resp.json()
         if resp.status_code == 200:
             return {"status": "connected", "page": {"id": data.get("id"), "name": data.get("name"), "followers": data.get("followers_count", 0)}}
@@ -709,7 +793,7 @@ async def facebook_post(request: Request):
         payload = {"access_token": FACEBOOK_ACCESS_TOKEN, "message": data.get("message", "")}
         if data.get("link"):
             payload["link"] = data["link"]
-        resp = requests.post(url, data=payload, timeout=10)
+        resp = await HTTP_CLIENT.post(url, data=payload)
         return resp.json()
     except Exception as e:
         return {"error": str(e)}
@@ -720,7 +804,7 @@ async def instagram_status():
         return {"error": "INSTAGRAM_ACCESS_TOKEN missing"}
     try:
         url = f"https://graph.facebook.com/v25.0/{INSTAGRAM_BUSINESS_ID}?access_token={INSTAGRAM_ACCESS_TOKEN}&fields=id,username,followers_count"
-        resp = requests.get(url, timeout=10)
+        resp = await HTTP_CLIENT.get(url)
         data = resp.json()
         if resp.status_code == 200:
             return {"status": "connected", "account": {"id": data.get("id"), "username": data.get("username"), "followers": data.get("followers_count", 0)}}
@@ -734,7 +818,7 @@ async def youtube_search(q: str = "", max_results: int = 10):
         return {"error": "YOUTUBE_API_KEY missing"}
     try:
         url = f"https://www.googleapis.com/youtube/v3/search?part=snippet&q={q}&maxResults={max_results}&key={YOUTUBE_API_KEY}"
-        resp = requests.get(url, timeout=10)
+        resp = await HTTP_CLIENT.get(url)
         return resp.json()
     except Exception as e:
         return {"error": str(e)}
@@ -746,7 +830,7 @@ async def web_search(q: str = "", max_results: int = 5):
     try:
         url = "https://api.tavily.com/search"
         payload = {"api_key": TAVILY_API_KEY, "query": q, "max_results": max_results, "search_depth": "basic"}
-        resp = requests.post(url, json=payload, timeout=15)
+        resp = await HTTP_CLIENT.post(url, json=payload, timeout=15)
         return resp.json()
     except Exception as e:
         return {"error": str(e)}
@@ -757,32 +841,7 @@ async def tax_calculate(request: Request):
     income = data.get("income", 0)
     regime = data.get("regime", "new")
     deductions = data.get("deductions", 0)
-    if regime == "new":
-        if income <= 300000:
-            tax = 0
-        elif income <= 600000:
-            tax = (income - 300000) * 0.05
-        elif income <= 900000:
-            tax = 15000 + (income - 600000) * 0.10
-        elif income <= 1200000:
-            tax = 45000 + (income - 900000) * 0.15
-        elif income <= 1500000:
-            tax = 90000 + (income - 1200000) * 0.20
-        else:
-            tax = 150000 + (income - 1500000) * 0.30
-    else:
-        taxable = max(0, income - 50000 - deductions)
-        if taxable <= 250000:
-            tax = 0
-        elif taxable <= 500000:
-            tax = (taxable - 250000) * 0.05
-        elif taxable <= 1000000:
-            tax = 12500 + (taxable - 500000) * 0.20
-        else:
-            tax = 112500 + (taxable - 1000000) * 0.30
-    cess = tax * 0.04
-    total_tax = tax + cess
-    return {"income": income, "regime": regime, "tax": round(tax, 2), "cess": round(cess, 2), "total": round(total_tax, 2), "take_home": round(income - total_tax, 2)}
+    return _calculate_tax(income, regime, deductions)
 
 @app.get("/api/swarm/status")
 async def swarm_status():
@@ -795,26 +854,26 @@ async def swarm_sync():
 
 TELEGRAM_API_BASE = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
 
-def _telegram_send_message(chat_id, text, reply_markup=None):
+async def _telegram_send_message(chat_id, text, reply_markup=None):
     if not TELEGRAM_TOKEN:
         return {"error": "TELEGRAM_TOKEN missing"}
     try:
         payload = {"chat_id": chat_id, "text": text, "parse_mode": "HTML"}
         if reply_markup:
             payload["reply_markup"] = json.dumps(reply_markup)
-        resp = requests.post(f"{TELEGRAM_API_BASE}/sendMessage", json=payload, timeout=10)
+        resp = await HTTP_CLIENT.post(f"{TELEGRAM_API_BASE}/sendMessage", json=payload)
         return resp.json()
     except Exception as e:
         return {"error": str(e)}
 
-def _telegram_send_voice(chat_id, audio_b64, caption=""):
+async def _telegram_send_voice(chat_id, audio_b64, caption=""):
     if not TELEGRAM_TOKEN:
         return {"error": "TELEGRAM_TOKEN missing"}
     try:
         audio_bytes = base64.b64decode(audio_b64)
         files = {"voice": ("voice.mp3", io.BytesIO(audio_bytes), "audio/mpeg")}
         data = {"chat_id": chat_id, "caption": caption}
-        resp = requests.post(f"{TELEGRAM_API_BASE}/sendVoice", data=data, files=files, timeout=15)
+        resp = await HTTP_CLIENT.post(f"{TELEGRAM_API_BASE}/sendVoice", data=data, files=files, timeout=15)
         return resp.json()
     except Exception as e:
         return {"error": str(e)}
@@ -845,14 +904,14 @@ async def telegram_webhook(request: Request):
                 text += f"Active: {status['active_running']}\n"
                 text += f"Idle: {status['idle']}\n"
                 text += f"APIs: {sum(1 for v in AVAILABLE_KEYS.values() if v)}/{len(AVAILABLE_KEYS)}"
-                _telegram_send_message(chat_id, text)
+                await _telegram_send_message(chat_id, text)
             elif query_data == "weather":
-                _telegram_send_message(chat_id, "Weather\n\nCity batao!")
+                await _telegram_send_message(chat_id, "Weather\n\nCity batao!")
             elif query_data == "news":
                 if NEWSDATA_API_KEY:
                     try:
                         url = f"https://newsdata.io/api/1/latest?apikey={NEWSDATA_API_KEY}&q=india&size=5"
-                        resp = requests.get(url, timeout=10)
+                        resp = await HTTP_CLIENT.get(url)
                         news_data = resp.json()
                         articles = news_data.get("results", [])[:5]
                         text = "News\n\n"
@@ -860,21 +919,21 @@ async def telegram_webhook(request: Request):
                             text += f"{i}. {article.get('title', 'No title')}\n"
                             desc = article.get('description', 'No description')[:100]
                             text += f"   {desc}...\n\n"
-                        _telegram_send_message(chat_id, text)
+                        await _telegram_send_message(chat_id, text)
                     except Exception as e:
-                        _telegram_send_message(chat_id, f"News error: {str(e)[:100]}")
+                        await _telegram_send_message(chat_id, f"News error: {str(e)[:100]}")
                 else:
-                    _telegram_send_message(chat_id, "News API key missing")
+                    await _telegram_send_message(chat_id, "News API key missing")
             elif query_data == "mandi":
-                _telegram_send_message(chat_id, "Mandi Bhav\n\nState batao!")
+                await _telegram_send_message(chat_id, "Mandi Bhav\n\nState batao!")
             elif query_data == "ai_chat":
-                _telegram_send_message(chat_id, "AI Chat\n\nKuch bhi poochho!")
+                await _telegram_send_message(chat_id, "AI Chat\n\nKuch bhi poochho!")
             elif query_data == "voice":
-                _telegram_send_message(chat_id, "Voice\n\nVoice message bhejo!")
+                await _telegram_send_message(chat_id, "Voice\n\nVoice message bhejo!")
             elif query_data == "tax":
-                _telegram_send_message(chat_id, "Tax Calculator\n\nIncome batao!")
+                await _telegram_send_message(chat_id, "Tax Calculator\n\nIncome batao!")
             elif query_data == "plant":
-                _telegram_send_message(chat_id, "Plant ID\n\nPlant ki photo bhejo!")
+                await _telegram_send_message(chat_id, "Plant ID\n\nPlant ki photo bhejo!")
 
             return {"status": "ok"}
 
@@ -888,72 +947,58 @@ async def telegram_webhook(request: Request):
 
         if user_id not in USER_PREFERENCES:
             USER_PREFERENCES[user_id] = {"language": "hi", "location": None}
+            await _memory_save(f"user_pref:{user_id}", USER_PREFERENCES[user_id], table="user_preferences")
 
         if _rate_check(f"tg_user:{user_id}", *RATE_LIMIT_TELEGRAM_USER):
-            _telegram_send_message(chat_id, "Thoda slow karo! 1 minute mein try karo.")
+            await _telegram_send_message(chat_id, "Thoda slow karo! 1 minute mein try karo.")
             return {"status": "ok"}
 
         if "voice" in message:
             voice = message["voice"]
             file_id = voice["file_id"]
             try:
-                file_resp = requests.get(f"{TELEGRAM_API_BASE}/getFile?file_id={file_id}", timeout=10)
+                file_resp = await HTTP_CLIENT.get(f"{TELEGRAM_API_BASE}/getFile?file_id={file_id}")
                 file_data = file_resp.json()
                 if file_data.get("ok"):
                     file_path = file_data["result"]["file_path"]
                     file_url = f"https://api.telegram.org/file/bot{TELEGRAM_TOKEN}/{file_path}"
-                    audio_resp = requests.get(file_url, timeout=15)
+                    audio_resp = await HTTP_CLIENT.get(file_url, timeout=15)
                     audio_bytes = audio_resp.content
-                    model = _get_whisper_model()
-                    if model:
-                        with tempfile.NamedTemporaryFile(suffix=".ogg", delete=True) as tmp:
-                            tmp.write(audio_bytes)
-                            tmp.flush()
-                            segments, info = model.transcribe(tmp.name)
-                            transcript = " ".join(seg.text.strip() for seg in segments)
+                    out = await run_in_threadpool(_transcribe_sync, audio_bytes, ".ogg", None)
+                    if out:
+                        transcript, _, _ = out
                         transcript_msg = "Transcript:" + chr(10) + transcript + chr(10) + chr(10) + "AI soch raha hai..."
-                        _telegram_send_message(chat_id, transcript_msg)
+                        await _telegram_send_message(chat_id, transcript_msg)
                         ai_text = None
                         if GROQ_API_KEY:
-                            ai_resp = requests.post(
-                                "https://api.groq.com/openai/v1/chat/completions",
-                                headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"},
-                                json={"model": "llama3-8b-8192", "messages": [{"role": "user", "content": transcript}]},
-                                timeout=30
-                            )
-                            ai_result = ai_resp.json()
-                            ai_text = ai_result["choices"][0]["message"]["content"]
+                            ai_text = await _call_groq(transcript)
                             try:
-                                from gtts import gTTS
                                 tts_text = ai_text[:500] if len(ai_text) > 500 else ai_text
-                                tts = gTTS(text=tts_text, lang="hi", slow=False)
-                                mp3_fp = io.BytesIO()
-                                tts.write_to_fp(mp3_fp)
-                                mp3_fp.seek(0)
-                                tts_b64 = base64.b64encode(mp3_fp.read()).decode("utf-8")
-                                _telegram_send_voice(chat_id, tts_b64, "AI Response (Hindi)")
+                                tts_bytes = await run_in_threadpool(_tts_sync, tts_text, "hi")
+                                tts_b64 = base64.b64encode(tts_bytes).decode("utf-8")
+                                await _telegram_send_voice(chat_id, tts_b64, "AI Response (Hindi)")
                             except Exception:
                                 ai_msg = "AI Response:" + chr(10) + chr(10) + ai_text
-                                _telegram_send_message(chat_id, ai_msg)
-                        _memory_save(f"telegram_voice:{user_id}:{int(time.time())}", {"transcript": transcript, "response": ai_text})
+                                await _telegram_send_message(chat_id, ai_msg)
+                        await _memory_save(f"telegram_voice:{user_id}:{int(time.time())}", {"transcript": transcript, "response": ai_text})
                     else:
-                        _telegram_send_message(chat_id, "Whisper model not available")
+                        await _telegram_send_message(chat_id, "Whisper model not available")
                 else:
-                    _telegram_send_message(chat_id, "Could not download voice file")
+                    await _telegram_send_message(chat_id, "Could not download voice file")
             except Exception as e:
                 logger.error(f"Voice processing error: {e}")
                 err_msg = "Voice processing error: " + str(e)[:100]
-                _telegram_send_message(chat_id, err_msg)
+                await _telegram_send_message(chat_id, err_msg)
             return {"status": "ok"}
 
         if text == "/start":
             welcome = "Welcome to Singh Ji AI Ultra v8.0!\n\nMain aapka AI assistant hoon.\n"
-            _telegram_send_message(chat_id, welcome, MAIN_KEYBOARD)
+            await _telegram_send_message(chat_id, welcome, MAIN_KEYBOARD)
             return {"status": "ok"}
 
         elif text == "/help":
             help_text = "Commands\n\n/start\n/weather city\n/news\n/mandi state\n/tax income\n/status\n/ai question"
-            _telegram_send_message(chat_id, help_text)
+            await _telegram_send_message(chat_id, help_text)
             return {"status": "ok"}
 
         elif text == "/status":
@@ -966,7 +1011,7 @@ async def telegram_webhook(request: Request):
             api_count = sum(1 for v in AVAILABLE_KEYS.values() if v)
             status_text += f"Active APIs: {api_count}/{len(AVAILABLE_KEYS)}\n"
             status_text += f"Time: {datetime.now().strftime('%H:%M:%S')}"
-            _telegram_send_message(chat_id, status_text)
+            await _telegram_send_message(chat_id, status_text)
             return {"status": "ok"}
 
         elif text.startswith("/weather "):
@@ -974,7 +1019,7 @@ async def telegram_webhook(request: Request):
             if OPENWEATHER_API_KEY:
                 try:
                     url = f"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={OPENWEATHER_API_KEY}&units=metric"
-                    resp = requests.get(url, timeout=10)
+                    resp = await HTTP_CLIENT.get(url)
                     data = resp.json()
                     if resp.status_code == 200:
                         weather_text = f"Weather in {city}\n\n"
@@ -983,20 +1028,20 @@ async def telegram_webhook(request: Request):
                         weather_text += f"Humidity: {data['main']['humidity']}%\n"
                         weather_text += f"Wind: {data['wind']['speed']} m/s\n"
                         weather_text += f"{data['weather'][0]['description'].title()}"
-                        _telegram_send_message(chat_id, weather_text)
+                        await _telegram_send_message(chat_id, weather_text)
                     else:
-                        _telegram_send_message(chat_id, f"City not found: {city}")
+                        await _telegram_send_message(chat_id, f"City not found: {city}")
                 except Exception as e:
-                    _telegram_send_message(chat_id, f"Error: {str(e)[:100]}")
+                    await _telegram_send_message(chat_id, f"Error: {str(e)[:100]}")
             else:
-                _telegram_send_message(chat_id, "Weather API key missing")
+                await _telegram_send_message(chat_id, "Weather API key missing")
             return {"status": "ok"}
 
         elif text == "/news":
             if NEWSDATA_API_KEY:
                 try:
                     url = f"https://newsdata.io/api/1/latest?apikey={NEWSDATA_API_KEY}&q=india&size=5"
-                    resp = requests.get(url, timeout=10)
+                    resp = await HTTP_CLIENT.get(url)
                     news_data = resp.json()
                     articles = news_data.get("results", [])[:5]
                     news_text = "Latest News\n\n"
@@ -1004,11 +1049,11 @@ async def telegram_webhook(request: Request):
                         news_text += f"{i}. {article.get('title', 'No title')}\n"
                         desc = article.get('description', 'No description')[:80]
                         news_text += f"   {desc}...\n\n"
-                    _telegram_send_message(chat_id, news_text)
+                    await _telegram_send_message(chat_id, news_text)
                 except Exception as e:
-                    _telegram_send_message(chat_id, f"News error: {str(e)[:100]}")
+                    await _telegram_send_message(chat_id, f"News error: {str(e)[:100]}")
             else:
-                _telegram_send_message(chat_id, "News API key missing")
+                await _telegram_send_message(chat_id, "News API key missing")
             return {"status": "ok"}
 
         elif text.startswith("/mandi "):
@@ -1016,7 +1061,7 @@ async def telegram_webhook(request: Request):
             if MANDI_API_KEY:
                 try:
                     params = {"api-key": MANDI_API_KEY, "format": "json", "limit": 10, "filters[state.keyword]": state}
-                    resp = requests.get(MANDI_BASE_URL, params=params, timeout=45)
+                    resp = await HTTP_CLIENT.get(MANDI_BASE_URL, params=params, timeout=45)
                     data = resp.json()
                     records = data.get("records", [])
                     mandi_text = f"Mandi Bhav - {state}\n\n"
@@ -1024,93 +1069,68 @@ async def telegram_webhook(request: Request):
                         mandi_text += f"{i}. {record.get('commodity', 'Unknown')}\n"
                         mandi_text += f"   Rs {record.get('modal_price', 'N/A')}/quintal\n"
                         mandi_text += f"   {record.get('district', 'N/A')}, {record.get('market', 'N/A')}\n\n"
-                    _telegram_send_message(chat_id, mandi_text)
+                    await _telegram_send_message(chat_id, mandi_text)
                 except Exception as e:
-                    _telegram_send_message(chat_id, f"Error: {str(e)[:100]}")
+                    await _telegram_send_message(chat_id, f"Error: {str(e)[:100]}")
             else:
-                _telegram_send_message(chat_id, "Mandi API key missing")
+                await _telegram_send_message(chat_id, "Mandi API key missing")
             return {"status": "ok"}
 
         elif text.startswith("/tax "):
             try:
                 income = float(text.replace("/tax ", "").strip())
-                if income <= 300000:
-                    tax = 0
-                elif income <= 600000:
-                    tax = (income - 300000) * 0.05
-                elif income <= 900000:
-                    tax = 15000 + (income - 600000) * 0.10
-                elif income <= 1200000:
-                    tax = 45000 + (income - 900000) * 0.15
-                elif income <= 1500000:
-                    tax = 90000 + (income - 1200000) * 0.20
-                else:
-                    tax = 150000 + (income - 1500000) * 0.30
-                cess = tax * 0.04
-                total = tax + cess
+                r = _calculate_tax(income, "new")
                 tax_text = "Tax Calculation\n\n"
-                tax_text += f"Income: Rs {income:,.0f}\n"
-                tax_text += f"Tax: Rs {tax:,.2f}\n"
-                tax_text += f"Health Cess (4%): Rs {cess:,.2f}\n"
-                tax_text += f"Total Tax: Rs {total:,.2f}\n"
-                tax_text += f"Take Home: Rs {income - total:,.2f}"
-                _telegram_send_message(chat_id, tax_text)
+                tax_text += f"Income: Rs {r['income']:,.0f}\n"
+                tax_text += f"Tax: Rs {r['tax']:,.2f}\n"
+                tax_text += f"Health Cess (4%): Rs {r['cess']:,.2f}\n"
+                tax_text += f"Total Tax: Rs {r['total']:,.2f}\n"
+                tax_text += f"Take Home: Rs {r['take_home']:,.2f}"
+                await _telegram_send_message(chat_id, tax_text)
             except Exception:
-                _telegram_send_message(chat_id, "Invalid income. Example: /tax 500000")
+                await _telegram_send_message(chat_id, "Invalid income. Example: /tax 500000")
             return {"status": "ok"}
 
         elif text.startswith("/ai "):
             prompt = text.replace("/ai ", "").strip()
             if GROQ_API_KEY:
                 try:
-                    resp = requests.post(
-                        "https://api.groq.com/openai/v1/chat/completions",
-                        headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"},
-                        json={"model": "llama3-8b-8192", "messages": [{"role": "user", "content": prompt}]},
-                        timeout=30
-                    )
-                    result = resp.json()
-                    ai_response = result["choices"][0]["message"]["content"]
+                    ai_response = await _call_groq(prompt)
                     if len(ai_response) > 4000:
                         ai_response = ai_response[:4000] + "...\n\n(Truncated)"
-                    _telegram_send_message(chat_id, f"AI Response:\n\n{ai_response}")
-                    _memory_save(f"telegram_chat:{user_id}:{int(time.time())}", {"prompt": prompt, "response": ai_response})
+                    await _telegram_send_message(chat_id, f"AI Response:\n\n{ai_response}")
+                    await _memory_save(f"telegram_chat:{user_id}:{int(time.time())}", {"prompt": prompt, "response": ai_response})
                 except Exception as e:
-                    _telegram_send_message(chat_id, f"AI Error: {str(e)[:100]}")
+                    await _telegram_send_message(chat_id, f"AI Error: {str(e)[:100]}")
             else:
-                _telegram_send_message(chat_id, "Groq API key missing")
+                await _telegram_send_message(chat_id, "Groq API key missing")
             return {"status": "ok"}
 
         elif text.startswith("/broadcast "):
-            admin_id = int(os.getenv("ADMIN_USER_ID", "0"))
-            if user_id != admin_id:
-                _telegram_send_message(chat_id, "Admin only command")
+            if user_id != ADMIN_USER_ID:
+                await _telegram_send_message(chat_id, "Admin only command")
                 return {"status": "ok"}
             broadcast_text = text.replace("/broadcast ", "").strip()
-            sent = 0
-            for uid in USER_PREFERENCES.keys():
-                _telegram_send_message(uid, f"Broadcast\n\n{broadcast_text}")
-                sent += 1
-            _telegram_send_message(chat_id, f"Broadcast sent to {sent} users")
+            # Sequential loop se badalkar bounded-concurrency me bheja —
+            # sab users ko ek saath, par ek waqt me zyada se zyada 20 hi
+            sem = asyncio.Semaphore(20)
+            async def _send(uid):
+                async with sem:
+                    await _telegram_send_message(uid, f"Broadcast\n\n{broadcast_text}")
+            await asyncio.gather(*(_send(uid) for uid in list(USER_PREFERENCES.keys())))
+            await _telegram_send_message(chat_id, f"Broadcast sent to {len(USER_PREFERENCES)} users")
             return {"status": "ok"}
 
         else:
             if GROQ_API_KEY and text:
                 try:
-                    resp = requests.post(
-                        "https://api.groq.com/openai/v1/chat/completions",
-                        headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"},
-                        json={"model": "llama3-8b-8192", "messages": [{"role": "user", "content": text}]},
-                        timeout=30
-                    )
-                    result = resp.json()
-                    ai_response = result["choices"][0]["message"]["content"]
+                    ai_response = await _call_groq(text)
                     if len(ai_response) > 4000:
                         ai_response = ai_response[:4000] + "...\n\n(Truncated)"
-                    _telegram_send_message(chat_id, ai_response)
-                    _memory_save(f"telegram_chat:{user_id}:{int(time.time())}", {"prompt": text, "response": ai_response})
+                    await _telegram_send_message(chat_id, ai_response)
+                    await _memory_save(f"telegram_chat:{user_id}:{int(time.time())}", {"prompt": text, "response": ai_response})
                 except Exception as e:
-                    _telegram_send_message(chat_id, f"AI Error: {str(e)[:100]}")
+                    await _telegram_send_message(chat_id, f"AI Error: {str(e)[:100]}")
             return {"status": "ok"}
 
     except Exception as e:
@@ -1143,7 +1163,7 @@ async def _news_scheduler_task():
             try:
                 if NEWSDATA_API_KEY:
                     url = f"https://newsdata.io/api/1/latest?apikey={NEWSDATA_API_KEY}&q=india&size=10"
-                    resp = requests.get(url, timeout=15)
+                    resp = await HTTP_CLIENT.get(url, timeout=15)
                     news_data = resp.json()
                     articles = news_data.get("results", [])[:5]
                     news_text = "4 AM Daily News\n\nSingh Ji AI\n"
@@ -1151,11 +1171,14 @@ async def _news_scheduler_task():
                         news_text += f"\n{i}. {article.get('title', 'No title')}\n"
                         desc = article.get('description', 'No description')[:100]
                         news_text += f"   {desc}...\n"
-                    for uid in USER_PREFERENCES.keys():
-                        try:
-                            _telegram_send_message(uid, news_text)
-                        except Exception:
-                            pass
+                    sem = asyncio.Semaphore(20)
+                    async def _send(uid):
+                        async with sem:
+                            try:
+                                await _telegram_send_message(uid, news_text)
+                            except Exception:
+                                pass
+                    await asyncio.gather(*(_send(uid) for uid in list(USER_PREFERENCES.keys())))
                     logger.info(f"News sent to {len(USER_PREFERENCES)} users")
             except Exception as e:
                 logger.error(f"News scheduler error: {e}")
@@ -1187,11 +1210,12 @@ async def admin_broadcast(request: Request):
         return JSONResponse({"error": "Unauthorized"}, status_code=401)
     data = await request.json()
     message = data.get("message", "")
-    sent = 0
-    for uid in USER_PREFERENCES.keys():
-        _telegram_send_message(uid, f"Admin Broadcast\n\n{message}")
-        sent += 1
-    return {"broadcast": True, "sent_to": sent}
+    sem = asyncio.Semaphore(20)
+    async def _send(uid):
+        async with sem:
+            await _telegram_send_message(uid, f"Admin Broadcast\n\n{message}")
+    await asyncio.gather(*(_send(uid) for uid in list(USER_PREFERENCES.keys())))
+    return {"broadcast": True, "sent_to": len(USER_PREFERENCES)}
 
 @app.get("/api/payment/")
 async def payment_root():
@@ -1205,10 +1229,14 @@ async def payment_create_order(request: Request):
     amount = data.get("amount", 0)
     currency = data.get("currency", "INR")
     receipt = data.get("receipt", f"order_{int(time.time())}")
-    try:
+
+    def _create_order_sync():
         import razorpay
         client = razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET))
-        order = client.order.create({"amount": amount, "currency": currency, "receipt": receipt, "payment_capture": 1})
+        return client.order.create({"amount": amount, "currency": currency, "receipt": receipt, "payment_capture": 1})
+
+    try:
+        order = await run_in_threadpool(_create_order_sync)
         return {"status": "success", "order": order, "source": "RAZORPAY_LIVE"}
     except Exception as e:
         return {"error": str(e)}
