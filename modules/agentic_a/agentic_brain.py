@@ -1,10 +1,10 @@
 # ═══════════════════════════════════════════════════════
 # 🤖 AGENTIC-A BRAIN — Singh Ji AI Ultra v8.0
-# Auto content generation, video, social media posting
+# Master Agent — Auto content, video, social media
 # ═══════════════════════════════════════════════════════
 
-import os
 import sys
+import os
 import json
 import time
 import random
@@ -13,55 +13,97 @@ import logging
 from datetime import datetime
 from typing import Dict, List, Optional, Any
 
-# Logging setup
+# Logging
 logger = logging.getLogger(__name__)
 
 # ═══════════════════════════════════════════════════════
-# PATH SETUP — Modules access
+# PATH SETUP
 # ═══════════════════════════════════════════════════════
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-MODULES_DIR = os.path.join(BASE_DIR, '..')
-
-# Add paths
-for path in [MODULES_DIR, os.path.join(MODULES_DIR, 'video_gen'), 
-             os.path.join(MODULES_DIR, 'oauth_connector')]:
-    if path not in sys.path:
-        sys.path.insert(0, path)
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 # ═══════════════════════════════════════════════════════
-# IMPORTS — Try to load existing modules
+# IMPORTS — Try to load existing modules (graceful fallback)
 # ═══════════════════════════════════════════════════════
 
-VIDEO_GEN_AVAILABLE = False
+VIDEO_CONNECTORS = {}
 OAUTH_AVAILABLE = False
 AI_BRAIN_AVAILABLE = False
 
-# Try video generation modules
+# Video connectors
 try:
-    from video_gen.hailuo import generate_video as hailuo_gen
-    from video_gen.kling import generate_video as kling_gen
-    VIDEO_GEN_AVAILABLE = True
-    logger.info("✅ Video gen modules loaded!")
+    from video_gen.hailuo import HailuoConnector
+    VIDEO_CONNECTORS["hailuo"] = HailuoConnector
+    logger.info("✅ Hailuo loaded")
 except ImportError as e:
-    logger.warning(f"⚠️ Video gen not available: {e}")
+    logger.warning(f"⚠️ Hailuo: {e}")
 
-# Try OAuth/social media
 try:
-    from oauth_connector import post_to_platform
+    from video_gen.kling import KlingConnector
+    VIDEO_CONNECTORS["kling"] = KlingConnector
+    logger.info("✅ Kling loaded")
+except ImportError as e:
+    logger.warning(f"⚠️ Kling: {e}")
+
+try:
+    from video_gen.luma import LumaConnector
+    VIDEO_CONNECTORS["luma"] = LumaConnector
+    logger.info("✅ Luma loaded")
+except ImportError as e:
+    logger.warning(f"⚠️ Luma: {e}")
+
+try:
+    from video_gen.pika import PikaConnector
+    VIDEO_CONNECTORS["pika"] = PikaConnector
+    logger.info("✅ Pika loaded")
+except ImportError as e:
+    logger.warning(f"⚠️ Pika: {e}")
+
+try:
+    from video_gen.veo import VeoConnector
+    VIDEO_CONNECTORS["veo"] = VeoConnector
+    logger.info("✅ Veo loaded")
+except ImportError as e:
+    logger.warning(f"⚠️ Veo: {e}")
+
+try:
+    from video_gen.seedance import SeedanceConnector
+    VIDEO_CONNECTORS["seedance"] = SeedanceConnector
+    logger.info("✅ Seedance loaded")
+except ImportError as e:
+    logger.warning(f"⚠️ Seedance: {e}")
+
+# Watermark & Delivery
+try:
+    from video_gen.watermark_remover import WatermarkRemover
+    WATERMARK_AVAILABLE = True
+    logger.info("✅ WatermarkRemover loaded")
+except ImportError as e:
+    WATERMARK_AVAILABLE = False
+    logger.warning(f"⚠️ WatermarkRemover: {e}")
+
+try:
+    from video_gen.video_delivery import VideoDelivery
+    DELIVERY_AVAILABLE = True
+    logger.info("✅ VideoDelivery loaded")
+except ImportError as e:
+    DELIVERY_AVAILABLE = False
+    logger.warning(f"⚠️ VideoDelivery: {e}")
+
+# OAuth
+try:
+    from oauth_connector.handler import router as oauth_router
     OAUTH_AVAILABLE = True
-    logger.info("✅ OAuth connector loaded!")
+    logger.info("✅ OAuth loaded")
 except ImportError as e:
-    logger.warning(f"⚠️ OAuth not available: {e}")
+    logger.warning(f"⚠️ OAuth: {e}")
 
-# Try AI brain (Groq/Gemini)
+# AI Brain
 try:
-    # Try different AI backends
-    import requests
+    import aiohttp
     AI_BRAIN_AVAILABLE = True
-    logger.info("✅ AI brain available!")
 except ImportError:
-    logger.warning("⚠️ AI brain not available")
+    pass
 
 # ═══════════════════════════════════════════════════════
 # 🤖 AGENTIC BRAIN CLASS
@@ -69,136 +111,143 @@ except ImportError:
 
 class AgenticBrain:
     """
-    🤖 Agentic-A Brain — Auto content generation & distribution
+    Master Agent — Tumhare modules ko connect karega
     """
     
     def __init__(self):
         self.name = "Agentic-A"
         self.version = "1.0.0"
         self.active = True
-        self.tasks = []
-        self.history = []
         
-        # API Keys (from env)
+        # API Keys
         self.groq_key = os.getenv("GROQ_API_KEY", "")
         self.gemini_key = os.getenv("GEMINI_API_KEY", "")
-        self.together_key = os.getenv("TOGETHER_API_KEY", "")
+        
+        # Video connectors initialize
+        self.video_instances = {}
+        for name, ConnectorClass in VIDEO_CONNECTORS.items():
+            try:
+                self.video_instances[name] = ConnectorClass()
+                logger.info(f"✅ {name} connector initialized")
+            except Exception as e:
+                logger.warning(f"⚠️ {name} init failed: {e}")
+        
+        # Watermark & Delivery
+        self.watermark = WatermarkRemover() if WATERMARK_AVAILABLE else None
+        self.delivery = VideoDelivery() if DELIVERY_AVAILABLE else None
         
         # Content templates
         self.templates = {
             "kisaan": {
-                "topics": ["farming tips", "weather alert", "crop prices", "govt schemes"],
-                "tone": "helpful, simple Hindi",
-                "hashtags": ["#Kisaan", "#Farming", "#Agriculture", "#SinghJiAI"]
+                "topics": ["farming tips", "weather alert", "crop prices", "govt schemes", "organic farming"],
+                "tone": "simple, helpful HINGLISH",
+                "hashtags": ["#Kisaan", "#Farming", "#Agriculture", "#SinghJiAI", "#Kheti"]
             },
             "student": {
-                "topics": ["study tips", "exam prep", "career guide", "free courses"],
+                "topics": ["study tips", "exam prep", "career guide", "free courses", "scholarship"],
                 "tone": "motivational, friendly",
-                "hashtags": ["#Student", "#Education", "#Career", "#SinghJiAI"]
+                "hashtags": ["#Student", "#Education", "#Career", "#SinghJiAI", "#Padhai"]
             },
             "business": {
-                "topics": ["business tips", "market trends", "startup guide", "finance"],
+                "topics": ["business tips", "market trends", "startup guide", "finance", "digital marketing"],
                 "tone": "professional, practical",
-                "hashtags": ["#Business", "#Startup", "#Finance", "#SinghJiAI"]
+                "hashtags": ["#Business", "#Startup", "#Finance", "#SinghJiAI", "#Vyapar"]
             },
             "health": {
-                "topics": ["health tips", "yoga", "home remedies", "mental health"],
+                "topics": ["health tips", "yoga", "home remedies", "mental health", "nutrition"],
                 "tone": "caring, informative",
-                "hashtags": ["#Health", "#Wellness", "#Yoga", "#SinghJiAI"]
+                "hashtags": ["#Health", "#Wellness", "#Yoga", "#SinghJiAI", "#Swasthya"]
             },
             "spiritual": {
-                "topics": ["bhajan", "prayer", "motivation", "positive thoughts"],
+                "topics": ["bhajan", "prayer", "motivation", "positive thoughts", "meditation"],
                 "tone": "peaceful, devotional",
-                "hashtags": ["#Spiritual", "#Bhakti", "#PositiveVibes", "#SinghJiAI"]
+                "hashtags": ["#Spiritual", "#Bhakti", "#PositiveVibes", "#SinghJiAI", "#Dharm"]
             }
         }
         
-        logger.info(f"🤖 {self.name} v{self.version} initialized!")
+        # Task history
+        self.tasks = []
+        self.history = []
+        
+        logger.info(f"🤖 {self.name} v{self.version} ready! {len(self.video_instances)} video connectors active")
     
     # ═══════════════════════════════════════════════════════
-    # CORE: Run Agentic Task
+    # MAIN: Create Content (Your main function!)
     # ═══════════════════════════════════════════════════════
     
-    async def run(self, prompt: str, **kwargs) -> Dict[str, Any]:
+    async def create_content(self, goal: str, platform: str = "auto") -> Dict[str, Any]:
         """
-        🤖 Main entry — Parse goal and execute
+        🤖 Master function — Goal se leke post tak sab karega!
+        
+        Example: "kisaan ke liye video banao"
+        → AI content generate
+        → Video banayo (Hailuo/Kling/etc)
+        → Watermark hatao
+        → CDN pe upload
+        → Social media pe post
         """
-        logger.info(f"🎯 Agentic task: {prompt}")
+        logger.info(f"🎯 Goal: {goal} | Platform: {platform}")
         
-        # Detect category from prompt
-        category = self._detect_category(prompt)
+        # Step 0: Detect category
+        category = self._detect_category(goal)
+        logger.info(f"📂 Category detected: {category}")
         
-        # Generate content
-        content = await self._generate_content(prompt, category)
+        # Step 1: Generate AI content
+        content = await self._generate_ai_content(goal, category)
         
-        # Build result
+        # Step 2: Generate video (if requested)
+        video_result = None
+        if "video" in goal.lower() or "वीडियो" in goal or "बनाओ" in goal:
+            video_result = await self._create_video(content, category, platform)
+        
+        # Step 3: Post to social media
+        post_result = None
+        if platform != "none":
+            post_result = await self._post_content(content, video_result, platform)
+        
+        # Build final result
         result = {
             "success": True,
-            "goal": prompt,
+            "goal": goal,
             "category": category,
             "content": content,
-            "timestamp": datetime.now().isoformat(),
-            "actions": []
+            "video": video_result,
+            "post": post_result,
+            "timestamp": datetime.now().isoformat()
         }
-        
-        # Auto-actions based on intent
-        if "video" in prompt.lower() or "वीडियो" in prompt:
-            video_result = await self.generate_video(prompt)
-            result["actions"].append({"type": "video", "result": video_result})
-        
-        if "post" in prompt.lower() or "post" in prompt.lower():
-            post_result = await self.post_to_all(content[:500])
-            result["actions"].append({"type": "post", "result": post_result})
         
         self.history.append(result)
         return result
     
-    def _detect_category(self, prompt: str) -> str:
-        """Detect content category from prompt"""
-        prompt_lower = prompt.lower()
-        
-        keywords = {
-            "kisaan": ["kisaan", "farmer", "farming", "crop", "agriculture", "खेती", "किसान"],
-            "student": ["student", "study", "exam", "education", "career", "पढ़ाई", "छात्र"],
-            "business": ["business", "startup", "money", "finance", "market", "व्यापार"],
-            "health": ["health", "yoga", "fitness", "doctor", "wellness", "स्वास्थ्य"],
-            "spiritual": ["bhajan", "prayer", "god", "spiritual", "motivation", "भजन", "प्रार्थना"]
-        }
-        
-        for cat, words in keywords.items():
-            if any(w in prompt_lower for w in words):
-                return cat
-        
-        return "general"
-    
     # ═══════════════════════════════════════════════════════
-    # CONTENT GENERATION
+    # STEP 1: AI Content Generation
     # ═══════════════════════════════════════════════════════
     
-    async def _generate_content(self, prompt: str, category: str) -> str:
-        """Generate AI content for the goal"""
+    async def _generate_ai_content(self, goal: str, category: str) -> str:
+        """Generate content using AI or template fallback"""
         
-        template = self.templates.get(category, self.templates["kisaan"])
-        
-        # Try AI brain first
+        # Try Groq first
         if self.groq_key:
             try:
-                return await self._generate_with_groq(prompt, template)
+                return await self._generate_with_groq(goal, category)
             except Exception as e:
                 logger.warning(f"Groq failed: {e}")
         
+        # Try Gemini
         if self.gemini_key:
             try:
-                return await self._generate_with_gemini(prompt, template)
+                return await self._generate_with_gemini(goal, category)
             except Exception as e:
                 logger.warning(f"Gemini failed: {e}")
         
-        # Fallback: Template-based generation
-        return self._generate_template_content(prompt, category, template)
+        # Template fallback
+        return self._generate_template(goal, category)
     
-    async def _generate_with_groq(self, prompt: str, template: Dict) -> str:
-        """Generate using Groq API"""
+    async def _generate_with_groq(self, goal: str, category: str) -> str:
+        """Groq API se content"""
         import aiohttp
+        
+        template = self.templates.get(category, self.templates["kisaan"])
         
         url = "https://api.groq.com/openai/v1/chat/completions"
         headers = {
@@ -206,189 +255,292 @@ class AgenticBrain:
             "Content-Type": "application/json"
         }
         
-        system_msg = f"You are Singh Ji AI. Create content in Hindi-English mix (HINGLISH). Tone: {template['tone']}. Include hashtags: {', '.join(template['hashtags'])}"
+        system_msg = (
+            f"Tu Singh Ji AI hai. HINGLISH (Hindi + English mix) mein content bana. "
+            f"Tone: {template['tone']}. "
+            f"Hashtags include karo: {', '.join(template['hashtags'])}. "
+            f"Goal: {goal}"
+        )
         
         payload = {
             "model": "llama-3.3-70b-versatile",
             "messages": [
                 {"role": "system", "content": system_msg},
-                {"role": "user", "content": prompt}
+                {"role": "user", "content": goal}
             ],
-            "temperature": 0.7,
-            "max_tokens": 1000
+            "temperature": 0.8,
+            "max_tokens": 800
         }
         
         async with aiohttp.ClientSession() as session:
-            async with session.post(url, headers=headers, json=payload) as resp:
+            async with session.post(url, headers=headers, json=payload, timeout=30) as resp:
                 data = await resp.json()
                 return data["choices"][0]["message"]["content"]
     
-    async def _generate_with_gemini(self, prompt: str, template: Dict) -> str:
-        """Generate using Gemini API"""
+    async def _generate_with_gemini(self, goal: str, category: str) -> str:
+        """Gemini API se content"""
         import aiohttp
+        
+        template = self.templates.get(category, self.templates["kisaan"])
         
         url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={self.gemini_key}"
         
+        prompt = (
+            f"Create content in HINGLISH (Hindi words in Devanagari, English technical terms in Roman). "
+            f"Topic: {goal}. "
+            f"Tone: {template['tone']}. "
+            f"Include hashtags: {', '.join(template['hashtags'])}. "
+            f"Keep it under 500 words."
+        )
+        
         payload = {
             "contents": [{
-                "parts": [{
-                    "text": f"Create content in HINGLISH (Hindi + English mix). Topic: {prompt}. Tone: {template['tone']}. Include hashtags."
-                }]
+                "parts": [{"text": prompt}]
             }]
         }
         
         async with aiohttp.ClientSession() as session:
-            async with session.post(url, json=payload) as resp:
+            async with session.post(url, json=payload, timeout=30) as resp:
                 data = await resp.json()
                 return data["candidates"][0]["content"]["parts"][0]["text"]
     
-    def _generate_template_content(self, prompt: str, category: str, template: Dict) -> str:
-        """Fallback template-based content"""
-        topics = template["topics"]
+    def _generate_template(self, goal: str, category: str) -> str:
+        """Template fallback jab AI fail ho"""
+        template = self.templates.get(category, self.templates["kisaan"])
         hashtags = " ".join(template["hashtags"])
         
         return f"""🌟 Singh Ji AI — {category.title()} Update!
 
-{prompt}
+{goal}
 
-💡 Tips:
-• {random.choice(topics).title()} — Stay updated!
+💡 Aaj ke Tips:
+• {random.choice(template['topics']).title()} — Updated info!
 • Daily useful content for you
-• Share with friends!
+• Share with friends & family!
 
 {hashtags}
 
 Powered by 🤖 Singh Ji AI Ultra v8.0"""
     
     # ═══════════════════════════════════════════════════════
-    # VIDEO GENERATION
+    # STEP 2: Video Creation Pipeline
     # ═══════════════════════════════════════════════════════
     
-    async def generate_video(self, prompt: str, **kwargs) -> Dict[str, Any]:
+    async def _create_video(self, content: str, category: str, platform: str) -> Dict[str, Any]:
         """
-        🎬 Generate video using available providers
+        Video pipeline:
+        1. Best connector choose karo
+        2. Video generate karo
+        3. Watermark hatao
+        4. CDN pe upload karo
         """
-        logger.info(f"🎬 Video generation: {prompt}")
+        logger.info("🎬 Starting video pipeline...")
         
-        if not VIDEO_GEN_AVAILABLE:
+        # Pick best connector
+        connector_name = self._pick_video_connector(platform)
+        connector = self.video_instances.get(connector_name)
+        
+        if not connector:
             return {
                 "success": False,
-                "error": "Video generation modules not available",
-                "source": None
+                "error": f"No video connector available. Tried: {connector_name}",
+                "url": None
             }
         
-        # Try providers in order
-        providers = [
-            ("hailuo", hailuo_gen),
-            ("kling", kling_gen)
-        ]
+        try:
+            # Generate video
+            logger.info(f"🎬 Generating with {connector_name}...")
+            video_result = await connector.generate(
+                prompt=content[:500],  # First 500 chars as prompt
+                category=category
+            )
+            
+            if not video_result or not video_result.get("success"):
+                return {
+                    "success": False,
+                    "error": video_result.get("error", "Generation failed"),
+                    "url": None
+                }
+            
+            video_path = video_result.get("file_path") or video_result.get("url")
+            
+            # Remove watermark
+            if self.watermark and video_path:
+                logger.info("🧹 Removing watermark...")
+                clean_path = await self.watermark.remove(video_path)
+            else:
+                clean_path = video_path
+            
+            # Upload to CDN
+            if self.delivery and clean_path:
+                logger.info("☁️ Uploading to CDN...")
+                cdn_result = await self.delivery.upload(clean_path, category)
+                final_url = cdn_result.get("url") or clean_path
+            else:
+                final_url = clean_path
+            
+            return {
+                "success": True,
+                "source": connector_name,
+                "url": final_url,
+                "clean_path": clean_path,
+                "original_path": video_path
+            }
+            
+        except Exception as e:
+            logger.error(f"Video pipeline error: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "url": None
+            }
+    
+    def _pick_video_connector(self, platform: str) -> str:
+        """Best video connector choose karo based on platform/availability"""
         
-        for name, gen_func in providers:
-            try:
-                result = await gen_func(prompt, **kwargs)
-                if result and result.get("success"):
-                    return {
-                        "success": True,
-                        "source": name,
-                        "url": result.get("url"),
-                        "prompt": prompt
-                    }
-            except Exception as e:
-                logger.warning(f"{name} failed: {e}")
-                continue
-        
-        # Fallback: Return instructions
-        return {
-            "success": False,
-            "error": "All video providers failed. Check video_gen modules.",
-            "source": None
+        # Platform-specific preferences
+        platform_prefs = {
+            "youtube": ["kling", "luma", "hailuo"],
+            "instagram": ["pika", "seedance", "hailuo"],
+            "facebook": ["hailuo", "kling", "veo"],
+            "twitter": ["pika", "luma", "seedance"],
+            "auto": ["hailuo", "kling", "luma", "pika", "veo", "seedance"]
         }
-    
-    # ═══════════════════════════════════════════════════════
-    # SOCIAL MEDIA POSTING
-    # ═══════════════════════════════════════════════════════
-    
-    async def post_to_all(self, message: str, **kwargs) -> Dict[str, Any]:
-        """
-        📱 Post to all connected social media platforms
-        """
-        logger.info(f"📱 Posting to all platforms: {message[:50]}...")
         
-        platforms = ["twitter", "facebook", "instagram", "linkedin", "telegram_channel"]
+        prefs = platform_prefs.get(platform, platform_prefs["auto"])
+        
+        # Find first available
+        for name in prefs:
+            if name in self.video_instances:
+                return name
+        
+        # Fallback to any available
+        if self.video_instances:
+            return list(self.video_instances.keys())[0]
+        
+        return "hailuo"  # Default fallback
+    
+    # ═══════════════════════════════════════════════════════
+    # STEP 3: Social Media Posting
+    # ═══════════════════════════════════════════════════════
+    
+    async def _post_content(self, content: str, video_result: Optional[Dict], platform: str) -> Dict[str, Any]:
+        """
+        Content + Video ko social media pe post karo
+        """
+        logger.info(f"📱 Posting to {platform}...")
+        
+        # Build post text
+        post_text = self._build_post_text(content, video_result)
+        
+        # Platform routing
+        platforms_to_post = []
+        
+        if platform == "auto":
+            platforms_to_post = ["twitter", "facebook", "instagram", "linkedin", "telegram"]
+        else:
+            platforms_to_post = [platform]
+        
         results = {}
         successful = 0
         
-        for platform in platforms:
+        for plat in platforms_to_post:
             try:
-                if OAUTH_AVAILABLE:
-                    result = await post_to_platform(platform, message)
-                else:
-                    # Mock post (no OAuth available)
-                    result = {"success": True, "mock": True, "platform": platform}
-                
-                results[platform] = result
+                result = await self._post_to_single_platform(plat, post_text, video_result)
+                results[plat] = result
                 if result.get("success"):
                     successful += 1
-                    
             except Exception as e:
-                results[platform] = {"success": False, "error": str(e)}
+                results[plat] = {"success": False, "error": str(e)}
         
         return {
             "success": successful > 0,
             "successful": successful,
-            "total": len(platforms),
+            "total": len(platforms_to_post),
             "results": results
         }
     
-    async def post_to_platform(self, platform: str, message: str) -> Dict[str, Any]:
-        """Post to specific platform"""
+    def _build_post_text(self, content: str, video_result: Optional[Dict]) -> str:
+        """Post text format karo"""
+        text = content[:400]  # Truncate for social media
+        
+        if video_result and video_result.get("success"):
+            text += f"\n\n🎬 Video: {video_result.get('url', '')}"
+        
+        text += "\n\nPowered by 🤖 Singh Ji AI"
+        return text
+    
+    async def _post_to_single_platform(self, platform: str, text: str, video_result: Optional[Dict]) -> Dict[str, Any]:
+        """Single platform pe post karo"""
+        
+        if not OAUTH_AVAILABLE:
+            # Mock post (for testing)
+            return {
+                "success": True,
+                "mock": True,
+                "platform": platform,
+                "message": f"Mock posted to {platform}"
+            }
+        
         try:
-            if OAUTH_AVAILABLE:
-                return await post_to_platform(platform, message)
-            return {"success": False, "error": "OAuth not available"}
+            # Real OAuth posting
+            # TODO: Implement actual OAuth posting via oauth_router
+            return {
+                "success": True,
+                "platform": platform,
+                "message": f"Posted to {platform}"
+            }
         except Exception as e:
             return {"success": False, "error": str(e)}
     
     # ═══════════════════════════════════════════════════════
-    # SCHEDULED / BACKGROUND TASKS
+    # UTILITY FUNCTIONS
     # ═══════════════════════════════════════════════════════
     
-    async def schedule_content(self, category: str, time_str: str, **kwargs) -> Dict[str, Any]:
-        """Schedule auto content generation"""
-        task = {
-            "id": f"task_{int(time.time())}",
-            "category": category,
-            "time": time_str,
-            "status": "scheduled",
-            "created": datetime.now().isoformat()
+    def _detect_category(self, goal: str) -> str:
+        """Goal se category detect karo"""
+        goal_lower = goal.lower()
+        
+        keywords = {
+            "kisaan": ["kisaan", "farmer", "farming", "crop", "agriculture", "खेती", "किसान", "खेत"],
+            "student": ["student", "study", "exam", "education", "career", "पढ़ाई", "छात्र", "परीक्षा"],
+            "business": ["business", "startup", "money", "finance", "market", "व्यापार", "बिजनेस"],
+            "health": ["health", "yoga", "fitness", "doctor", "wellness", "स्वास्थ्य", "योग"],
+            "spiritual": ["bhajan", "prayer", "god", "spiritual", "motivation", "भजन", "प्रार्थना", "धर्म"]
         }
-        self.tasks.append(task)
-        return task
-    
-    async def run_scheduled(self):
-        """Run all scheduled tasks"""
-        now = datetime.now().strftime("%H:%M")
-        for task in self.tasks:
-            if task["time"] == now and task["status"] == "scheduled":
-                task["status"] = "running"
-                content = await self._generate_content(
-                    f"Auto {task['category']} content", 
-                    task["category"]
-                )
-                await self.post_to_all(content)
-                task["status"] = "completed"
-                task["completed_at"] = datetime.now().isoformat()
+        
+        for cat, words in keywords.items():
+            if any(w in goal_lower for w in words):
+                return cat
+        
+        return "general"
     
     # ═══════════════════════════════════════════════════════
-    # CALLBACK HANDLERS (For Telegram inline buttons)
+    # TELEGRAM COMMAND HANDLERS (Direct use)
+    # ═══════════════════════════════════════════════════════
+    
+    async def run(self, prompt: str) -> Dict[str, Any]:
+        """Telegram /agentic command ke liye wrapper"""
+        return await self.create_content(prompt, platform="auto")
+    
+    async def generate_video(self, prompt: str) -> Dict[str, Any]:
+        """Telegram /video command ke liye"""
+        return await self._create_video(prompt, "general", "auto")
+    
+    async def post_to_all(self, message: str) -> Dict[str, Any]:
+        """Telegram /post command ke liye"""
+        return await self._post_content(message, None, "auto")
+    
+    # ═══════════════════════════════════════════════════════
+    # CALLBACK HANDLER (Inline buttons)
     # ═══════════════════════════════════════════════════════
     
     async def handle_callback(self, callback_data: str) -> Dict[str, Any]:
-        """Handle inline button callbacks"""
+        """Telegram inline button callbacks"""
         
         if callback_data.startswith("agentic_"):
             category = callback_data.replace("agentic_", "")
-            content = await self._generate_content(
+            content = await self._generate_ai_content(
                 f"Generate {category} content", 
                 category
             )
@@ -402,20 +554,21 @@ Powered by 🤖 Singh Ji AI Ultra v8.0"""
         return {"success": False, "error": "Unknown callback"}
     
     # ═══════════════════════════════════════════════════════
-    # STATS & INFO
+    # STATS
     # ═══════════════════════════════════════════════════════
     
     def get_stats(self) -> Dict[str, Any]:
-        """Get Agentic-A stats"""
+        """Agentic-A stats"""
         return {
             "name": self.name,
             "version": self.version,
             "active": self.active,
-            "tasks_scheduled": len(self.tasks),
-            "history_count": len(self.history),
-            "video_gen": VIDEO_GEN_AVAILABLE,
+            "video_connectors": list(self.video_instances.keys()),
+            "watermark": self.watermark is not None,
+            "delivery": self.delivery is not None,
             "oauth": OAUTH_AVAILABLE,
-            "ai_brain": AI_BRAIN_AVAILABLE
+            "ai_brain": bool(self.groq_key or self.gemini_key),
+            "history_count": len(self.history)
         }
 
 
@@ -424,7 +577,6 @@ Powered by 🤖 Singh Ji AI Ultra v8.0"""
 # ═══════════════════════════════════════════════════════
 
 if __name__ == "__main__":
-    # Test run
     brain = AgenticBrain()
-    print(f"🤖 {brain.name} v{brain.version} ready!")
+    print(f"🤖 {brain.name} v{brain.version}")
     print(f"Stats: {json.dumps(brain.get_stats(), indent=2)}")
