@@ -46,7 +46,37 @@ class Config:
         self.MEMORY_TTL = int(os.getenv("MEMORY_TTL", "86400"))
 
 config = Config()
+# ═══════════════════════════════════════════════════════
+# 🤖 AGENTIC-A IMPORTS
+# ═══════════════════════════════════════════════════════
 
+import sys
+import os
+
+# Agentic-A path add karo
+agentic_path = os.path.join(os.path.dirname(__file__), '..', 'agentic_a')
+if agentic_path not in sys.path:
+    sys.path.insert(0, agentic_path)
+
+# Video gen path
+video_gen_path = os.path.join(os.path.dirname(__file__), '..', 'video_gen')
+if video_gen_path not in sys.path:
+    sys.path.insert(0, video_gen_path)
+
+# OAuth path
+oauth_path = os.path.join(os.path.dirname(__file__), '..', 'oauth_connector')
+if oauth_path not in sys.path:
+    sys.path.insert(0, oauth_path)
+
+# Try import
+try:
+    from agentic_brain import AgenticBrain
+    agentic = AgenticBrain()
+    AGENTIC_AVAILABLE = True
+    logger.info("✅ Agentic-A loaded successfully!")
+except ImportError as e:
+    logger.warning(f"⚠️ Agentic-A not available: {e}")
+    AGENTIC_AVAILABLE = False
 # ═══════════════════════════════════════════════════════
 # LOGGING
 # ═══════════════════════════════════════════════════════
@@ -1811,7 +1841,7 @@ async def setup_application() -> Application:
 
     application = Application.builder().token(config.TELEGRAM_BOT_TOKEN).build()
 
-    commands = [
+      commands = [
         BotCommand("start", "Start bot"),
         BotCommand("help", "Help & guide"),
         BotCommand("modules", "All 95 modules"),
@@ -1824,6 +1854,9 @@ async def setup_application() -> Application:
         BotCommand("stats", "Usage statistics"),
         BotCommand("bachpan", "Child safety helplines 🛡️"),
         BotCommand("yojana", "Sarkari yojana check 🏛️"),
+        BotCommand("agentic", "🤖 Agentic AI — auto content"),      
+        BotCommand("video", "🎬 Generate video"),                     
+        BotCommand("post", "📱 Post to social media"),                
     ]
     await application.bot.set_my_commands(commands)
 
@@ -1838,13 +1871,19 @@ async def setup_application() -> Application:
     application.add_handler(CommandHandler("settings", settings_command))
     application.add_handler(CommandHandler("about", about_command))
     application.add_handler(CommandHandler("bachpan", bachpan_command))
-    application.add_handler(CommandHandler("yojana", yojana_command))  # ✅ NEW
-
+    application.add_handler(CommandHandler("yojana", yojana_command))
+    
     application.add_handler(MessageHandler(filters.VOICE, voice_handler))
     application.add_handler(MessageHandler(filters.PHOTO, photo_handler))  # ✅ NEW
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_chat_handler))
     application.add_handler(CallbackQueryHandler(button_callback))
     application.add_error_handler(error_handler)
+     # 🤖 AGENTIC-A HANDLERS — NEW!
+    if AGENTIC_AVAILABLE:
+        application.add_handler(CommandHandler("agentic", agentic_command))
+        application.add_handler(CommandHandler("video", video_command))
+        application.add_handler(CommandHandler("post", post_command))
+        logger.info("✅ Agentic-A handlers registered!")
 
     logger.info("Bot application setup complete!")
     return application
@@ -2116,7 +2155,153 @@ async def payment_status(order_id: str):
         "status": "pending",
         "timestamp": datetime.now().isoformat()
     }
+# ═══════════════════════════════════════════════════════
+# 🤖 AGENTIC-A COMMAND HANDLERS
+# ═══════════════════════════════════════════════════════
 
+@error_handler_decorator
+@rate_limit_check
+async def agentic_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """🤖 /agentic — Master Agentic AI"""
+    if not AGENTIC_AVAILABLE:
+        await update.message.reply_text("❌ Agentic-A abhi available nahi hai!")
+        return
+    
+    args = context.args
+    if not args:
+        # Show menu
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🌾 Kisaan", callback_data="agentic_kisaan"),
+             InlineKeyboardButton("📚 Student", callback_data="agentic_student")],
+            [InlineKeyboardButton("💼 Business", callback_data="agentic_business"),
+             InlineKeyboardButton("💪 Health", callback_data="agentic_health")],
+            [InlineKeyboardButton("🙏 Spiritual", callback_data="agentic_spiritual"),
+             InlineKeyboardButton("🎬 Video", callback_data="agentic_video")],
+        ])
+        
+        await update.message.reply_text(
+            "🤖 *AGENTIC-A SYSTEM*\n\n"
+            "Main apne aap content banaunga!\n\n"
+            "Usage: `/agentic <goal>`\n"
+            "Example: `/agentic kisaano ke liye content banao`",
+            parse_mode=ParseMode.MARKDOWN,
+            reply_markup=keyboard
+        )
+        return
+    
+    # Run agentic
+    prompt = " ".join(args)
+    msg = await update.message.reply_text(f"🤖 Working: {prompt[:50]}...")
+    
+    try:
+        result = await agentic.run(prompt)
+        content = result.get('content', 'No content generated')
+        
+        # Send content
+        await msg.edit_text(
+            f"✅ *Done!*\n\n"
+            f"🎯 Goal: `{result.get('goal', 'N/A')[:50]}`\n"
+            f"📂 Category: *{result.get('category', 'general').title()}*\n\n"
+            f"{content[:800]}",
+            parse_mode=ParseMode.MARKDOWN
+        )
+        
+        # If video was generated
+        for action in result.get('actions', []):
+            if action['type'] == 'video' and action['result'].get('success'):
+                await update.message.reply_text(
+                    f"🎬 Video bhi ban gaya!\n"
+                    f"Source: {action['result'].get('source')}"
+                )
+                
+    except Exception as e:
+        logger.error(f"Agentic error: {e}")
+        await msg.edit_text(f"❌ Error: {str(e)[:100]}")
+
+
+@error_handler_decorator
+@rate_limit_check
+async def video_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """🎬 /video — Generate video"""
+    if not AGENTIC_AVAILABLE:
+        await update.message.reply_text("❌ Video system nahi hai!")
+        return
+    
+    args = context.args
+    if not args:
+        await update.message.reply_text(
+            "🎬 *Video Generator*\n\n"
+            "Usage: `/video <prompt>`\n"
+            "Example: `/video kisaan ki zindagi`",
+            parse_mode=ParseMode.MARKDOWN
+        )
+        return
+    
+    prompt = " ".join(args)
+    msg = await update.message.reply_text(f"🎬 Generating: {prompt[:50]}...")
+    
+    try:
+        result = await agentic.generate_video(prompt)
+        if result.get("success"):
+            await msg.edit_text(
+                f"✅ *Video Generated!*\n\n"
+                f"🎬 Source: `{result.get('source')}`\n"
+                f"📝 Prompt: `{prompt[:100]}`"
+            )
+            # If URL available, send video
+            if result.get("url"):
+                await update.message.reply_video(video=result["url"])
+        else:
+            await msg.edit_text(
+                f"❌ *Failed*\n\n"
+                f"Error: `{result.get('error')}`\n\n"
+                f"💡 Video gen modules check karo!"
+            )
+    except Exception as e:
+        logger.error(f"Video error: {e}")
+        await msg.edit_text(f"❌ Error: {str(e)[:100]}")
+
+
+@error_handler_decorator
+@rate_limit_check
+async def post_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """📱 /post — Post to social media"""
+    if not AGENTIC_AVAILABLE:
+        await update.message.reply_text("❌ Auto-poster nahi hai!")
+        return
+    
+    args = context.args
+    if not args:
+        await update.message.reply_text(
+            "📱 *Social Media Poster*\n\n"
+            "Usage: `/post <message>`\n"
+            "Example: `/post Kisaano ke liye nayi scheme!`",
+            parse_mode=ParseMode.MARKDOWN
+        )
+        return
+    
+    message = " ".join(args)
+    msg = await update.message.reply_text(f"📱 Posting: {message[:50]}...")
+    
+    try:
+        result = await agentic.post_to_all(message)
+        successful = result.get("successful", 0)
+        total = result.get("total", 0)
+        
+        # Build platform status
+        platform_status = ""
+        for plat, res in result.get('results', {}).items():
+            icon = "✅" if res.get('success') else "❌"
+            platform_status += f"{icon} {plat.title()}\n"
+        
+        await msg.edit_text(
+            f"✅ *Posted!*\n\n"
+            f"📊 {successful}/{total} platforms\n\n"
+            f"{platform_status}"
+        )
+    except Exception as e:
+        logger.error(f"Post error: {e}")
+        await msg.edit_text(f"❌ Error: {str(e)[:100]}")
 # ═══════════════════════════════════════════════════════
 # STARTUP/SHUTDOWN EVENTS
 # ═══════════════════════════════════════════════════════
