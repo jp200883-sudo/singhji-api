@@ -72,6 +72,7 @@ INDIA = {
         ]
     }
 }
+INDIA_TITLE = "🇮🇳 India"
 
 # ============================================================
 # 🌏 ASIA-PACIFIC
@@ -638,10 +639,9 @@ NRI = {
 }
 
 # ============================================================
-# 🏦 ALL REGIONS COMBINED
+# 🏦 ALL REGIONS COMBINED (india yahan nahi — usko alag handle karte hain)
 # ============================================================
 ALL_REGIONS = {
-    "india": INDIA,
     **ASIA_PACIFIC,
     **EUROPE,
     **AMERICAS,
@@ -659,50 +659,58 @@ async def handler(request: Request):
         bank = params.get("bank", "").strip().lower()
         country = params.get("country", "").strip().lower()
         region = params.get("region", "").strip().lower()
-        
-        # 🇮🇳 INDIA QUERIES
+
+        # 🇮🇳 INDIA — query se (categories) ya country=india se, dono se ab sahi kaam karta hai
         if query in INDIA:
             data = INDIA[query]
             if bank and query in ["balance_check", "customer_care"]:
-                if bank in data:
-                    return JSONResponse(content={
-                        "success": True,
-                        "country": "🇮🇳 India",
-                        "bank": bank.upper(),
-                        "data": data[bank]
+                if bank not in data:
+                    return JSONResponse(status_code=404, content={
+                        "success": False, "error": f"Bank '{bank}' not found under {query}"
                     })
+                return JSONResponse(content={
+                    "success": True, "country": INDIA_TITLE,
+                    "bank": bank.upper(), "data": data[bank]
+                })
+            return JSONResponse(content={"success": True, "country": INDIA_TITLE, "data": data})
+
+        if country == "india":
             return JSONResponse(content={
-                "success": True,
-                "country": "🇮🇳 India",
-                "data": data
+                "success": True, "country": INDIA_TITLE,
+                "categories": list(INDIA.keys()),
+                "data": INDIA,
+                "usage": "/api/banking?query=balance_check&bank=sbi"
             })
-        
-        # 🌍 COUNTRY SEARCH
+
+        # 🌍 COUNTRY SEARCH (baaki duniya)
         if country in ALL_REGIONS:
             data = ALL_REGIONS[country]
-            if bank and "banks" in data:
-                if bank in data["banks"]:
-                    return JSONResponse(content={
-                        "success": True,
-                        "country": data["title"],
-                        "currency": data.get("currency", ""),
-                        "bank": bank.upper(),
-                        "data": data["banks"][bank]
+            if bank:
+                if "banks" not in data or bank not in data["banks"]:
+                    return JSONResponse(status_code=404, content={
+                        "success": False, "error": f"Bank '{bank}' not found in {data['title']}"
                     })
+                return JSONResponse(content={
+                    "success": True, "country": data["title"],
+                    "currency": data.get("currency", ""),
+                    "bank": bank.upper(), "data": data["banks"][bank]
+                })
             return JSONResponse(content={
-                "success": True,
-                "country": data["title"],
-                "currency": data.get("currency", ""),
-                "data": data
+                "success": True, "country": data["title"],
+                "currency": data.get("currency", ""), "data": data
             })
-        
+
+        # Country diya gaya par kahin nahi mila
+        if country:
+            return JSONResponse(status_code=404, content={
+                "success": False, "error": f"Country '{country}' not found",
+                "hint": "/api/banking?query=countries se poori list dekhein"
+            })
+
         # 🌐 NRI
-        if country == "nri":
-            return JSONResponse(content={
-                "success": True,
-                "data": NRI
-            })
-        
+        if query == "nri":
+            return JSONResponse(content={"success": True, "data": NRI})
+
         # 🌍 REGION LIST
         if query == "regions":
             return JSONResponse(content={
@@ -715,30 +723,31 @@ async def handler(request: Request):
                     "middle_east_africa": list(MEA.keys()),
                     "oceania": list(OCEANIA.keys())
                 },
-                "total_countries": len(ALL_REGIONS),
+                "total_countries": len(ALL_REGIONS) + 1,
                 "usage": "/api/banking?country=usa&bank=chase"
             })
-        
+
         # 🌐 ALL COUNTRIES
         if query == "countries":
             return JSONResponse(content={
                 "success": True,
                 "message": "🌍 All Countries",
                 "india_queries": list(INDIA.keys()),
-                "world_countries": list(ALL_REGIONS.keys()),
-                "total": len(ALL_REGIONS),
+                "world_countries": ["india"] + list(ALL_REGIONS.keys()),
+                "total": len(ALL_REGIONS) + 1,
                 "usage": "/api/banking?country=usa&bank=chase"
             })
-        
+
         # DEFAULT
         return JSONResponse(content={
             "success": True,
             "message": "🦁 Singh Ji AI - World Banking",
-            "total_countries": len(ALL_REGIONS),
+            "total_countries": len(ALL_REGIONS) + 1,
             "total_banks": sum(len(v.get("banks", {})) for v in ALL_REGIONS.values()),
             "regions": ["india", "asia_pacific", "europe", "americas", "middle_east_africa", "oceania"],
             "examples": [
                 "/api/banking?query=balance_check&bank=sbi",
+                "/api/banking?country=india",
                 "/api/banking?country=usa&bank=chase",
                 "/api/banking?country=china&bank=icbc",
                 "/api/banking?country=uk&bank=barclays",
@@ -747,14 +756,12 @@ async def handler(request: Request):
                 "/api/banking?country=south_africa&bank=absa",
                 "/api/banking?country=brazil&bank=nubank",
                 "/api/banking?country=japan&bank=mufg",
-                "/api/banking?country=nri",
+                "/api/banking?query=nri",
                 "/api/banking?query=regions",
                 "/api/banking?query=countries"
             ]
         })
-        
+
     except Exception as e:
         logger.error(f"Banking error: {e}")
-        return JSONResponse(status_code=500, content={
-            "success": False, "error": str(e)
-        })
+        return JSONResponse(status_code=500, content={"success": False, "error": str(e)})
