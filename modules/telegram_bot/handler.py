@@ -46,37 +46,7 @@ class Config:
         self.MEMORY_TTL = int(os.getenv("MEMORY_TTL", "86400"))
 
 config = Config()
-# ═══════════════════════════════════════════════════════
-# 🤖 AGENTIC-A IMPORTS
-# ═══════════════════════════════════════════════════════
 
-import sys
-import os
-
-# Agentic-A path add karo
-agentic_path = os.path.join(os.path.dirname(__file__), '..', 'agentic_a')
-if agentic_path not in sys.path:
-    sys.path.insert(0, agentic_path)
-
-# Video gen path
-video_gen_path = os.path.join(os.path.dirname(__file__), '..', 'video_gen')
-if video_gen_path not in sys.path:
-    sys.path.insert(0, video_gen_path)
-
-# OAuth path
-oauth_path = os.path.join(os.path.dirname(__file__), '..', 'oauth_connector')
-if oauth_path not in sys.path:
-    sys.path.insert(0, oauth_path)
-
-# Try import
-try:
-    from agentic_brain import AgenticBrain
-    agentic = AgenticBrain()
-    AGENTIC_AVAILABLE = True
-    logger.info("✅ Agentic-A loaded successfully!")
-except ImportError as e:
-    logger.warning(f"⚠️ Agentic-A not available: {e}")
-    AGENTIC_AVAILABLE = False
 # ═══════════════════════════════════════════════════════
 # LOGGING
 # ═══════════════════════════════════════════════════════
@@ -86,6 +56,33 @@ logging.basicConfig(
     level=logging.INFO
 )
 logger = logging.getLogger(__name__)
+# ═══════════════════════════════════════════════════════
+# 🤖 AGENTIC-A IMPORTS
+# ═══════════════════════════════════════════════════════
+
+import sys
+import os
+
+agentic_path = os.path.join(os.path.dirname(__file__), '..', 'agentic_a')
+if agentic_path not in sys.path:
+    sys.path.insert(0, agentic_path)
+
+video_gen_path = os.path.join(os.path.dirname(__file__), '..', 'video_gen')
+if video_gen_path not in sys.path:
+    sys.path.insert(0, video_gen_path)
+
+oauth_path = os.path.join(os.path.dirname(__file__), '..', 'oauth_connector')
+if oauth_path not in sys.path:
+    sys.path.insert(0, oauth_path)
+
+try:
+    from agentic_brain import AgenticBrain
+    agentic = AgenticBrain()
+    AGENTIC_AVAILABLE = True
+    logger.info("Agentic-A loaded successfully!")
+except ImportError as e:
+    logger.warning(f"Agentic-A not available: {e}")
+    AGENTIC_AVAILABLE = False
 
 # ═══════════════════════════════════════════════════════
 # CONVERSATION STATE MANAGER
