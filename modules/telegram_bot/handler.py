@@ -1841,7 +1841,22 @@ async def setup_application() -> Application:
 
     application = Application.builder().token(config.TELEGRAM_BOT_TOKEN).build()
 
-      commands = [
+     async def setup_application() -> Application:
+    global application
+
+    if application is not None:
+        return application
+
+    if not config.TELEGRAM_BOT_TOKEN:
+        logger.error("TELEGRAM_BOT_TOKEN not set!")
+        raise ValueError("TELEGRAM_BOT_TOKEN is required")
+
+    application = Application.builder().token(config.TELEGRAM_BOT_TOKEN).build()
+
+    # ═══════════════════════════════════════════════════════
+    # COMMANDS LIST
+    # ═══════════════════════════════════════════════════════
+    commands = [
         BotCommand("start", "Start bot"),
         BotCommand("help", "Help & guide"),
         BotCommand("modules", "All 95 modules"),
@@ -1852,14 +1867,49 @@ async def setup_application() -> Application:
         BotCommand("settings", "Settings"),
         BotCommand("about", "About Singh Ji AI"),
         BotCommand("stats", "Usage statistics"),
-        BotCommand("bachpan", "Child safety helplines 🛡️"),
-        BotCommand("yojana", "Sarkari yojana check 🏛️"),
-        BotCommand("agentic", "🤖 Agentic AI — auto content"),      
-        BotCommand("video", "🎬 Generate video"),                     
-        BotCommand("post", "📱 Post to social media"),                
+        BotCommand("bachpan", "Child safety helplines"),
+        BotCommand("yojana", "Sarkari yojana check"),
+        BotCommand("agentic", "Agentic AI auto content"),
+        BotCommand("video", "Generate video"),
+        BotCommand("post", "Post to social media"),
     ]
     await application.bot.set_my_commands(commands)
 
+    # ═══════════════════════════════════════════════════════
+    # COMMAND HANDLERS
+    # ═══════════════════════════════════════════════════════
+    application.add_handler(CommandHandler("start", start_command))
+    application.add_handler(CommandHandler("help", help_command))
+    application.add_handler(CommandHandler("modules", modules_command))
+    application.add_handler(CommandHandler("use", use_module_command))
+    application.add_handler(CommandHandler("remember", remember_command))
+    application.add_handler(CommandHandler("recall", recall_command))
+    application.add_handler(CommandHandler("status", status_command))
+    application.add_handler(CommandHandler("settings", settings_command))
+    application.add_handler(CommandHandler("about", about_command))
+    application.add_handler(CommandHandler("bachpan", bachpan_command))
+    application.add_handler(CommandHandler("yojana", yojana_command))
+
+    # AGENTIC-A HANDLERS
+    if AGENTIC_AVAILABLE:
+        application.add_handler(CommandHandler("agentic", agentic_command))
+        application.add_handler(CommandHandler("video", video_command))
+        application.add_handler(CommandHandler("post", post_command))
+        logger.info("Agentic-A handlers registered!")
+    else:
+        logger.warning("Agentic-A handlers skipped")
+
+    # MESSAGE HANDLERS
+    application.add_handler(MessageHandler(filters.VOICE, voice_handler))
+    application.add_handler(MessageHandler(filters.PHOTO, photo_handler))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_chat_handler))
+
+    # CALLBACK & ERROR HANDLERS
+    application.add_handler(CallbackQueryHandler(button_callback))
+    application.add_error_handler(error_handler)
+
+    logger.info("Bot application setup complete!")
+    return application
     # ✅ ALL HANDLERS REGISTERED HERE — INSIDE setup_application()
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("help", help_command))
