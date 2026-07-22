@@ -387,6 +387,8 @@ app.include_router(kisaan_router, prefix="/modules/kisaan_doctor")
 from modules.sarkari_yojana.handler import router as yojana_router
 app.include_router(yojana_router, prefix="/modules/sarkari_yojana")
 app.include_router(telegram_router, prefix="/modules/telegram_bot")
+from modules.banking.handler import handler as banking_handler
+app.add_api_route("/api/banking", banking_handler, methods=["GET"])
 
 @app.middleware("http")
 async def rate_limit_middleware(request: Request, call_next):
