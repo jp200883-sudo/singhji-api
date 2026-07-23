@@ -15,7 +15,7 @@ import logging
 import random
 import cv2
 import numpy as np
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass, asdict, field
 from enum import Enum
@@ -306,7 +306,7 @@ _जहाँ सिंह जी की नज़र, वहाँ चोर �
             priority=self._get_priority("vehicle", {"sub_type": vehicle_type}),
             confidence=confidence,
             camera_id=camera_id,
-            timestamp=datetime.utcnow().isoformat(),
+            timestamp=datetime.now(timezone.utc).isoformat(),
             details={
                 "vehicle_type": vehicle_type,
                 "color": color,
@@ -342,7 +342,7 @@ _जहाँ सिंह जी की नज़र, वहाँ चोर �
             priority=self._get_priority("human", {"sub_type": detected_behavior}),
             confidence=confidence,
             camera_id=camera_id,
-            timestamp=datetime.utcnow().isoformat(),
+            timestamp=datetime.now(timezone.utc).isoformat(),
             details={
                 "person_count": count,
                 "behavior": detected_behavior,
@@ -369,7 +369,7 @@ _जहाँ सिंह जी की नज़र, वहाँ चोर �
             priority=self._get_priority("sound", {"sub_type": sound_type}),
             confidence=confidence,
             camera_id=camera_id,
-            timestamp=datetime.utcnow().isoformat(),
+            timestamp=datetime.now(timezone.utc).isoformat(),
             details={
                 "sound_type": sound_type,
                 "decibel": decibel or round(random.uniform(40, 120), 1),
@@ -402,7 +402,7 @@ _जहाँ सिंह जी की नज़र, वहाँ चोर �
             priority=AlertPriority.INFO.value,
             confidence=confidence,
             camera_id=camera_id,
-            timestamp=datetime.utcnow().isoformat(),
+            timestamp=datetime.now(timezone.utc).isoformat(),
             details={
                 "person_name": name,
                 "face_id": face_id,
@@ -432,7 +432,7 @@ _जहाँ सिंह जी की नज़र, वहाँ चोर �
             priority=AlertPriority.WARNING.value if not whitelisted else AlertPriority.INFO.value,
             confidence=confidence,
             camera_id=camera_id,
-            timestamp=datetime.utcnow().isoformat(),
+            timestamp=datetime.now(timezone.utc).isoformat(),
             details={
                 "plate_number": detected_plate,
                 "message": f"Plate: {detected_plate} at {location}"
@@ -460,7 +460,7 @@ _जहाँ सिंह जी की नज़र, वहाँ चोर �
             priority=AlertPriority.CRITICAL.value,
             confidence=confidence,
             camera_id=camera_id,
-            timestamp=datetime.utcnow().isoformat(),
+            timestamp=datetime.now(timezone.utc).isoformat(),
             details={
                 "fire_type": detected_type,
                 "message": f"🚨 {detected_type.upper()} at {location}! IMMEDIATE ACTION REQUIRED!"
@@ -489,7 +489,7 @@ _जहाँ सिंह जी की नज़र, वहाँ चोर �
             priority=self._get_priority("crowd", {"sub_type": density}),
             confidence=confidence,
             camera_id=camera_id,
-            timestamp=datetime.utcnow().isoformat(),
+            timestamp=datetime.now(timezone.utc).isoformat(),
             details={
                 "person_count": count,
                 "density_level": density,
@@ -517,7 +517,7 @@ _जहाँ सिंह जी की नज़र, वहाँ चोर �
             priority=self._get_priority("object", {"sub_type": detected_obj}),
             confidence=confidence,
             camera_id=camera_id,
-            timestamp=datetime.utcnow().isoformat(),
+            timestamp=datetime.now(timezone.utc).isoformat(),
             details={
                 "object_type": detected_obj,
                 "message": f"⚠️ {detected_obj.upper()} at {location}!"
@@ -549,7 +549,7 @@ _जहाँ सिंह जी की नज़र, वहाँ चोर �
             priority=self._get_priority("behavior", {"sub_type": detected_behavior}),
             confidence=confidence,
             camera_id=camera_id,
-            timestamp=datetime.utcnow().isoformat(),
+            timestamp=datetime.now(timezone.utc).isoformat(),
             details={
                 "behavior_type": detected_behavior,
                 "person_id": person_id,
@@ -592,7 +592,7 @@ _जहाँ सिंह जी की नज़र, वहाँ चोर �
             stream_url=stream_url,
             username=username,
             password=password,
-            registered_at=datetime.utcnow().isoformat(),
+            registered_at=datetime.now(timezone.utc).isoformat(),
             status="online"
         )
 
@@ -614,7 +614,7 @@ _जहाँ सिंह जी की नज़र, वहाँ चोर �
             "online": is_online,
             "fps": cam.fps,
             "resolution": cam.resolution,
-            "last_frame": datetime.utcnow().isoformat(),
+            "last_frame": datetime.now(timezone.utc).isoformat(),
             "uptime_minutes": random.randint(10, 1440),
             "stream_url": cam.stream_url
         }
@@ -631,7 +631,7 @@ _जहाँ सिंह जी की नज़र, वहाँ चोर �
             face_id=face_id,
             owner=owner,
             type=vehicle_type,
-            added_at=datetime.utcnow().isoformat()
+            added_at=datetime.now(timezone.utc).isoformat()
         )
 
         self.whitelist_db.append(entry)
@@ -677,7 +677,7 @@ _जहाँ सिंह जी की नज़र, वहाँ चोर �
             "camera_id": camera_id,
             "location": location,
             "detections": results,
-            "processed_at": datetime.utcnow().isoformat()
+            "processed_at": datetime.now(timezone.utc).isoformat()
         }
 
     # ============ ALERT MANAGEMENT ============
