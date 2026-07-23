@@ -433,8 +433,9 @@ async def health():
     return {"status": "ok", "service": "Singh Ji AI v8.0 HYBRID"}
 
 @app.get("/ping")
+@app.get("/api/ping")
 async def ping():
-    """Railway health check endpoint"""
+    """Health check endpoint - works for both /ping and /api/ping"""
     return {
         "status": "pong",
         "timestamp": datetime.now().isoformat(),
@@ -442,6 +443,20 @@ async def ping():
         "version": "8.0.0-hybrid"
     }
 
+@app.get("/api/status")
+async def status():
+    active = [n for n, i in MODULES.items() if i["active"]]
+    inactive = [{"name": n, "needs_key": i["needs_key"]} for n, i in MODULES.items() if not i["active"]]
+    return {
+        "name": "Singh Ji AI Ultra v8.0",
+        "total_modules": len(MODULES),
+        "active_count": len(active),
+        "active_modules": active,
+        "inactive_modules": inactive,
+        "agents": SMART_SWARM.get_status(),
+        "apis": AVAILABLE_KEYS,
+        "timestamp": datetime.now().isoformat()
+    }
 @app.get("/api/status")
 async def status():
     active = [n for n, i in MODULES.items() if i["active"]]
