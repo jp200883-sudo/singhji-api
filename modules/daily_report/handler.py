@@ -6,18 +6,28 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 async def handler(request: Request):
     try:
         method = request.method
         if method == "GET":
             params = dict(request.query_params)
             date = params.get('date', datetime.now().strftime('%Y-%m-%d'))
-            report_type = params.get('type', 'full').strip()
+            report_type = params.get('type', 'full').strip().lower()
         else:
-            body = await request.json()
+            try:
+                body = await request.json()
+            except Exception:
+                body = {}
             date = body.get('date', datetime.now().strftime('%Y-%m-%d'))
-            report_type = body.get('type', 'full').strip()
-        
+            report_type = body.get('type', 'full').strip().lower()
+
+        # date format galat ho to aaj ki date use karo
+        try:
+            datetime.strptime(date, '%Y-%m-%d')
+        except ValueError:
+            date = datetime.now().strftime('%Y-%m-%d')
+
         report = {
             "date": date,
             "generated_at": datetime.now().isoformat(),
@@ -38,30 +48,30 @@ async def handler(request: Request):
                 "active_schemes": 10
             },
             "system_health": {
-                "status": "🦁 LIVE",
+                "status": "LIVE",
                 "uptime": "24+ hours",
-                "modules_active": 25
+                "modules_active": 41
             }
         }
-        
+
         if report_type == 'brief':
             return JSONResponse(content={
                 "success": True,
                 "error": None,
                 "data": {
                     "date": date,
-                    "status": "🦁 LIVE",
-                    "modules": 25,
+                    "status": "LIVE",
+                    "modules": 41,
                     "message": "Full report available with ?type=full"
                 }
             })
-        
+
         return JSONResponse(content={
             "success": True,
             "error": None,
             "data": report
         })
-        
+
     except Exception as e:
         logger.error(f"Daily report crash: {e}")
         return JSONResponse(status_code=500, content={
