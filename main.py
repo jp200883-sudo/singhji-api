@@ -311,6 +311,7 @@ MODULES = {
     "aavishkar": {"needs_key": "GROQ", "active": AVAILABLE_KEYS["GROQ"] or AVAILABLE_KEYS["GEMINI"]},
     "bhashini": {"needs_key": "BHASHINI", "active": AVAILABLE_KEYS["BHASHINI"]},
     "whisper": {"needs_key": None, "active": True},
+    "miniprogram": {"needs_key": None, "active": True},        ← यह लाइन जोड़नी है
 }
 
 _rate_lock = threading.Lock()
