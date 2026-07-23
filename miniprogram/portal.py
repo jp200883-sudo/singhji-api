@@ -1,4 +1,4 @@
-cat > /app/miniprogram/portal.py << 'EOF'
+
 """
 Singh Ji AI Ultra v8.0 — Mini-Program Portal API
 Developer: Singh Ji
