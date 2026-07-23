@@ -1,18 +1,23 @@
-
 """
 Singh Ji AI Ultra v8.0 — Mini-Program Auth Module
 Developer: Singh Ji
 Version: 1.0.0
 """
 
+import os
 import jwt
 import hashlib
 import uuid
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 
-# JWT Config
-SECRET_KEY = "singhji-ultra-secret-key-v8"
+# JWT Config — hardcoded fallback nahi, sirf env variable se
+SECRET_KEY = os.getenv("JWT_SECRET_KEY")
+if not SECRET_KEY:
+    raise RuntimeError(
+        "JWT_SECRET_KEY env variable set nahi hai! "
+        "Railway par ek strong random string set karo, warna auth insecure rahega."
+    )
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 1 din
 
@@ -44,46 +49,87 @@ class AuthManager:
 
 class MiniAuth:
     """Mini-Program authentication"""
-    
+
     @staticmethod
     async def authenticate(email: str, password: str) -> Optional[Dict]:
-        # Supabase ya local DB se check karo
-        # Abhi demo ke liye simple check
+        """Supabase se developer record nikalkar password_hash match karo"""
+        from .storage import storage
+
+        record = storage.get_record("miniprogram_developers", "email", email)
+        if not record:
+            return None
+
+        password_hash = AuthManager.hash_password(password)
+        if not hmac_compare(record.get("password_hash", ""), password_hash):
+            return None
+
         return {
-            "id": str(uuid.uuid4()),
-            "email": email,
-            "name": "Developer",
+            "id": record.get("id"),
+            "email": record.get("email"),
+            "name": record.get("full_name", "Developer"),
             "role": "developer"
         }
 
 
+def hmac_compare(a: str, b: str) -> bool:
+    """Constant-time string comparison (timing-attack se bachne ke liye)"""
+    import hmac as _hmac
+    return _hmac.compare_digest(a or "", b or "")
+
+
 class DeveloperAuth:
     """Developer authentication helper"""
-    
+
     @staticmethod
     async def register(email: str, password: str, name: str = "", supabase=None):
-        """Register new developer"""
+        """Register new developer — Supabase mein save karo"""
+        from .storage import storage
+
+        existing = storage.get_record("miniprogram_developers", "email", email)
+        if existing:
+            return {
+                "status": "error",
+                "message": "Ye email pehle se registered hai!"
+            }
+
         dev_id = str(uuid.uuid4())
+        record = storage.insert_record("miniprogram_developers", {
+            "id": dev_id,
+            "email": email,
+            "password_hash": AuthManager.hash_password(password),
+            "full_name": name or "Developer"
+        })
+
+        if not record:
+            return {
+                "status": "error",
+                "message": "Registration fail ho gaya, dobara try karo."
+            }
+
         return {
             "status": "success",
             "developer_id": dev_id,
             "email": email,
             "message": "Registration successful! Login karo."
         }
-    
+
     @staticmethod
     async def login(email: str, password: str):
-        """Login developer"""
+        """Login developer — password asli verify hota hai ab"""
+        developer = await MiniAuth.authenticate(email, password)
+        if not developer:
+            raise ValueError("Email ya password galat hai!")
+
         token = AuthManager.create_token({
-            "sub": str(uuid.uuid4()),
-            "email": email,
-            "role": "developer"
+            "sub": developer["id"],
+            "email": developer["email"],
+            "role": developer["role"]
         })
         return {
             "token": token,
             "developer": {
-                "email": email,
-                "name": "Developer"
+                "email": developer["email"],
+                "name": developer["name"]
             }
         }
     
@@ -110,4 +156,3 @@ async def get_current_developer(token: str = None):
         "email": payload.get("email"),
         "role": payload.get("role", "developer")
     }
-
