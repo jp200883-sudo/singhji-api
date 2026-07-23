@@ -409,6 +409,10 @@ async def rate_limit_middleware(request: Request, call_next):
         )
     return await call_next(request)
 
+# ==========================================
+# ✅ HEALTH CHECK ENDPOINTS
+# ==========================================
+
 @app.get("/")
 @app.head("/")
 async def root():
@@ -427,6 +431,16 @@ async def root():
 @app.get("/health")
 async def health():
     return {"status": "ok", "service": "Singh Ji AI v8.0 HYBRID"}
+
+@app.get("/ping")
+async def ping():
+    """Railway health check endpoint"""
+    return {
+        "status": "pong",
+        "timestamp": datetime.now().isoformat(),
+        "service": "Singh Ji AI Ultra v8.0",
+        "version": "8.0.0-hybrid"
+    }
 
 @app.get("/api/status")
 async def status():
