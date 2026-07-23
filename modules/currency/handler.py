@@ -23,11 +23,14 @@ CURRENCY_APIS = {
     "primary": "https://api.exchangerate-api.com/v4/latest/{base}",
     "fallback_1": "https://open.er-api.com/v6/latest/{base}",
     "fallback_2": "https://api.frankfurter.app/latest?from={base}&to={target}",
+    "fallback_3": "https://api.exchangerate.host/latest?base={base}&symbols={target}",
+    "fallback_4": "https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/{base}.json",
 }
 
 POPULAR_CURRENCIES = [
     "USD", "INR", "EUR", "GBP", "JPY", "AUD", "CAD", 
-    "CHF", "CNY", "SGD", "AED", "SAR", "BDT", "PKR", "LKR"
+    "CHF", "CNY", "SGD", "AED", "SAR", "BDT", "PKR", "LKR",
+    "NZD", "ZAR", "THB", "MYR", "KRW"
 ]
 
 # ==== डेटा क्लास ====
@@ -75,6 +78,25 @@ class SinghJiCurrency:
         }
         logger.info(f"💾 कैश सेव: {key}")
     
+    async def _log_to_supabase(self, data: Dict):
+        """सुपाबेस में लॉग करो"""
+        if not self.supabase:
+            return
+        
+        try:
+            self.supabase.table("currency_logs").insert({
+                "base": data.get("base"),
+                "target": data.get("target"),
+                "amount": data.get("amount"),
+                "rate": data.get("rate"),
+                "converted": data.get("converted"),
+                "source": data.get("source"),
+                "timestamp": datetime.now().isoformat()
+            }).execute()
+            logger.info("📝 Logged to Supabase")
+        except Exception as e:
+            logger.warning(f"Supabase log failed: {e}")
+    
     async def _call_api(self, url: str, source: str, base: str, target: str) -> Optional[Dict]:
         """एक API कॉल करो"""
         try:
@@ -88,12 +110,27 @@ class SinghJiCurrency:
             data = resp.json()
             
             # API के हिसाब से rate निकालो
-            if source == "primary" or source == "fallback_1":
+            if source in ["primary", "fallback_1"]:
                 rate = data.get("rates", {}).get(target)
+                date = data.get("date", datetime.now().strftime("%Y-%m-%d"))
             elif source == "fallback_2":
                 rate = data.get("rates", {}).get(target)
+                date = data.get("date", datetime.now().strftime("%Y-%m-%d"))
+            elif source == "fallback_3":
+                rate = data.get("rates", {}).get(target)
+                date = data.get("date", datetime.now().strftime("%Y-%m-%d"))
+            elif source == "fallback_4":
+                # Special: currency-api format
+                base_lower = base.lower()
+                if base_lower in data:
+                    rates = data[base_lower]
+                    rate = rates.get(target.lower())
+                    date = datetime.now().strftime("%Y-%m-%d")
+                else:
+                    rate = None
             else:
                 rate = None
+                date = datetime.now().strftime("%Y-%m-%d")
                 
             if not rate:
                 logger.warning(f"⚠️ {source} में {target} rate नहीं मिला")
@@ -101,7 +138,7 @@ class SinghJiCurrency:
                 
             return {
                 "rate": float(rate),
-                "date": data.get("date", data.get("time_last_update_utc", datetime.now().strftime("%Y-%m-%d"))),
+                "date": date,
                 "source": source
             }
             
@@ -119,23 +156,31 @@ class SinghJiCurrency:
         base = base.upper()
         target = target.upper()
         
+        # Input validation
+        if amount <= 0:
+            raise ValueError("Amount must be greater than 0")
+        
         # कैश चेक करो
         cache_key = f"{base}_{target}"
         cached = await self._get_from_cache(cache_key)
         if cached:
             rate = cached["rate"]
-            return CurrencyResponse(
+            converted = round(amount * rate, 2)
+            response = CurrencyResponse(
                 base=base, target=target, amount=amount,
-                rate=rate, converted=round(amount * rate, 2),
+                rate=rate, converted=converted,
                 date=cached["date"], source=f"{cached['source']} (cache)",
                 timestamp=datetime.now().isoformat()
             )
+            return response
         
         # API कॉल करो — fallback chain
         apis = [
             ("primary", CURRENCY_APIS["primary"].format(base=base)),
             ("fallback_1", CURRENCY_APIS["fallback_1"].format(base=base)),
             ("fallback_2", CURRENCY_APIS["fallback_2"].format(base=base, target=target)),
+            ("fallback_3", CURRENCY_APIS["fallback_3"].format(base=base, target=target)),
+            ("fallback_4", CURRENCY_APIS["fallback_4"].format(base=base.lower())),
         ]
         
         result = None
@@ -153,16 +198,27 @@ class SinghJiCurrency:
         
         converted = round(amount * result["rate"], 2)
         
-        return CurrencyResponse(
+        response = CurrencyResponse(
             base=base, target=target, amount=amount,
             rate=result["rate"], converted=converted,
             date=result["date"], source=result["source"],
             timestamp=datetime.now().isoformat()
         )
+        
+        # ✅ Log to Supabase
+        await self._log_to_supabase({
+            "base": base, "target": target, "amount": amount,
+            "rate": result["rate"], "converted": converted,
+            "source": result["source"]
+        })
+        
+        return response
     
     async def get_all_rates(self, base: str = "USD") -> Dict[str, Any]:
         """सभी करेंसी रेट्स निकालो"""
         base = base.upper()
+        
+        # Try primary API first
         url = CURRENCY_APIS["primary"].format(base=base)
         
         try:
@@ -207,23 +263,46 @@ async def currency_convert(
     Example: /currency/convert?base=USD&target=INR&amount=100
     """
     try:
+        if amount <= 0:
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "success": False,
+                    "error": "Amount must be greater than 0",
+                    "data": None
+                }
+            )
+            
         result = await singhji_currency.convert(base, target, amount)
         
         return JSONResponse(content={
             "success": True,
             "error": None,
             "data": result.to_dict(),
-            "message": f"✅ {amount} {base.upper()} = {result.converted} {target.upper()}"
+            "message": f"✅ {amount} {base.upper()} = {result.converted} {target.upper()}",
+            "timestamp": datetime.now().isoformat()
         })
         
+    except httpx.TimeoutException:
+        return JSONResponse(
+            status_code=504,
+            content={
+                "success": False,
+                "error": "Currency API timeout - please try again",
+                "data": None
+            }
+        )
     except Exception as e:
         logger.error(f"💥 Currency convert fail: {e}")
-        return JSONResponse(status_code=500, content={
-            "success": False,
-            "error": str(e),
-            "data": None,
-            "message": "❌ करेंसी कनवर्जन फेल हुआ, बाद में कोशिश करो"
-        })
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "error": str(e),
+                "data": None,
+                "message": "❌ करेंसी कनवर्जन फेल हुआ, बाद में कोशिश करो"
+            }
+        )
 
 
 @router.get("/rates")
@@ -238,11 +317,14 @@ async def currency_rates(base: str = "USD"):
         return JSONResponse(content=result)
         
     except Exception as e:
-        return JSONResponse(status_code=500, content={
-            "success": False,
-            "error": str(e),
-            "data": None
-        })
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "error": str(e),
+                "data": None
+            }
+        )
 
 
 @router.get("/popular")
@@ -277,6 +359,31 @@ async def popular_conversions():
         "success": True,
         "data": results,
         "updated": datetime.now().strftime("%H:%M:%S")
+    })
+
+
+@router.get("/cache/clear")
+async def clear_cache():
+    """🧹 कैश क्लियर करो"""
+    singhji_currency.cache.clear()
+    return JSONResponse(content={
+        "success": True,
+        "message": "✅ कैश क्लियर हो गया",
+        "timestamp": datetime.now().isoformat()
+    })
+
+
+@router.get("/stats")
+async def currency_stats():
+    """📊 करेंसी मॉड्यूल स्टेट्स"""
+    return JSONResponse(content={
+        "module": "सिंह जी करेंसी v8.0",
+        "cache_size": len(singhji_currency.cache),
+        "cache_ttl": f"{singhji_currency.cache_ttl} seconds",
+        "apis_available": len(CURRENCY_APIS),
+        "popular_currencies": len(POPULAR_CURRENCIES),
+        "status": "🟢 Active",
+        "version": "8.0.0"
     })
 
 
