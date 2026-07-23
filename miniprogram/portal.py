@@ -1,4 +1,3 @@
-
 """
 Singh Ji AI Ultra v8.0 — Mini-Program Portal API
 Developer: Singh Ji
@@ -48,7 +47,10 @@ async def login_developer(
     password: str = Form(...)
 ):
     """🔑 Developer login karo"""
-    return await DeveloperAuth.login(email=email, password=password)
+    try:
+        return await DeveloperAuth.login(email=email, password=password)
+    except ValueError as e:
+        raise HTTPException(status_code=401, detail=str(e))
 
 
 @router.post("/auth/refresh", response_model=None)
@@ -216,6 +218,8 @@ async def app_analytics(app_id: str, token: str):
 @router.get("/admin/pending-apps", response_model=None)
 async def pending_apps(admin_token: str):
     """🔒 Admin — pending apps dikhao"""
+    if not MiniProgramConfig.is_admin_ready():
+        raise HTTPException(status_code=503, detail="Admin panel disabled — ADMIN_SECRET set nahi hai!")
     if admin_token != MiniProgramConfig.ADMIN_SECRET:
         raise HTTPException(status_code=403, detail="Admin access denied!")
     
@@ -226,6 +230,8 @@ async def pending_apps(admin_token: str):
 @router.post("/admin/approve/{app_id}", response_model=None)
 async def approve_app(app_id: str, admin_token: str):
     """✅ Admin — app approve karo"""
+    if not MiniProgramConfig.is_admin_ready():
+        raise HTTPException(status_code=503, detail="Admin panel disabled — ADMIN_SECRET set nahi hai!")
     if admin_token != MiniProgramConfig.ADMIN_SECRET:
         raise HTTPException(status_code=403, detail="Admin access denied!")
     
@@ -236,9 +242,10 @@ async def approve_app(app_id: str, admin_token: str):
 @router.post("/admin/reject/{app_id}", response_model=None)
 async def reject_app(app_id: str, admin_token: str, reason: Optional[str] = Form(None)):
     """❌ Admin — app reject karo"""
+    if not MiniProgramConfig.is_admin_ready():
+        raise HTTPException(status_code=503, detail="Admin panel disabled — ADMIN_SECRET set nahi hai!")
     if admin_token != MiniProgramConfig.ADMIN_SECRET:
         raise HTTPException(status_code=403, detail="Admin access denied!")
     
     await storage.update_app_status(app_id, "rejected", reason)
     return {"status": "success", "app_id": app_id, "reason": reason}
-
