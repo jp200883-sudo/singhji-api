@@ -311,7 +311,11 @@ MODULES = {
     "aavishkar": {"needs_key": "GROQ", "active": AVAILABLE_KEYS["GROQ"] or AVAILABLE_KEYS["GEMINI"]},
     "bhashini": {"needs_key": "BHASHINI", "active": AVAILABLE_KEYS["BHASHINI"]},
     "whisper": {"needs_key": None, "active": True},
-    "miniprogram": {"needs_key": None, "active": True},       
+    "miniprogram": {"needs_key": None, "active": True},
+    "currency": {"needs_key": None, "active": True},  # ✅ NEW - No API key needed (uses free APIs)
+    "kisaan_doctor": {"needs_key": None, "active": True},  # ✅ NEW - Plant disease diagnosis
+    "sarkari_yojana": {"needs_key": None, "active": True},  # ✅ NEW - Govt schemes
+    "banking": {"needs_key": None, "active": True},  # ✅ NEW - Banking info
 }
 
 _rate_lock = threading.Lock()
