@@ -8,14 +8,15 @@ from datetime import timedelta
 class MiniProgramConfig:
     """Mini-Program के लिए सब config"""
 
-    # 🔐 JWT Settings
-    JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "singhji-ultra-v8-secret-key-2026")
+    # 🔐 JWT Settings — hardcoded fallback nahi, sirf env variable se
+    JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
     JWT_ALGORITHM = "HS256"
     JWT_ACCESS_TOKEN_EXPIRE = timedelta(hours=24)
     JWT_REFRESH_TOKEN_EXPIRE = timedelta(days=30)
 
-    # 🔒 Admin Access
-    ADMIN_SECRET = os.getenv("MINIPROGRAM_ADMIN_SECRET", "")
+    # 🔒 Admin Access — khali string default hatayi, warna admin_token=""
+    # bhi match ho jata jab env variable set na ho
+    ADMIN_SECRET = os.getenv("MINIPROGRAM_ADMIN_SECRET")
 
     # 👤 Developer Settings
     DEVELOPER_REGISTRATION_OPEN = True
@@ -58,3 +59,8 @@ class MiniProgramConfig:
     def is_storage_ready(cls):
         """Check karo Supabase ready hai ya nahi"""
         return bool(cls.SUPABASE_URL and cls.SUPABASE_KEY)
+
+    @classmethod
+    def is_admin_ready(cls):
+        """Check karo ADMIN_SECRET set hai ya nahi"""
+        return bool(cls.ADMIN_SECRET)
