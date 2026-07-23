@@ -241,4 +241,4 @@ async def reject_app(app_id: str, admin_token: str, reason: Optional[str] = Form
     
     await storage.update_app_status(app_id, "rejected", reason)
     return {"status": "success", "app_id": app_id, "reason": reason}
-EOF
+
