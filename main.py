@@ -23,6 +23,12 @@ from datetime import datetime, timedelta
 import httpx
 import logging
 from modules.telegram_bot.handler import router as telegram_router
+from modules.kisaan_doctor.handler import router as kisaan_router  
+from modules.sarkari_yojana.handler import router as yojana_router  
+from modules.banking.handler import handler as banking_handler  
+from modules.currency.handler import router as currency_router  
+from modules.aavishkar.handler import router as aavishkar_router  
+from miniprogram.portal import router as miniprogram_router  
 from collections import defaultdict, deque
 import threading
 
