@@ -390,7 +390,7 @@ app.include_router(yojana_router, prefix="/modules/sarkari_yojana")
 app.include_router(telegram_router, prefix="/modules/telegram_bot")
 from modules.banking.handler import handler as banking_handler
 app.add_api_route("/api/banking", banking_handler, methods=["GET"])
-from modules.miniprogram.portal import router as miniprogram_router
+from miniprogram.portal import router as miniprogram_router
 app.include_router(miniprogram_router, prefix="/api/v1/miniprogram")
 
 @app.middleware("http")
