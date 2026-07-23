@@ -1,7 +1,10 @@
 {
+  "build": {
+    "builder": "DOCKERFILE"
+  },
   "deploy": {
     "startCommand": "uvicorn main:app --host 0.0.0.0 --port $PORT",
-    "healthcheckPath": "/ping",   // ← यहाँ /ping है, /api/ping नहीं
+    "healthcheckPath": "/ping",
     "healthcheckTimeout": 300,
     "restartPolicyType": "ON_FAILURE"
   }
