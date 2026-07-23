@@ -318,10 +318,10 @@ MODULES = {
     "bhashini": {"needs_key": "BHASHINI", "active": AVAILABLE_KEYS["BHASHINI"]},
     "whisper": {"needs_key": None, "active": True},
     "miniprogram": {"needs_key": None, "active": True},
-    "currency": {"needs_key": None, "active": True},  # ✅ NEW - No API key needed (uses free APIs)
-    "kisaan_doctor": {"needs_key": None, "active": True},  # ✅ NEW - Plant disease diagnosis
-    "sarkari_yojana": {"needs_key": None, "active": True},  # ✅ NEW - Govt schemes
-    "banking": {"needs_key": None, "active": True},  # ✅ NEW - Banking info
+    "currency": {"needs_key": None, "active": True},
+    "kisaan_doctor": {"needs_key": None, "active": True},
+    "sarkari_yojana": {"needs_key": None, "active": True},
+    "banking": {"needs_key": None, "active": True},
 }
 
 _rate_lock = threading.Lock()
@@ -393,14 +393,16 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-from modules.kisaan_doctor.handler import router as kisaan_router
+
+# ==========================================
+# ROUTERS REGISTER
+# ==========================================
 app.include_router(kisaan_router, prefix="/modules/kisaan_doctor")
-from modules.sarkari_yojana.handler import router as yojana_router
 app.include_router(yojana_router, prefix="/modules/sarkari_yojana")
 app.include_router(telegram_router, prefix="/modules/telegram_bot")
-from modules.banking.handler import handler as banking_handler
+app.include_router(currency_router, prefix="/api")  # ✅ /api/currency/*
+app.include_router(aavishkar_router, prefix="/modules/aavishkar")  # ✅ /modules/aavishkar/*
 app.add_api_route("/api/banking", banking_handler, methods=["GET"])
-from miniprogram.portal import router as miniprogram_router
 app.include_router(miniprogram_router, prefix="/api/v1/miniprogram")
 
 @app.middleware("http")
@@ -453,20 +455,6 @@ async def ping():
         "version": "8.0.0-hybrid"
     }
 
-@app.get("/api/status")
-async def status():
-    active = [n for n, i in MODULES.items() if i["active"]]
-    inactive = [{"name": n, "needs_key": i["needs_key"]} for n, i in MODULES.items() if not i["active"]]
-    return {
-        "name": "Singh Ji AI Ultra v8.0",
-        "total_modules": len(MODULES),
-        "active_count": len(active),
-        "active_modules": active,
-        "inactive_modules": inactive,
-        "agents": SMART_SWARM.get_status(),
-        "apis": AVAILABLE_KEYS,
-        "timestamp": datetime.now().isoformat()
-    }
 @app.get("/api/status")
 async def status():
     active = [n for n, i in MODULES.items() if i["active"]]
