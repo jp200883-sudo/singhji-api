@@ -6,16 +6,20 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 async def handler(request: Request):
     try:
         method = request.method
         if method == "GET":
             params = dict(request.query_params)
-            action = params.get('action', 'status').strip()
+            action = params.get('action', 'status').strip().lower()
         else:
-            body = await request.json()
-            action = body.get('action', 'status').strip()
-        
+            try:
+                body = await request.json()
+            except Exception:
+                body = {}
+            action = str(body.get('action', 'status')).strip().lower()
+
         # News scheduler config
         scheduler = {
             "status": "active",
@@ -33,7 +37,7 @@ async def handler(request: Request):
                 "email": False
             }
         }
-        
+
         if action == 'schedule':
             return JSONResponse(content={
                 "success": True,
@@ -44,13 +48,13 @@ async def handler(request: Request):
                     "config": scheduler
                 }
             })
-        
+
         return JSONResponse(content={
             "success": True,
             "error": None,
             "data": scheduler
         })
-        
+
     except Exception as e:
         logger.error(f"News scheduler crash: {e}")
         return JSONResponse(status_code=500, content={
