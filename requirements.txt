@@ -135,3 +135,5 @@ python-dotenv==1.0.1
 
 # ─── WEBSOCKETS ───
 websockets==14.2
+APScheduler==3.10.4
+pytz==2024.1
