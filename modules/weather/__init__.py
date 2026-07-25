@@ -1,1 +1,8 @@
-# Singh Ji AI Ultra v7.0 - Weather
+"""
+🦁 SINGH JI AI ULTRA v8.0 — WEATHER MODULE
+Polished: Async, Cached, Retry, Rate-Limited, Superior
+"""
+
+from .handler import router, handler
+
+__all__ = ["router", "handler"]
