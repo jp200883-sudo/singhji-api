@@ -222,7 +222,7 @@ async def _memory_get(key, table="memory_store"):
 def _load_user_preferences_sync() -> Dict[int, Any]:
     """
     _memory_save() हर नए Telegram user को key=f"user_pref:{user_id}" के
-    साथ table "user_preferences" में सेव करता है। यह फ़ंक्शन वही रिकॉर्ड
+    साथ table "user_memory" में सेव करता है। यह फ़ंक्शन वही रिकॉर्ड
     वापस पढ़कर USER_PREFERENCES (RAM dict) में भर देता है, ताकि restart के
     बाद भी broadcast/scheduler को पुराने सब्सक्राइबर दिखें।
     """
@@ -231,7 +231,7 @@ def _load_user_preferences_sync() -> Dict[int, Any]:
         logger.warning("[STARTUP] Supabase कनेक्ट नहीं है — subscriber लिस्ट सिर्फ़ नए messages से बनेगी")
         return loaded
     try:
-        resp = SUPABASE_CLIENT.table("user_preferences").select("*").execute()
+        resp = SUPABASE_CLIENT.table("user_memory").select("*").execute()
         for row in (resp.data or []):
             key = row.get("key", "")
             if not key.startswith("user_pref:"):
@@ -1411,7 +1411,7 @@ async def telegram_webhook(request: Request):
 
         if user_id not in USER_PREFERENCES:
             USER_PREFERENCES[user_id] = {"language": "hi", "location": None}
-            await _memory_save(f"user_pref:{user_id}", USER_PREFERENCES[user_id], table="user_preferences")
+            await _memory_save(f"user_pref:{user_id}", USER_PREFERENCES[user_id], table="user_memory")
 
         if _rate_check(f"tg_user:{user_id}", *RATE_LIMIT_TELEGRAM_USER):
             await _telegram_send_message(chat_id, "Thoda slow karo! 1 minute mein try karo.")
