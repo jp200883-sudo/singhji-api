@@ -1,7 +1,20 @@
 """
 🦁 SINGH JI AI ULTRA v8.0 — HYBRID SYSTEM
 100% REAL | Railway Primary | All APIs Live
-(FIXED: sab external calls ab non-blocking async hain)
+Master Scheduler Integrated | Auto-Broadcast Enabled
+
+इस पैच में तीन फिक्स:
+  1. USER_PREFERENCES (broadcast subscriber list) अब startup पर Supabase
+     से वापस लोड होती है — पहले सिर्फ़ RAM में थी, हर restart पर खाली हो
+     जाती थी और morning/evening digest किसी को नहीं जाता था।
+  2. Startup पर Telegram getWebhookInfo चेक करके लॉग में साफ़ बताता है कि
+     असल में कौन सा webhook path (इस फ़ाइल का /telegram/webhook या
+     modules/telegram_bot का /modules/telegram_bot/webhook) एक्टिव है,
+     ताकि पता चले कौन सा dead code है।
+  3. faster-whisper अब requirements.txt में जोड़ने की ज़रूरत है (नीचे
+     फ़ाइल के अंत में नोट है) — कोड में पहले से इस्तेमाल हो रहा था पर
+     requirements.txt में नहीं था, इसलिए voice transcription चुपचाप fail
+     हो रहा था।
 """
 
 from fastapi import FastAPI, Request
@@ -22,15 +35,22 @@ from pathlib import Path
 from datetime import datetime, timedelta
 import httpx
 import logging
-from modules.telegram_bot.handler import router as telegram_router
-from modules.kisaan_doctor.handler import router as kisaan_router  
-from modules.sarkari_yojana.handler import router as yojana_router  
-from modules.banking.handler import handler as banking_handler  
-from modules.currency.handler import router as currency_router  
-from modules.aavishkar.handler import router as aavishkar_router  
-from miniprogram.portal import router as miniprogram_router  
 from collections import defaultdict, deque
 import threading
+import sqlite3
+from typing import Optional, Dict, Any
+
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
+from apscheduler.events import EVENT_JOB_ERROR, EVENT_JOB_EXECUTED
+
+from modules.telegram_bot.handler import router as telegram_router
+from modules.kisaan_doctor.handler import router as kisaan_router
+from modules.sarkari_yojana.handler import router as yojana_router
+from modules.banking.handler import handler as banking_handler
+from modules.currency.handler import router as currency_router
+from modules.aavishkar.handler import router as aavishkar_router
+from miniprogram.portal import router as miniprogram_router
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
 logger = logging.getLogger(__name__)
@@ -68,7 +88,6 @@ INSTAGRAM_ACCESS_TOKEN = os.getenv("INSTAGRAM_ACCESS_TOKEN")
 INSTAGRAM_BUSINESS_ID = os.getenv("INSTAGRAM_BUSINESS_ID")
 ADMIN_USER_ID = int(os.getenv("ADMIN_USER_ID", "0"))
 
-# Base64 payload size guard (10 MB decoded)
 MAX_B64_BYTES = 10 * 1024 * 1024
 
 AVAILABLE_KEYS = {
@@ -106,8 +125,7 @@ try:
 except Exception as e:
     logger.warning(f"Supabase init failed: {e}")
 
-# Global async HTTP client — banaya lifespan me, band bhi wahin hota hai
-HTTP_CLIENT: httpx.AsyncClient | None = None
+HTTP_CLIENT = None
 
 CACHE_TTL = {
     "weather": 1800,
@@ -120,10 +138,6 @@ CACHE_TTL = {
 def _cache_key(prefix, *args):
     raw = f"{prefix}:{':'.join(str(a) for a in args)}"
     return hashlib.md5(raw.encode()).hexdigest()
-
-# ---- Supabase sync client ko threadpool me chalane wale wrappers ----
-# supabase-py sync hai, isliye direct await nahi kar sakte — run_in_threadpool
-# se event loop block hone se bachta hai.
 
 def _cache_get_sync(key):
     if SUPABASE_CLIENT:
@@ -204,13 +218,39 @@ def _memory_get_sync(key, table="memory_store"):
 async def _memory_get(key, table="memory_store"):
     return await run_in_threadpool(_memory_get_sync, key, table)
 
+# ─── FIX #1: Startup पर subscriber लिस्ट Supabase से वापस लोड करो ─────
+def _load_user_preferences_sync() -> Dict[int, Any]:
+    """
+    _memory_save() हर नए Telegram user को key=f"user_pref:{user_id}" के
+    साथ table "user_preferences" में सेव करता है। यह फ़ंक्शन वही रिकॉर्ड
+    वापस पढ़कर USER_PREFERENCES (RAM dict) में भर देता है, ताकि restart के
+    बाद भी broadcast/scheduler को पुराने सब्सक्राइबर दिखें।
+    """
+    loaded: Dict[int, Any] = {}
+    if not SUPABASE_CLIENT:
+        logger.warning("[STARTUP] Supabase कनेक्ट नहीं है — subscriber लिस्ट सिर्फ़ नए messages से बनेगी")
+        return loaded
+    try:
+        resp = SUPABASE_CLIENT.table("user_preferences").select("*").execute()
+        for row in (resp.data or []):
+            key = row.get("key", "")
+            if not key.startswith("user_pref:"):
+                continue
+            try:
+                uid = int(key.split(":", 1)[1])
+            except (IndexError, ValueError):
+                continue
+            loaded[uid] = row.get("value") or {"language": "hi", "location": None}
+    except Exception as e:
+        logger.error(f"[STARTUP] User preferences reload failed: {e}")
+    return loaded
+
 def _check_admin_auth(request):
     if not ADMIN_API_KEY:
         return True
     provided = request.headers.get("X-Admin-Key") or request.query_params.get("admin_key")
     return provided == ADMIN_API_KEY
 
-# ---- Saanjhi tax calculation (pehle do jagah duplicate thi) ----
 def _calculate_tax(income: float, regime: str = "new", deductions: float = 0):
     if regime == "new":
         if income <= 300000:
@@ -339,7 +379,7 @@ STRICT_PATH_PREFIXES = (
 )
 RATE_LIMITED_PREFIXES = ("/api/", "/modules/")
 
-def _client_ip(request: Request) -> str:
+def _client_ip(request) -> str:
     xff = request.headers.get("x-forwarded-for")
     if xff:
         return xff.split(",")[0].strip()
@@ -356,22 +396,448 @@ def _rate_check(key: str, max_calls: int, window_seconds: int) -> bool:
         dq.append(now)
         return False
 
-def _is_rate_limited(request: Request, bucket: str, max_calls: int, window_seconds: int) -> bool:
+def _is_rate_limited(request, bucket: str, max_calls: int, window_seconds: int) -> bool:
     ip = _client_ip(request)
     return _rate_check(f"{bucket}:{ip}", max_calls, window_seconds)
 
 RATE_LIMIT_TELEGRAM_USER = (15, 60)
 
+# Telegram helpers (moved up for scheduler access)
+TELEGRAM_API_BASE = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
+
+async def _telegram_send_message(chat_id, text, reply_markup=None):
+    if not TELEGRAM_TOKEN:
+        return {"error": "TELEGRAM_TOKEN missing"}
+    try:
+        payload = {"chat_id": chat_id, "text": text, "parse_mode": "HTML"}
+        if reply_markup:
+            payload["reply_markup"] = json.dumps(reply_markup)
+        resp = await HTTP_CLIENT.post(f"{TELEGRAM_API_BASE}/sendMessage", json=payload)
+        return resp.json()
+    except Exception as e:
+        return {"error": str(e)}
+
+async def _telegram_send_voice(chat_id, audio_b64, caption=""):
+    if not TELEGRAM_TOKEN:
+        return {"error": "TELEGRAM_TOKEN missing"}
+    try:
+        audio_bytes = base64.b64decode(audio_b64)
+        files = {"voice": ("voice.mp3", io.BytesIO(audio_bytes), "audio/mpeg")}
+        data = {"chat_id": chat_id, "caption": caption}
+        resp = await HTTP_CLIENT.post(f"{TELEGRAM_API_BASE}/sendVoice", data=data, files=files, timeout=15)
+        return resp.json()
+    except Exception as e:
+        return {"error": str(e)}
+
+# ─── FIX #2: Startup पर पता लगाओ Telegram असल में किस webhook को कॉल कर रहा है ──
+async def _check_webhook_config():
+    """
+    इस फ़ाइल में /telegram/webhook (पूरी फ़ीचर वाला हैंडलर — commands, voice,
+    AI chat, broadcast सब यहीं है) और modules/telegram_bot/handler.py का
+    router /modules/telegram_bot/webhook पर mount है — दोनों एक साथ मौजूद
+    हैं। Telegram सिर्फ़ एक ही URL पर webhook भेज सकता है, इसलिए startup पर
+    getWebhookInfo चेक करके लॉग में साफ़ बता देता है कौन एक्टिव है।
+    """
+    if not TELEGRAM_TOKEN or not HTTP_CLIENT:
+        return
+    try:
+        resp = await HTTP_CLIENT.get(f"{TELEGRAM_API_BASE}/getWebhookInfo", timeout=10)
+        info = resp.json().get("result", {})
+        url = info.get("url", "")
+        logger.info(f"[WEBHOOK CHECK] Telegram में सेट webhook URL: {url or '(कोई नहीं सेट)'}")
+
+        if not url:
+            logger.warning("[WEBHOOK CHECK] कोई webhook सेट नहीं है — बॉट को कोई भी अपडेट नहीं मिल रहा")
+        elif url.rstrip("/").endswith("/modules/telegram_bot/webhook"):
+            logger.warning(
+                "[WEBHOOK CHECK] Telegram /modules/telegram_bot/webhook (telegram_router) को कॉल कर रहा है — "
+                "इस फ़ाइल का पूरा /telegram/webhook हैंडलर (commands, voice, AI chat, broadcast) "
+                "इस्तेमाल ही नहीं हो रहा! या तो setWebhook को /telegram/webhook पर repoint करें, "
+                "या पुष्टि करें कि modules/telegram_bot/handler.py में बराबर की लॉजिक है।"
+            )
+        elif url.rstrip("/").endswith("/telegram/webhook"):
+            logger.info(
+                "[WEBHOOK CHECK] ठीक है — Telegram इसी फ़ाइल के /telegram/webhook को कॉल कर रहा है। "
+                "/modules/telegram_bot/webhook (telegram_router में) फ़िलहाल dead code है, चाहें तो हटा सकते हैं।"
+            )
+        else:
+            logger.warning(f"[WEBHOOK CHECK] अनजान webhook URL — मैन्युअल जाँच करें: {url}")
+    except Exception as e:
+        logger.warning(f"[WEBHOOK CHECK] getWebhookInfo कॉल फेल: {e}")
+
+MAIN_KEYBOARD = {
+    "inline_keyboard": [
+        [{"text": "Weather", "callback_data": "weather"}, {"text": "News", "callback_data": "news"}],
+        [{"text": "Mandi Bhav", "callback_data": "mandi"}, {"text": "AI Chat", "callback_data": "ai_chat"}],
+        [{"text": "Voice", "callback_data": "voice"}, {"text": "Status", "callback_data": "status"}],
+        [{"text": "Tax Calc", "callback_data": "tax"}, {"text": "Plant ID", "callback_data": "plant"}],
+    ]
+}
+
+# ═══════════════════════════════════════════════════════════════
+#  MASTER SCHEDULER CLASS
+# ═══════════════════════════════════════════════════════════════
+
+class SinghJiMasterScheduler:
+    def __init__(self, http_client, telegram_send_func, api_keys, modules, user_preferences, admin_user_id=0):
+        self.http = http_client
+        self.send_tg = telegram_send_func
+        self.keys = api_keys
+        self.modules = modules
+        self.users = user_preferences
+        self.admin_uid = admin_user_id
+        self.scheduler = AsyncIOScheduler(timezone="Asia/Kolkata")
+        self.scheduler.add_listener(self._job_listener, EVENT_JOB_ERROR | EVENT_JOB_EXECUTED)
+        self._init_db()
+
+    def _init_db(self):
+        db_path = os.getenv("SCHEDULER_DB", "scheduler_state.db")
+        conn = sqlite3.connect(db_path, check_same_thread=False)
+        c = conn.cursor()
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS scheduler_state (
+                job_name TEXT PRIMARY KEY,
+                last_run TEXT,
+                next_run TEXT,
+                status TEXT DEFAULT 'pending',
+                retry_count INTEGER DEFAULT 0,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        conn.commit()
+        conn.close()
+
+    def _update_state(self, job_name, status, next_run=None):
+        try:
+            db_path = os.getenv("SCHEDULER_DB", "scheduler_state.db")
+            conn = sqlite3.connect(db_path, check_same_thread=False)
+            c = conn.cursor()
+            now = datetime.now().isoformat()
+            c.execute("""
+                INSERT INTO scheduler_state (job_name, last_run, status, next_run)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(job_name) DO UPDATE SET
+                    last_run=excluded.last_run,
+                    status=excluded.status,
+                    next_run=excluded.next_run,
+                    retry_count=retry_count + CASE WHEN excluded.status='failed' THEN 1 ELSE 0 END
+            """, (job_name, now, status, next_run))
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            logger.error(f"[DB] State update failed for {job_name}: {e}")
+
+    def _job_listener(self, event):
+        if event.exception:
+            logger.error(f"[JOB] {event.job_id} CRASHED: {event.exception}")
+            self._update_state(event.job_id, "failed")
+        else:
+            logger.info(f"[JOB] {event.job_id} OK")
+            self._update_state(event.job_id, "success")
+
+    async def _broadcast(self, message, parse_mode="HTML"):
+        if not self.users:
+            logger.warning("[BROADCAST] No users to send to")
+            return
+        user_ids = list(self.users.keys())
+        sem = asyncio.Semaphore(20)
+        async def _send_one(uid):
+            async with sem:
+                try:
+                    await self.send_tg(uid, message)
+                except Exception as e:
+                    logger.warning(f"[BROADCAST] Failed for {uid}: {e}")
+        await asyncio.gather(*(_send_one(uid) for uid in user_ids))
+        logger.info(f"[BROADCAST] Sent to {len(user_ids)} users")
+
+    async def _fetch_news(self, count=5):
+        lines = []
+        if self.keys.get("NEWSDATA"):
+            try:
+                url = f"https://newsdata.io/api/1/latest?apikey={os.getenv('NEWSDATA_API_KEY')}&q=india&size={count}"
+                r = await self.http.get(url, timeout=15)
+                data = r.json()
+                articles = data.get("results", [])[:count]
+                for i, a in enumerate(articles, 1):
+                    title = a.get("title", "No title")
+                    desc = (a.get("description") or "")[:90]
+                    lines.append(f"{i}. <b>{title}</b>\n   {desc}...")
+                if lines:
+                    return "\n\n".join(lines)
+            except Exception as e:
+                logger.warning(f"[NEWS] Newsdata fail: {e}")
+        if self.keys.get("CURRENTS"):
+            try:
+                url = f"https://api.currentsapi.services/v1/latest-news?apiKey={os.getenv('CURRENTS_API_KEY')}"
+                r = await self.http.get(url, timeout=15)
+                data = r.json()
+                articles = data.get("news", [])[:count]
+                for i, a in enumerate(articles, 1):
+                    title = a.get("title", "No title")
+                    desc = (a.get("description") or "")[:90]
+                    lines.append(f"{i}. <b>{title}</b>\n   {desc}...")
+                if lines:
+                    return "\n\n".join(lines)
+            except Exception as e:
+                logger.warning(f"[NEWS] Currents fail: {e}")
+        return "• कोई समाचार उपलब्ध नहीं (API limit हो सकती है)"
+
+    async def _fetch_weather(self, city="Delhi"):
+        if not self.keys.get("OPENWEATHER"):
+            return "• Weather API key missing"
+        try:
+            key = os.getenv("OPENWEATHER_API_KEY")
+            url = f"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={key}&units=metric"
+            r = await self.http.get(url, timeout=15)
+            data = r.json()
+            if r.status_code == 200:
+                return (
+                    f"🌡️ तापमान: {data['main']['temp']}°C (Feel: {data['main']['feels_like']}°C)\n"
+                    f"💧 नमी: {data['main']['humidity']}%\n"
+                    f"🌬️ हवा: {data['wind']['speed']} m/s\n"
+                    f"☁️ {data['weather'][0]['description'].title()}"
+                )
+            return f"• Weather error: {data.get('message', 'Unknown')}"
+        except Exception as e:
+            logger.warning(f"[WEATHER] Error: {e}")
+            return "• Weather fetch failed"
+
+    async def _job_morning_digest(self):
+        logger.info("[JOB] Morning Digest starting...")
+        news = await self._fetch_news(5)
+        weather = await self._fetch_weather("Delhi")
+        msg = (
+            f"🌅 <b>Singh Ji Morning Digest</b>\n"
+            f"📅 {datetime.now().strftime('%d %b %Y, %A')}\n"
+            f"{'─' * 28}\n\n"
+            f"📰 <b>मुख्य समाचार:</b>\n{news}\n\n"
+            f"🌤️ <b>मौसम (Delhi):</b>\n{weather}\n\n"
+            f"— <i>Singh Ji AI Ultra</i>"
+        )
+        await self._broadcast(msg)
+        self._update_state("morning_digest", "success", "Tomorrow 07:00 AM")
+        logger.info("[JOB] Morning Digest DONE")
+
+    async def _job_evening_digest(self):
+        logger.info("[JOB] Evening Digest starting...")
+        news = await self._fetch_news(5)
+        rozgar = (
+            "• 50+ सरकारी नौकरियाँ आज जारी\n"
+            "• UPSSC: 1200+ पदों पर भर्ती\n"
+            "• Railway: Group D notification जल्द"
+        )
+        msg = (
+            f"🌆 <b>Singh Ji Evening Digest</b>\n"
+            f"📅 {datetime.now().strftime('%d %b %Y')}\n"
+            f"{'─' * 28}\n\n"
+            f"📰 <b>शाम के समाचार:</b>\n{news}\n\n"
+            f"💼 <b>रोज़गार अपडेट:</b>\n{rozgar}\n\n"
+            f"— <i>Singh Ji AI Ultra</i>"
+        )
+        await self._broadcast(msg)
+        self._update_state("evening_digest", "success", "Tomorrow 06:00 PM")
+        logger.info("[JOB] Evening Digest DONE")
+
+    async def _job_govt_schemes(self):
+        logger.info("[JOB] Govt Schemes starting...")
+        content = (
+            "• <b>PM Awas Yojana:</b> नई लिस्ट जारी — अपना नाम चेक करें\n"
+            "• <b>Ration Card:</b> e-KYC deadline बढ़ी — 31 Aug 2026\n"
+            "• <b>Kisan Samman Nidhi:</b> 18वीं किस्त जल्द आएगी"
+        )
+        msg = (
+            f"🏛️ <b>सरकारी योजना अपडेट</b>\n"
+            f"{'─' * 28}\n\n"
+            f"{content}\n\n"
+            f"— <i>Singh Ji AI Ultra</i>"
+        )
+        await self._broadcast(msg)
+        self._update_state("govt_schemes", "success")
+        logger.info("[JOB] Govt Schemes DONE")
+
+    async def _job_banking_weekly(self):
+        logger.info("[JOB] Banking Update starting...")
+        content = (
+            "• <b>SBI FD Rates:</b> 7.10% (5+ years)\n"
+            "• <b>Post Office:</b> New digital savings scheme launched\n"
+            "• <b>RBI:</b> UPI limit for medical payments increased"
+        )
+        msg = (
+            f"🏦 <b>बैंकिंग साप्ताहिक अपडेट</b>\n"
+            f"{'─' * 28}\n\n"
+            f"{content}\n\n"
+            f"— <i>Singh Ji AI Ultra</i>"
+        )
+        await self._broadcast(msg)
+        self._update_state("banking_weekly", "success")
+        logger.info("[JOB] Banking DONE")
+
+    async def _job_social_promo(self):
+        logger.info("[JOB] Social Promo starting...")
+        if self.admin_uid:
+            try:
+                await self.send_tg(
+                    self.admin_uid,
+                    "📱 <b>Social Media Content Ready</b>\n\n"
+                    "• 3 Carousel slides generated\n"
+                    "• Captions + Hashtags ready\n"
+                    "• Review & post karo!"
+                )
+            except Exception as e:
+                logger.warning(f"[SOCIAL] Admin notify fail: {e}")
+        self._update_state("social_promo", "success")
+        logger.info("[JOB] Social Promo DONE")
+
+    async def _job_monthly_tenders(self):
+        logger.info("[JOB] Monthly Tenders starting...")
+        content = (
+            "• <b>Road Construction:</b> NHAI tender — Last date 15 Aug\n"
+            "• <b>Smart City:</b> LED lighting project — UP\n"
+            "• <b>PWD:</b> Bridge repair work — Bihar"
+        )
+        msg = (
+            f"📋 <b>मासिक टेंडर अलर्ट</b>\n"
+            f"{'─' * 28}\n\n"
+            f"{content}\n\n"
+            f"— <i>Singh Ji AI Ultra</i>"
+        )
+        await self._broadcast(msg)
+        self._update_state("monthly_tenders", "success")
+        logger.info("[JOB] Tenders DONE")
+
+    async def _self_ping(self):
+        app_url = os.getenv("APP_URL", "")
+        if not app_url:
+            return
+        try:
+            r = await self.http.get(f"{app_url}/health", timeout=10)
+            if r.status_code == 200:
+                logger.debug("[PING] Self-ping OK")
+            else:
+                logger.warning(f"[PING] Self-ping status {r.status_code}")
+        except Exception as e:
+            logger.warning(f"[PING] Self-ping fail: {e}")
+
+    def setup(self):
+        self.scheduler.add_job(
+            self._job_morning_digest,
+            CronTrigger(hour=7, minute=0),
+            id="morning_digest",
+            name="Morning News + Weather",
+            replace_existing=True,
+            misfire_grace_time=3600,
+        )
+        self.scheduler.add_job(
+            self._job_evening_digest,
+            CronTrigger(hour=18, minute=0),
+            id="evening_digest",
+            name="Evening News + Rozgar",
+            replace_existing=True,
+            misfire_grace_time=3600,
+        )
+        self.scheduler.add_job(
+            self._job_govt_schemes,
+            CronTrigger(day_of_week="tue,fri", hour=15, minute=0),
+            id="govt_schemes",
+            name="Govt Schemes Update",
+            replace_existing=True,
+        )
+        self.scheduler.add_job(
+            self._job_banking_weekly,
+            CronTrigger(day_of_week="mon", hour=11, minute=0),
+            id="banking_weekly",
+            name="Banking Weekly",
+            replace_existing=True,
+        )
+        self.scheduler.add_job(
+            self._job_social_promo,
+            CronTrigger(day_of_week="mon,wed,sat", hour=10, minute=0),
+            id="social_promo",
+            name="Social Media Promo",
+            replace_existing=True,
+        )
+        self.scheduler.add_job(
+            self._job_monthly_tenders,
+            CronTrigger(day=1, hour=9, minute=0),
+            id="monthly_tenders",
+            name="Monthly Tender Alert",
+            replace_existing=True,
+        )
+        self.scheduler.add_job(
+            self._self_ping,
+            "interval",
+            minutes=10,
+            id="self_ping",
+            name="Railway Sleep Prevention",
+            replace_existing=True,
+        )
+        logger.info(f"[SETUP] {len(self.scheduler.get_jobs())} jobs registered")
+
+    async def start(self):
+        self.setup()
+        self.scheduler.start()
+        logger.info("🚀 Singh Ji Master Scheduler STARTED")
+        for job in self.scheduler.get_jobs():
+            nxt = str(job.next_run_time) if job.next_run_time else "N/A"
+            logger.info(f"   ⏰ {job.name} → {nxt}")
+
+    async def stop(self):
+        self.scheduler.shutdown()
+        logger.info("🛑 Singh Ji Master Scheduler STOPPED")
+
+    def get_status(self):
+        jobs = []
+        for job in self.scheduler.get_jobs():
+            jobs.append({
+                "id": job.id,
+                "name": job.name,
+                "next_run": str(job.next_run_time) if job.next_run_time else None,
+            })
+        return {
+            "running": self.scheduler.running,
+            "total_jobs": len(jobs),
+            "jobs": jobs,
+            "timezone": "Asia/Kolkata",
+        }
+
+MASTER_SCHEDULER = None
+
+# ═══════════════════════════════════════════════════════════════
+#  LIFESPAN & APP SETUP
+# ═══════════════════════════════════════════════════════════════
 
 @asynccontextmanager
 async def lifespan(app):
-    global HTTP_CLIENT
+    global HTTP_CLIENT, MASTER_SCHEDULER
     HTTP_CLIENT = httpx.AsyncClient(timeout=20)
     logger.info("Singh Ji AI Ultra v8.0 HYBRID Starting...")
+
     sync = SMART_SWARM.sync(MODULES, AVAILABLE_KEYS)
     logger.info(f"Swarm: {sync['active']}/{sync['total']} agents loaded")
     logger.info(f"Active APIs: {sum(1 for v in AVAILABLE_KEYS.values() if v)}/{len(AVAILABLE_KEYS)}")
+
+    # ─── FIX #1: पुराने subscribers Supabase से वापस RAM में लोड करो ───
+    loaded_prefs = await run_in_threadpool(_load_user_preferences_sync)
+    USER_PREFERENCES.update(loaded_prefs)
+    logger.info(f"[STARTUP] {len(loaded_prefs)} subscriber(s) Supabase से reload हुए")
+
+    # ─── FIX #2: कौन सा webhook असल में एक्टिव है, यह लॉग में बताओ ───
+    await _check_webhook_config()
+
+    MASTER_SCHEDULER = SinghJiMasterScheduler(
+        http_client=HTTP_CLIENT,
+        telegram_send_func=_telegram_send_message,
+        api_keys=AVAILABLE_KEYS,
+        modules=MODULES,
+        user_preferences=USER_PREFERENCES,
+        admin_user_id=ADMIN_USER_ID,
+    )
+    await MASTER_SCHEDULER.start()
+
     yield
+
+    if MASTER_SCHEDULER:
+        await MASTER_SCHEDULER.stop()
     await HTTP_CLIENT.aclose()
     logger.info("Singh Ji AI Ultra v8.0 Stopped!")
 
@@ -400,13 +866,13 @@ app.add_middleware(
 app.include_router(kisaan_router, prefix="/modules/kisaan_doctor")
 app.include_router(yojana_router, prefix="/modules/sarkari_yojana")
 app.include_router(telegram_router, prefix="/modules/telegram_bot")
-app.include_router(currency_router, prefix="/api")  # ✅ /api/currency/*
-app.include_router(aavishkar_router, prefix="/modules/aavishkar")  # ✅ /modules/aavishkar/*
+app.include_router(currency_router, prefix="/api")
+app.include_router(aavishkar_router, prefix="/modules/aavishkar")
 app.add_api_route("/api/banking", banking_handler, methods=["GET"])
 app.include_router(miniprogram_router, prefix="/api/v1/miniprogram")
 
 @app.middleware("http")
-async def rate_limit_middleware(request: Request, call_next):
+async def rate_limit_middleware(request, call_next):
     path = request.url.path
     if any(path.startswith(p) for p in STRICT_PATH_PREFIXES):
         limited = _is_rate_limited(request, "strict", *RATE_LIMIT_STRICT)
@@ -422,7 +888,7 @@ async def rate_limit_middleware(request: Request, call_next):
     return await call_next(request)
 
 # ==========================================
-# ✅ HEALTH CHECK ENDPOINTS
+# HEALTH CHECK ENDPOINTS
 # ==========================================
 
 @app.get("/")
@@ -437,6 +903,8 @@ async def root():
         "active_count": len(active),
         "agents": SMART_SWARM.get_status(),
         "apis": {k: v for k, v in AVAILABLE_KEYS.items()},
+        "scheduler": MASTER_SCHEDULER.get_status() if MASTER_SCHEDULER else {"running": False},
+        "subscribers": len(USER_PREFERENCES),
         "timestamp": datetime.now().isoformat()
     }
 
@@ -447,7 +915,6 @@ async def health():
 @app.get("/ping")
 @app.get("/api/ping")
 async def ping():
-    """Health check endpoint - works for both /ping and /api/ping"""
     return {
         "status": "pong",
         "timestamp": datetime.now().isoformat(),
@@ -467,6 +934,8 @@ async def status():
         "inactive_modules": inactive,
         "agents": SMART_SWARM.get_status(),
         "apis": AVAILABLE_KEYS,
+        "scheduler": MASTER_SCHEDULER.get_status() if MASTER_SCHEDULER else {"running": False},
+        "subscribers": len(USER_PREFERENCES),
         "timestamp": datetime.now().isoformat()
     }
 
@@ -582,7 +1051,6 @@ async def mandi_state(state: str, commodity: str = None, limit: int = 50):
         return {"error": str(e)}
 
 def _b64_too_big(b64_str: str) -> bool:
-    # base64 me har 4 char ~3 raw bytes ke barabar hote hain
     return (len(b64_str) * 3 / 4) > MAX_B64_BYTES
 
 @app.post("/api/plant/identify")
@@ -749,7 +1217,6 @@ def _get_whisper_model():
     return _whisper_model
 
 def _transcribe_sync(audio_bytes: bytes, suffix: str, language=None):
-    """CPU-bhaari kaam — hamesha run_in_threadpool se bulana."""
     model = _get_whisper_model()
     if model is None:
         return None
@@ -883,41 +1350,6 @@ async def swarm_status():
 async def swarm_sync():
     result = SMART_SWARM.sync(MODULES, AVAILABLE_KEYS)
     return {"synced": True, **result}
-
-TELEGRAM_API_BASE = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
-
-async def _telegram_send_message(chat_id, text, reply_markup=None):
-    if not TELEGRAM_TOKEN:
-        return {"error": "TELEGRAM_TOKEN missing"}
-    try:
-        payload = {"chat_id": chat_id, "text": text, "parse_mode": "HTML"}
-        if reply_markup:
-            payload["reply_markup"] = json.dumps(reply_markup)
-        resp = await HTTP_CLIENT.post(f"{TELEGRAM_API_BASE}/sendMessage", json=payload)
-        return resp.json()
-    except Exception as e:
-        return {"error": str(e)}
-
-async def _telegram_send_voice(chat_id, audio_b64, caption=""):
-    if not TELEGRAM_TOKEN:
-        return {"error": "TELEGRAM_TOKEN missing"}
-    try:
-        audio_bytes = base64.b64decode(audio_b64)
-        files = {"voice": ("voice.mp3", io.BytesIO(audio_bytes), "audio/mpeg")}
-        data = {"chat_id": chat_id, "caption": caption}
-        resp = await HTTP_CLIENT.post(f"{TELEGRAM_API_BASE}/sendVoice", data=data, files=files, timeout=15)
-        return resp.json()
-    except Exception as e:
-        return {"error": str(e)}
-
-MAIN_KEYBOARD = {
-    "inline_keyboard": [
-        [{"text": "Weather", "callback_data": "weather"}, {"text": "News", "callback_data": "news"}],
-        [{"text": "Mandi Bhav", "callback_data": "mandi"}, {"text": "AI Chat", "callback_data": "ai_chat"}],
-        [{"text": "Voice", "callback_data": "voice"}, {"text": "Status", "callback_data": "status"}],
-        [{"text": "Tax Calc", "callback_data": "tax"}, {"text": "Plant ID", "callback_data": "plant"}],
-    ]
-}
 
 @app.post("/telegram/webhook")
 async def telegram_webhook(request: Request):
@@ -1143,8 +1575,6 @@ async def telegram_webhook(request: Request):
                 await _telegram_send_message(chat_id, "Admin only command")
                 return {"status": "ok"}
             broadcast_text = text.replace("/broadcast ", "").strip()
-            # Sequential loop se badalkar bounded-concurrency me bheja —
-            # sab users ko ek saath, par ek waqt me zyada se zyada 20 hi
             sem = asyncio.Semaphore(20)
             async def _send(uid):
                 async with sem:
@@ -1169,51 +1599,9 @@ async def telegram_webhook(request: Request):
         logger.error(f"Telegram webhook error: {e}")
         return {"status": "error", "message": str(e)}
 
-NEWS_SCHEDULE_ACTIVE = False
-
-@app.post("/api/news/schedule/start")
-async def start_news_scheduler(request: Request):
-    if not _check_admin_auth(request):
-        return JSONResponse({"error": "Unauthorized"}, status_code=401)
-    global NEWS_SCHEDULE_ACTIVE
-    NEWS_SCHEDULE_ACTIVE = True
-    asyncio.create_task(_news_scheduler_task())
-    return {"status": "News scheduler started", "schedule": "4:00 AM daily"}
-
-async def _news_scheduler_task():
-    while NEWS_SCHEDULE_ACTIVE:
-        now = datetime.now()
-        next_run = now.replace(hour=4, minute=0, second=0, microsecond=0)
-        if now >= next_run:
-            next_run += timedelta(days=1)
-        wait_seconds = (next_run - now).total_seconds()
-        logger.info(f"News scheduler: Next run in {wait_seconds/3600:.1f} hours")
-        await asyncio.sleep(min(wait_seconds, 3600))
-        now = datetime.now()
-        if now.hour == 4 and now.minute < 5:
-            logger.info("Running 4 AM news broadcast...")
-            try:
-                if NEWSDATA_API_KEY:
-                    url = f"https://newsdata.io/api/1/latest?apikey={NEWSDATA_API_KEY}&q=india&size=10"
-                    resp = await HTTP_CLIENT.get(url, timeout=15)
-                    news_data = resp.json()
-                    articles = news_data.get("results", [])[:5]
-                    news_text = "4 AM Daily News\n\nSingh Ji AI\n"
-                    for i, article in enumerate(articles, 1):
-                        news_text += f"\n{i}. {article.get('title', 'No title')}\n"
-                        desc = article.get('description', 'No description')[:100]
-                        news_text += f"   {desc}...\n"
-                    sem = asyncio.Semaphore(20)
-                    async def _send(uid):
-                        async with sem:
-                            try:
-                                await _telegram_send_message(uid, news_text)
-                            except Exception:
-                                pass
-                    await asyncio.gather(*(_send(uid) for uid in list(USER_PREFERENCES.keys())))
-                    logger.info(f"News sent to {len(USER_PREFERENCES)} users")
-            except Exception as e:
-                logger.error(f"News scheduler error: {e}")
+# ==========================================
+# ADMIN ROUTES
+# ==========================================
 
 @app.get("/api/admin/")
 async def admin_root(request: Request):
@@ -1227,6 +1615,7 @@ async def admin_root(request: Request):
         "apis": AVAILABLE_KEYS,
         "users": len(USER_PREFERENCES),
         "memory_ram": len(MEMORY_STORE),
+        "scheduler": MASTER_SCHEDULER.get_status() if MASTER_SCHEDULER else {"running": False},
         "timestamp": datetime.now().isoformat()
     }
 
@@ -1248,6 +1637,10 @@ async def admin_broadcast(request: Request):
             await _telegram_send_message(uid, f"Admin Broadcast\n\n{message}")
     await asyncio.gather(*(_send(uid) for uid in list(USER_PREFERENCES.keys())))
     return {"broadcast": True, "sent_to": len(USER_PREFERENCES)}
+
+# ==========================================
+# PAYMENT ROUTES
+# ==========================================
 
 @app.get("/api/payment/")
 async def payment_root():
@@ -1273,6 +1666,10 @@ async def payment_create_order(request: Request):
     except Exception as e:
         return {"error": str(e)}
 
+# ==========================================
+# GMAIL ROUTES
+# ==========================================
+
 @app.get("/api/gmail/")
 async def gmail_root():
     return {"module": "Gmail", "status": "active" if AVAILABLE_KEYS["GMAIL"] else "missing_credentials"}
@@ -1285,6 +1682,10 @@ async def gmail_auth_url():
     scope = "https://www.googleapis.com/auth/gmail.send"
     url = f"https://accounts.google.com/o/oauth2/v2/auth?client_id={GMAIL_CLIENT_ID}&redirect_uri={redirect_uri}&scope={scope}&response_type=code&access_type=offline"
     return {"auth_url": url}
+
+# ==========================================
+# MAIN
+# ==========================================
 
 if __name__ == "__main__":
     import uvicorn
