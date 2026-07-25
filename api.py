@@ -46,6 +46,7 @@ TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 TWILIO_SID = os.getenv("TWILIO_SID")
 TWILIO_TOKEN = os.getenv("TWILIO_TOKEN")
 TZ = os.getenv("TZ", "Asia/Kolkata")
+SELF_PING_URL = os.getenv("SELF_PING_URL", "http://localhost:8000/api/health")  # ✅ FIXED: was hardcoded
 
 app = FastAPI(title="🦁 Singh Ji AI Ultra v7.0", version="7.0.0-merged")
 
@@ -100,7 +101,7 @@ async def self_ping():
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.get(
-                    "https://singhji-api.onrender.com/api/health",
+                    os.getenv("SELF_PING_URL", "http://localhost:8000/api/health"),
                     timeout=aiohttp.ClientTimeout(total=10)
                 ) as resp:
                     logger.info(f"🦁 Self-ping: {resp.status} | Render awake!")
