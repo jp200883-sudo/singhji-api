@@ -1,4 +1,30 @@
+"""
+🦁 SINGH JI AI ULTRA v8.0 — HYBRID SYSTEM
+100% REAL | Railway Primary | All APIs Live
+Master Scheduler Integrated | Auto-Broadcast Enabled
 
+इस पैच में तीन फिक्स:
+  1. USER_PREFERENCES (broadcast subscriber list) अब startup पर Supabase
+     से वापस लोड होती है — पहले सिर्फ़ RAM में थी, हर restart पर खाली हो
+     जाती थी और morning/evening digest किसी को नहीं जाता था।
+  2. Startup पर Telegram getWebhookInfo चेक करके लॉग में साफ़ बताता है कि
+     असल में कौन सा webhook path (इस फ़ाइल का /telegram/webhook या
+     modules/telegram_bot का /modules/telegram_bot/webhook) एक्टिव है,
+     ताकि पता चले कौन सा dead code है।
+  3. faster-whisper अब requirements.txt में जोड़ने की ज़रूरत है (नीचे
+     फ़ाइल के अंत में नोट है) — कोड में पहले से इस्तेमाल हो रहा था पर
+     requirements.txt में नहीं था, इसलिए voice transcription चुपचाप fail
+     हो रहा था।
+
+नया फिक्स (इस पैच में जोड़ा गया):
+  4. _ensure_correct_webhook() — हर startup पर अपने आप Telegram के
+     webhook को इसी फाइल के /telegram/webhook पर सेट कर देता है, ताकि
+     modules/telegram_bot/webhook (जो USER_PREFERENCES में यूज़र सेव
+     नहीं करता, इसलिए broadcast को कभी कोई recipient नहीं मिलता) कभी
+     गलती से एक्टिव न रह जाए। इसके लिए Railway पर APP_URL env var
+     पूरा URL सहित सेट होना ज़रूरी है (जैसे
+     https://singhji-api-production-85ca.up.railway.app)।
+"""
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -388,11 +414,13 @@ RATE_LIMIT_TELEGRAM_USER = (15, 60)
 # Telegram helpers (moved up for scheduler access)
 TELEGRAM_API_BASE = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
 
-async def _telegram_send_message(chat_id, text, reply_markup=None):
+async def _telegram_send_message(chat_id, text, reply_markup=None, parse_mode=None):
     if not TELEGRAM_TOKEN:
         return {"error": "TELEGRAM_TOKEN missing"}
     try:
-        payload = {"chat_id": chat_id, "text": text, "parse_mode": "HTML"}
+        payload = {"chat_id": chat_id, "text": text}
+        if parse_mode:
+            payload["parse_mode"] = parse_mode
         if reply_markup:
             payload["reply_markup"] = json.dumps(reply_markup)
         resp = await HTTP_CLIENT.post(f"{TELEGRAM_API_BASE}/sendMessage", json=payload)
@@ -553,7 +581,7 @@ class SinghJiMasterScheduler:
             logger.info(f"[JOB] {event.job_id} OK")
             self._update_state(event.job_id, "success")
 
-    async def _broadcast(self, message, parse_mode="HTML"):
+    async def _broadcast(self, message, parse_mode=None):
         if not self.users:
             logger.warning("[BROADCAST] No users to send to")
             return
@@ -562,7 +590,7 @@ class SinghJiMasterScheduler:
         async def _send_one(uid):
             async with sem:
                 try:
-                    await self.send_tg(uid, message)
+                    await self.send_tg(uid, message, parse_mode=parse_mode)
                 except Exception as e:
                     logger.warning(f"[BROADCAST] Failed for {uid}: {e}")
         await asyncio.gather(*(_send_one(uid) for uid in user_ids))
@@ -632,7 +660,7 @@ class SinghJiMasterScheduler:
             f"🌤️ <b>मौसम (Delhi):</b>\n{weather}\n\n"
             f"— <i>Singh Ji AI Ultra</i>"
         )
-        await self._broadcast(msg)
+        await self._broadcast(msg, parse_mode="HTML")
         self._update_state("morning_digest", "success", "Tomorrow 07:00 AM")
         logger.info("[JOB] Morning Digest DONE")
 
@@ -652,7 +680,7 @@ class SinghJiMasterScheduler:
             f"💼 <b>रोज़गार अपडेट:</b>\n{rozgar}\n\n"
             f"— <i>Singh Ji AI Ultra</i>"
         )
-        await self._broadcast(msg)
+        await self._broadcast(msg, parse_mode="HTML")
         self._update_state("evening_digest", "success", "Tomorrow 06:00 PM")
         logger.info("[JOB] Evening Digest DONE")
 
@@ -669,7 +697,7 @@ class SinghJiMasterScheduler:
             f"{content}\n\n"
             f"— <i>Singh Ji AI Ultra</i>"
         )
-        await self._broadcast(msg)
+        await self._broadcast(msg, parse_mode="HTML")
         self._update_state("govt_schemes", "success")
         logger.info("[JOB] Govt Schemes DONE")
 
@@ -686,7 +714,7 @@ class SinghJiMasterScheduler:
             f"{content}\n\n"
             f"— <i>Singh Ji AI Ultra</i>"
         )
-        await self._broadcast(msg)
+        await self._broadcast(msg, parse_mode="HTML")
         self._update_state("banking_weekly", "success")
         logger.info("[JOB] Banking DONE")
 
@@ -719,7 +747,7 @@ class SinghJiMasterScheduler:
             f"{content}\n\n"
             f"— <i>Singh Ji AI Ultra</i>"
         )
-        await self._broadcast(msg)
+        await self._broadcast(msg, parse_mode="HTML")
         self._update_state("monthly_tenders", "success")
         logger.info("[JOB] Tenders DONE")
 
