@@ -2181,6 +2181,45 @@ async def setup_application() -> Application:
         logger.error("TELEGRAM_BOT_TOKEN not set!")
         raise ValueError("TELEGRAM_BOT_TOKEN is required")
     application = Application.builder().token(config.TELEGRAM_BOT_TOKEN).build()
+
+    # ─── GLOBAL FIX: har jagah 'Can't parse entities' crash se bachao ───
+    # Pure file mein 80+ jagah parse_mode=MARKDOWN ke saath dynamic text
+    # (AI response, API key slice, scheme names, news, etc.) bheja ja raha
+    # hai. Kisi bhi jagah agar text mein * _ ` [ unmatched ho gaya, to
+    # Telegram poora message reject kar deta tha. Ab bot.send_message aur
+    # bot.edit_message_text ko yahin ek jagah patch kar diya hai — agar
+    # parse_mode ke saath BadRequest (entity parse error) aaye, to plain
+    # text (parse_mode=None) se dobara try karega. Isse har command,
+    # callback, aur handler apne aap surakshit ho gaya — alag se har
+    # jagah chhedne ki zaroorat nahi.
+    from telegram.error import BadRequest as _BadRequest
+
+    _orig_send_message = application.bot.send_message
+    _orig_edit_message_text = application.bot.edit_message_text
+
+    async def _safe_send_message(*args, **kwargs):
+        try:
+            return await _orig_send_message(*args, **kwargs)
+        except _BadRequest as e:
+            if "can't parse entities" in str(e).lower() or "can't find end" in str(e).lower():
+                logger.warning(f"[GLOBAL SAFE SEND] parse_mode entity error, plain text se retry: {e}")
+                kwargs["parse_mode"] = None
+                return await _orig_send_message(*args, **kwargs)
+            raise
+
+    async def _safe_edit_message_text(*args, **kwargs):
+        try:
+            return await _orig_edit_message_text(*args, **kwargs)
+        except _BadRequest as e:
+            if "can't parse entities" in str(e).lower() or "can't find end" in str(e).lower():
+                logger.warning(f"[GLOBAL SAFE EDIT] parse_mode entity error, plain text se retry: {e}")
+                kwargs["parse_mode"] = None
+                return await _orig_edit_message_text(*args, **kwargs)
+            raise
+
+    application.bot.send_message = _safe_send_message
+    application.bot.edit_message_text = _safe_edit_message_text
+
     commands = [
         BotCommand("start", "Start bot"),
         BotCommand("help", "Help & guide"),
