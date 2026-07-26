@@ -1,0 +1,2132 @@
+[
+  {
+    "scheme_code": "PM-KISAN",
+    "name": "PM-KISAN Samman Nidhi",
+    "name_hi": "पीएम-किसान सम्मान निधि",
+    "description": "Direct income support of ₹6000/year to farmer families in three installments of ₹2000 each",
+    "description_hi": "किसान परिवारों को सालाना ₹6000 की सीधी आय सहायता — ₹2000 की तीन किस्तों में",
+    "level": "central",
+    "ministry": "Agriculture & Farmers Welfare",
+    "category": "agriculture",
+    "subcategory": "income_support",
+    "eligibility_rules": {
+      "is_farmer": true,
+      "age": {
+        "min": 18,
+        "max": 100
+      },
+      "income": {
+        "max": 500000
+      },
+      "land_area": {
+        "min": 0.01,
+        "max": 200
+      }
+    },
+    "benefits": {
+      "amount": 6000,
+      "frequency": "yearly",
+      "type": "cash_transfer",
+      "benefit_summary": "₹6,000/year (3 installments of ₹2,000)"
+    },
+    "application_url": "https://pmkisan.gov.in",
+    "offline_process": "Visit nearest CSC/Common Service Centre with Aadhaar and land documents",
+    "documents_required": [
+      "Aadhaar Card",
+      "Bank Passbook",
+      "Land Records (7/12 or equivalent)",
+      "Income Certificate",
+      "Passport Size Photo"
+    ],
+    "deadline": null,
+    "is_active": true,
+    "launched_year": 2019
+  },
+  {
+    "scheme_code": "PM-AWAS",
+    "name": "Pradhan Mantri Awas Yojana (PMAY)",
+    "name_hi": "प्रधानमंत्री आवास योजना",
+    "description": "Housing for all — interest subsidy on home loans up to ₹2.67 lakh",
+    "description_hi": "सबके लिए आवास — होम लोन पर ₹2.67 लाख तक ब्याज सब्सिडी",
+    "level": "central",
+    "ministry": "Housing & Urban Affairs",
+    "category": "housing",
+    "subcategory": "subsidy",
+    "eligibility_rules": {
+      "income": {
+        "max": 1800000
+      },
+      "age": {
+        "min": 18,
+        "max": 70
+      },
+      "own_house": false
+    },
+    "benefits": {
+      "amount": 267000,
+      "frequency": "one_time",
+      "type": "interest_subsidy",
+      "benefit_summary": "Up to ₹2.67 lakh interest subsidy on home loan"
+    },
+    "application_url": "https://pmaymis.gov.in",
+    "offline_process": "Apply through bank/HFC while taking home loan",
+    "documents_required": [
+      "Aadhaar Card",
+      "PAN Card",
+      "Income Proof",
+      "Bank Statement (6 months)",
+      "Property Documents",
+      "Passport Photo"
+    ],
+    "deadline": null,
+    "is_active": true,
+    "launched_year": 2015
+  },
+  {
+    "scheme_code": "PM-JAY",
+    "name": "Ayushman Bharat PM-JAY",
+    "name_hi": "आयुष्मान भारत प्रधानमंत्री जन आरोग्य योजना",
+    "description": "Health insurance cover up to ₹5 lakh per family per year for secondary and tertiary care",
+    "description_hi": "प्रति परिवार प्रति वर्ष ₹5 लाख तक का स्वास्थ्य बीमा कवर",
+    "level": "central",
+    "ministry": "Health & Family Welfare",
+    "category": "health",
+    "subcategory": "health_insurance",
+    "eligibility_rules": {
+      "income": {
+        "max": 500000
+      },
+      "bpl_status": true,
+      "age": {
+        "min": 0,
+        "max": 100
+      }
+    },
+    "benefits": {
+      "amount": 500000,
+      "frequency": "yearly",
+      "type": "health_insurance",
+      "benefit_summary": "₹5 lakh health insurance per family/year"
+    },
+    "application_url": "https://pmjay.gov.in",
+    "offline_process": "Visit nearest Ayushman Bharat Kendra or hospital with Aadhaar",
+    "documents_required": [
+      "Aadhaar Card",
+      "Ration Card/BPL Card",
+      "Income Certificate",
+      "Mobile Number",
+      "Family Photo"
+    ],
+    "deadline": null,
+    "is_active": true,
+    "launched_year": 2018
+  },
+  {
+    "scheme_code": "PM-SVANIDHI",
+    "name": "PM Street Vendor's Atmanirbhar Nidhi",
+    "name_hi": "पीएम स्वनिधि योजना",
+    "description": "Working capital loan up to ₹10,000 for street vendors with 7% interest subsidy",
+    "description_hi": "स्ट्रीट वेंडर्स के लिए ₹10,000 तक का कार्यशील पूंजी ऋण",
+    "level": "central",
+    "ministry": "Housing & Urban Affairs",
+    "category": "employment",
+    "subcategory": "loan",
+    "eligibility_rules": {
+      "occupation": [
+        "street_vendor",
+        "hawker",
+        "thelawala",
+        "fruit_seller",
+        "vegetable_seller"
+      ],
+      "age": {
+        "min": 18,
+        "max": 65
+      },
+      "income": {
+        "max": 300000
+      }
+    },
+    "benefits": {
+      "amount": 10000,
+      "frequency": "one_time",
+      "type": "loan",
+      "benefit_summary": "₹10,000 loan + 7% interest subsidy"
+    },
+    "application_url": "https://pmsvanidhi.mohua.gov.in",
+    "offline_process": "Apply through Urban Local Body (ULB) or Common Service Centre",
+    "documents_required": [
+      "Aadhaar Card",
+      "Vendor Certificate/ID",
+      "Bank Account",
+      "Passport Photo",
+      "Mobile Number"
+    ],
+    "deadline": null,
+    "is_active": true,
+    "launched_year": 2020
+  },
+  {
+    "scheme_code": "PM-MUDRA",
+    "name": "Pradhan Mantri MUDRA Yojana (PMMY)",
+    "name_hi": "प्रधानमंत्री मुद्रा योजना",
+    "description": "Loans up to ₹10 lakh for non-corporate small business without collateral",
+    "description_hi": "बिना गारंटी के छोटे व्यवसाय के लिए ₹10 लाख तक का ऋण",
+    "level": "central",
+    "ministry": "Finance",
+    "category": "employment",
+    "subcategory": "loan",
+    "eligibility_rules": {
+      "occupation": [
+        "self_employed",
+        "small_business",
+        "entrepreneur",
+        "shop_owner",
+        "artisan"
+      ],
+      "age": {
+        "min": 18,
+        "max": 65
+      },
+      "income": {
+        "max": 1200000
+      }
+    },
+    "benefits": {
+      "amount": 1000000,
+      "frequency": "one_time",
+      "type": "loan",
+      "benefit_summary": "Up to ₹10 lakh loan without collateral (Shishu/Kishor/Tarun)"
+    },
+    "application_url": "https://mudra.org.in",
+    "offline_process": "Visit any bank branch — SBI, PNB, BoB, or private banks",
+    "documents_required": [
+      "Aadhaar Card",
+      "PAN Card",
+      "Business Proof",
+      "Bank Statement (6 months)",
+      "Project Report",
+      "Passport Photo"
+    ],
+    "deadline": null,
+    "is_active": true,
+    "launched_year": 2015
+  },
+  {
+    "scheme_code": "PM-UJJWALA",
+    "name": "PM Ujjwala Yojana",
+    "name_hi": "प्रधानमंत्री उज्ज्वला योजना",
+    "description": "Free LPG connection to BPL households with first refill and stove",
+    "description_hi": "BPL परिवारों को मुफ्त LPG कनेक्शन + स्टोव + पहली रिफिल",
+    "level": "central",
+    "ministry": "Petroleum & Natural Gas",
+    "category": "welfare",
+    "subcategory": "energy",
+    "eligibility_rules": {
+      "bpl_status": true,
+      "income": {
+        "max": 200000
+      },
+      "no_lpg": true,
+      "age": {
+        "min": 18,
+        "max": 100
+      }
+    },
+    "benefits": {
+      "amount": 1600,
+      "frequency": "one_time",
+      "type": "subsidy",
+      "benefit_summary": "Free LPG connection + stove + first refill"
+    },
+    "application_url": "https://pmuy.gov.in",
+    "offline_process": "Visit nearest LPG distributor with BPL card and Aadhaar",
+    "documents_required": [
+      "Aadhaar Card",
+      "BPL Card/Ration Card",
+      "Bank Account",
+      "Passport Photo",
+      "Address Proof"
+    ],
+    "deadline": null,
+    "is_active": true,
+    "launched_year": 2016
+  },
+  {
+    "scheme_code": "PM-SBY",
+    "name": "Pradhan Mantri Suraksha Bima Yojana",
+    "name_hi": "प्रधानमंत्री सुरक्षा बीमा योजना",
+    "description": "Accident insurance of ₹2 lakh for just ₹20/year premium",
+    "description_hi": "सिर्फ ₹20/साल में ₹2 लाख का दुर्घटना बीमा",
+    "level": "central",
+    "ministry": "Finance",
+    "category": "social_security",
+    "subcategory": "insurance",
+    "eligibility_rules": {
+      "age": {
+        "min": 18,
+        "max": 70
+      },
+      "bank_account": true,
+      "income": {
+        "max": 5000000
+      }
+    },
+    "benefits": {
+      "amount": 200000,
+      "frequency": "yearly",
+      "type": "insurance",
+      "benefit_summary": "₹2 lakh accident insurance for ₹20/year"
+    },
+    "application_url": "https://jansuraksha.gov.in",
+    "offline_process": "Auto-debit from bank account — visit bank to enroll",
+    "documents_required": [
+      "Aadhaar Card",
+      "Bank Account",
+      "Mobile Number"
+    ],
+    "deadline": "2026-05-31",
+    "is_active": true,
+    "launched_year": 2015
+  },
+  {
+    "scheme_code": "PM-JBY",
+    "name": "Pradhan Mantri Jeevan Jyoti Bima Yojana",
+    "name_hi": "प्रधानमंत्री जीवन ज्योति बीमा योजना",
+    "description": "Life insurance of ₹2 lakh for just ₹436/year premium",
+    "description_hi": "सिर्फ ₹436/साल में ₹2 लाख का जीवन बीमा",
+    "level": "central",
+    "ministry": "Finance",
+    "category": "social_security",
+    "subcategory": "insurance",
+    "eligibility_rules": {
+      "age": {
+        "min": 18,
+        "max": 50
+      },
+      "bank_account": true,
+      "income": {
+        "max": 5000000
+      }
+    },
+    "benefits": {
+      "amount": 200000,
+      "frequency": "yearly",
+      "type": "insurance",
+      "benefit_summary": "₹2 lakh life insurance for ₹436/year"
+    },
+    "application_url": "https://jansuraksha.gov.in",
+    "offline_process": "Auto-debit from bank account — visit bank to enroll",
+    "documents_required": [
+      "Aadhaar Card",
+      "Bank Account",
+      "Mobile Number",
+      "Nominee Details"
+    ],
+    "deadline": "2026-05-31",
+    "is_active": true,
+    "launched_year": 2015
+  },
+  {
+    "scheme_code": "PM-SYM",
+    "name": "Pradhan Mantri Shram Yogi Maan-dhan",
+    "name_hi": "प्रधानमंत्री श्रम योगी मानधन",
+    "description": "Pension of ₹3000/month after 60 years for unorganized workers",
+    "description_hi": "60 साल के बाद ₹3000/महीना पेंशन — असंगठित कर्मचारियों के लिए",
+    "level": "central",
+    "ministry": "Labour & Employment",
+    "category": "social_security",
+    "subcategory": "pension",
+    "eligibility_rules": {
+      "age": {
+        "min": 18,
+        "max": 40
+      },
+      "income": {
+        "max": 15000
+      },
+      "occupation": [
+        "unorganized_worker",
+        "daily_wage",
+        "domestic_worker",
+        "rickshaw_puller",
+        "street_vendor"
+      ]
+    },
+    "benefits": {
+      "amount": 3000,
+      "frequency": "monthly_pension",
+      "type": "pension",
+      "benefit_summary": "₹3,000/month pension after age 60"
+    },
+    "application_url": "https://maandhan.in",
+    "offline_process": "Visit nearest CSC with Aadhaar and bank account",
+    "documents_required": [
+      "Aadhaar Card",
+      "Bank Account",
+      "Mobile Number",
+      "Age Proof",
+      "Income Certificate"
+    ],
+    "deadline": null,
+    "is_active": true,
+    "launched_year": 2019
+  },
+  {
+    "scheme_code": "PM-VVY",
+    "name": "Pradhan Mantri Vaya Vandana Yojana",
+    "name_hi": "प्रधानमंत्री वय वंदना योजना",
+    "description": "Pension scheme for senior citizens — 8% guaranteed return",
+    "description_hi": "वरिष्ठ नागरिकों के लिए पेंशन योजना — 8% गारंटीड रिटर्न",
+    "level": "central",
+    "ministry": "Finance",
+    "category": "social_security",
+    "subcategory": "pension",
+    "eligibility_rules": {
+      "is_senior_citizen": true,
+      "age": {
+        "min": 60,
+        "max": 100
+      },
+      "income": {
+        "max": 10000000
+      }
+    },
+    "benefits": {
+      "amount": 10000,
+      "frequency": "monthly_pension",
+      "type": "pension",
+      "benefit_summary": "Up to ₹10,000/month pension at 8% return"
+    },
+    "application_url": "https://licindia.in",
+    "offline_process": "Visit LIC office or apply online through LIC",
+    "documents_required": [
+      "Aadhaar Card",
+      "PAN Card",
+      "Age Proof",
+      "Bank Account",
+      "Passport Photo",
+      "Medical Certificate (if >80)"
+    ],
+    "deadline": null,
+    "is_active": true,
+    "launched_year": 2017
+  },
+  {
+    "scheme_code": "SCHOLARSHIP-POSTMATRIC",
+    "name": "Post Matric Scholarship for SC/ST/OBC",
+    "name_hi": "पोस्ट मैट्रिक छात्रवृत्ति योजना",
+    "description": "Full scholarship for SC/ST/OBC students pursuing higher education including tuition, maintenance, and books",
+    "description_hi": "उच्च शिक्षा के लिए SC/ST/OBC छात्रों की पूरी फीस + रहने का खर्च + किताबें",
+    "level": "central",
+    "ministry": "Social Justice & Empowerment",
+    "category": "education",
+    "subcategory": "scholarship",
+    "eligibility_rules": {
+      "is_student": true,
+      "caste": [
+        "SC",
+        "ST",
+        "OBC"
+      ],
+      "income": {
+        "max": 250000
+      },
+      "education_level": [
+        "class_11",
+        "class_12",
+        "undergraduate",
+        "postgraduate",
+        "phd"
+      ]
+    },
+    "benefits": {
+      "amount": 50000,
+      "frequency": "yearly",
+      "type": "scholarship",
+      "benefit_summary": "Full fee reimbursement + maintenance allowance + books"
+    },
+    "application_url": "https://scholarships.gov.in",
+    "offline_process": "Apply through National Scholarship Portal (NSP)",
+    "documents_required": [
+      "Aadhaar Card",
+      "Caste Certificate",
+      "Income Certificate",
+      "Marksheet",
+      "Bank Account",
+      "Institute Certificate",
+      "Fee Receipt"
+    ],
+    "deadline": "2026-10-31",
+    "is_active": true,
+    "launched_year": 2006
+  },
+  {
+    "scheme_code": "PM-VANI",
+    "name": "PM Vishwakarma Kaushal Samman",
+    "name_hi": "पीएम विश्वकर्मा कौशल सम्मान",
+    "description": "Skill development + tool kit + loan up to ₹3 lakh for traditional artisans",
+    "description_hi": "पारंपरिक कारीगरों के लिए स्किल ट्रेनिंग + टूल किट + ₹3 लाख तक का ऋण",
+    "level": "central",
+    "ministry": "MSME",
+    "category": "employment",
+    "subcategory": "skill_development",
+    "eligibility_rules": {
+      "occupation": [
+        "carpenter",
+        "blacksmith",
+        "goldsmith",
+        "potter",
+        "tailor",
+        "barber",
+        "shoemaker",
+        "locksmith",
+        "sculptor",
+        "weaver"
+      ],
+      "age": {
+        "min": 18,
+        "max": 60
+      },
+      "income": {
+        "max": 500000
+      }
+    },
+    "benefits": {
+      "amount": 300000,
+      "frequency": "one_time",
+      "type": "loan_plus_training",
+      "benefit_summary": "₹15,000 toolkit + skill training + ₹3 lakh loan"
+    },
+    "application_url": "https://pmvishwakarma.gov.in",
+    "offline_process": "Apply online or visit nearest CSC/MSME office",
+    "documents_required": [
+      "Aadhaar Card",
+      "Caste Certificate",
+      "Bank Account",
+      "Age Proof",
+      "Artisan Photo",
+      "Community Certificate"
+    ],
+    "deadline": null,
+    "is_active": true,
+    "launched_year": 2023
+  },
+  {
+    "scheme_code": "PM-SB",
+    "name": "Sukanya Samriddhi Yojana",
+    "name_hi": "सुकन्या समृद्धि योजना",
+    "description": "Savings scheme for girl child — 8.2% interest, tax-free maturity",
+    "description_hi": "बेटी के लिए बचत योजना — 8.2% ब्याज, टैक्स फ्री परिपक्वता",
+    "level": "central",
+    "ministry": "Women & Child Development",
+    "category": "welfare",
+    "subcategory": "savings",
+    "eligibility_rules": {
+      "gender": [
+        "female"
+      ],
+      "age": {
+        "min": 0,
+        "max": 10
+      },
+      "income": {
+        "max": 10000000
+      }
+    },
+    "benefits": {
+      "amount": 150000,
+      "frequency": "yearly_deposit",
+      "type": "savings",
+      "benefit_summary": "8.2% interest, tax-free, deposit ₹250-₹1.5 lakh/year"
+    },
+    "application_url": "https://www.indiapost.gov.in",
+    "offline_process": "Open account at Post Office or authorized banks",
+    "documents_required": [
+      "Girl Child Birth Certificate",
+      "Parent's Aadhaar",
+      "Parent's PAN",
+      "Address Proof",
+      "Passport Photo"
+    ],
+    "deadline": null,
+    "is_active": true,
+    "launched_year": 2015
+  },
+  {
+    "scheme_code": "PM-MMY-SHISHU",
+    "name": "MUDRA Shishu Loan",
+    "name_hi": "मुद्रा शिशु ऋण",
+    "description": "Micro loan up to ₹50,000 for small business starters",
+    "description_hi": "छोटे व्यवसाय शुरू करने के लिए ₹50,000 तक का माइक्रो ऋण",
+    "level": "central",
+    "ministry": "Finance",
+    "category": "employment",
+    "subcategory": "micro_loan",
+    "eligibility_rules": {
+      "occupation": [
+        "self_employed",
+        "small_business",
+        "entrepreneur",
+        "startup"
+      ],
+      "age": {
+        "min": 18,
+        "max": 65
+      },
+      "income": {
+        "max": 500000
+      }
+    },
+    "benefits": {
+      "amount": 50000,
+      "frequency": "one_time",
+      "type": "loan",
+      "benefit_summary": "Up to ₹50,000 loan without collateral"
+    },
+    "application_url": "https://mudra.org.in",
+    "offline_process": "Visit any bank with business idea",
+    "documents_required": [
+      "Aadhaar Card",
+      "PAN Card",
+      "Business Plan",
+      "Bank Account",
+      "Passport Photo"
+    ],
+    "deadline": null,
+    "is_active": true,
+    "launched_year": 2015
+  },
+  {
+    "scheme_code": "PM-FME",
+    "name": "PM Formalisation of Micro Food Enterprises",
+    "name_hi": "पीएम फूड एंटरप्राइजेज़ फॉर्मलाइजेशन",
+    "description": "Up to ₹10 lakh grant for food processing micro enterprises",
+    "description_hi": "फूड प्रोसेसिंग माइक्रो उद्योगों के लिए ₹10 लाख तक का अनुदान",
+    "level": "central",
+    "ministry": "Food Processing Industries",
+    "category": "employment",
+    "subcategory": "grant",
+    "eligibility_rules": {
+      "occupation": [
+        "food_processor",
+        "pickle_maker",
+        "spice_maker",
+        "dairy_farmer",
+        "baker"
+      ],
+      "age": {
+        "min": 18,
+        "max": 65
+      },
+      "income": {
+        "max": 1000000
+      }
+    },
+    "benefits": {
+      "amount": 1000000,
+      "frequency": "one_time",
+      "type": "grant",
+      "benefit_summary": "Up to ₹10 lakh grant + credit linked subsidy"
+    },
+    "application_url": "https://mofpi.gov.in",
+    "offline_process": "Apply through State Nodal Agency or online portal",
+    "documents_required": [
+      "Aadhaar Card",
+      "PAN Card",
+      "GST Registration",
+      "FSSAI License",
+      "Bank Account",
+      "Project Report"
+    ],
+    "deadline": null,
+    "is_active": true,
+    "launched_year": 2020
+  },
+  {
+    "scheme_code": "PM-SBM",
+    "name": "Swachh Bharat Mission (Grameen) Phase-II",
+    "name_hi": "स्वच्छ भारत मिशन (ग्रामीण) फेज-II",
+    "description": "₹12,000 incentive for building Individual Household Latrine (IHHL)",
+    "description_hi": "शौचालय बनाने के लिए ₹12,000 की प्रोत्साहन राशि",
+    "level": "central",
+    "ministry": "Jal Shakti",
+    "category": "welfare",
+    "subcategory": "sanitation",
+    "eligibility_rules": {
+      "income": {
+        "max": 500000
+      },
+      "no_toilet": true,
+      "age": {
+        "min": 18,
+        "max": 100
+      }
+    },
+    "benefits": {
+      "amount": 12000,
+      "frequency": "one_time",
+      "type": "incentive",
+      "benefit_summary": "₹12,000 for building toilet at home"
+    },
+    "application_url": "https://swachhbharatmission.gov.in",
+    "offline_process": "Apply through Gram Panchayat or BDO office",
+    "documents_required": [
+      "Aadhaar Card",
+      "Ration Card",
+      "Bank Account",
+      "Land Proof",
+      "Passport Photo"
+    ],
+    "deadline": null,
+    "is_active": true,
+    "launched_year": 2021
+  },
+  {
+    "scheme_code": "PM-JY",
+    "name": "Jal Jeevan Mission",
+    "name_hi": "जल जीवन मिशन",
+    "description": "Tap water connection to every rural household — 55 LPCD",
+    "description_hi": "हर ग्रामीण घर में नल के पानी का कनेक्शन — 55 लीटर प्रति व्यक्ति प्रति दिन",
+    "level": "central",
+    "ministry": "Jal Shakti",
+    "category": "welfare",
+    "subcategory": "water",
+    "eligibility_rules": {
+      "income": {
+        "max": 10000000
+      },
+      "rural": true,
+      "no_tap_water": true
+    },
+    "benefits": {
+      "amount": 0,
+      "frequency": "one_time",
+      "type": "infrastructure",
+      "benefit_summary": "Free tap water connection at home"
+    },
+    "application_url": "https://jaljeevanmission.gov.in",
+    "offline_process": "Contact Village Water & Sanitation Committee (VWSC)",
+    "documents_required": [
+      "Aadhaar Card",
+      "Ration Card",
+      "Address Proof"
+    ],
+    "deadline": null,
+    "is_active": true,
+    "launched_year": 2019
+  },
+  {
+    "scheme_code": "PM-SBM-U",
+    "name": "Swachh Bharat Mission (Urban) 2.0",
+    "name_hi": "स्वच्छ भारत मिशन (शहरी) 2.0",
+    "description": "Construction of community toilets and waste management in urban areas",
+    "description_hi": "शहरी क्षेत्रों में सामुदायिक शौचालय और कचरा प्रबंधन",
+    "level": "central",
+    "ministry": "Housing & Urban Affairs",
+    "category": "welfare",
+    "subcategory": "sanitation",
+    "eligibility_rules": {
+      "income": {
+        "max": 500000
+      },
+      "urban": true
+    },
+    "benefits": {
+      "amount": 0,
+      "frequency": "one_time",
+      "type": "infrastructure",
+      "benefit_summary": "Community toilet + waste management facility"
+    },
+    "application_url": "https://swachhbharaturban.gov.in",
+    "offline_process": "Contact Urban Local Body (Municipality)",
+    "documents_required": [
+      "Aadhaar Card",
+      "Address Proof"
+    ],
+    "deadline": null,
+    "is_active": true,
+    "launched_year": 2021
+  },
+  {
+    "scheme_code": "PM-DIGITAL",
+    "name": "PMGDISHA — Digital Literacy",
+    "name_hi": "पीएमजीडीआईएसएचए — डिजिटल साक्षरता",
+    "description": "Free digital literacy training for 6 crore rural adults",
+    "description_hi": "6 करोड़ ग्रामीण वयस्कों के लिए मुफ्त डिजिटल साक्षरता प्रशिक्षण",
+    "level": "central",
+    "ministry": "Electronics & IT",
+    "category": "education",
+    "subcategory": "digital_literacy",
+    "eligibility_rules": {
+      "age": {
+        "min": 18,
+        "max": 60
+      },
+      "rural": true,
+      "income": {
+        "max": 500000
+      },
+      "digital_illiterate": true
+    },
+    "benefits": {
+      "amount": 0,
+      "frequency": "one_time",
+      "type": "training",
+      "benefit_summary": "Free 20-hour digital literacy course + certificate"
+    },
+    "application_url": "https://pmgdisha.in",
+    "offline_process": "Register at nearest CSC/Common Service Centre",
+    "documents_required": [
+      "Aadhaar Card",
+      "Mobile Number",
+      "Passport Photo"
+    ],
+    "deadline": null,
+    "is_active": true,
+    "launched_year": 2017
+  },
+  {
+    "scheme_code": "PM-SKILL-INDIA",
+    "name": "Skill India Mission (PMKVY)",
+    "name_hi": "स्किल इंडिया मिशन (पीएमकेवीवाई)",
+    "description": "Free skill training + certification + placement assistance for youth",
+    "description_hi": "युवाओं के लिए मुफ्त स्किल ट्रेनिंग + सर्टिफिकेशन + प्लेसमेंट सहायता",
+    "level": "central",
+    "ministry": "Skill Development & Entrepreneurship",
+    "category": "education",
+    "subcategory": "skill_training",
+    "eligibility_rules": {
+      "age": {
+        "min": 18,
+        "max": 35
+      },
+      "income": {
+        "max": 500000
+      },
+      "education_level": [
+        "class_8",
+        "class_10",
+        "class_12",
+        "undergraduate"
+      ]
+    },
+    "benefits": {
+      "amount": 0,
+      "frequency": "one_time",
+      "type": "training",
+      "benefit_summary": "Free training + NSDC certificate + job placement"
+    },
+    "application_url": "https://pmkvyofficial.org",
+    "offline_process": "Register at nearest Training Centre (TC)",
+    "documents_required": [
+      "Aadhaar Card",
+      "Age Proof",
+      "Education Certificate",
+      "Bank Account",
+      "Passport Photo"
+    ],
+    "deadline": null,
+    "is_active": true,
+    "launched_year": 2015
+  },
+  {
+    "scheme_code": "PM-SB-STARTUP",
+    "name": "Startup India Seed Fund",
+    "name_hi": "स्टार्टअप इंडिया सीड फंड",
+    "description": "Seed funding up to ₹1 crore for DPIIT-recognized startups",
+    "description_hi": "DPIIT-मान्यता प्राप्त स्टार्टअप्स के लिए ₹1 करोड़ तक का सीड फंड",
+    "level": "central",
+    "ministry": "Commerce & Industry",
+    "category": "employment",
+    "subcategory": "startup_funding",
+    "eligibility_rules": {
+      "occupation": [
+        "startup_founder",
+        "entrepreneur"
+      ],
+      "age": {
+        "min": 18,
+        "max": 50
+      },
+      "dpiit_recognized": true
+    },
+    "benefits": {
+      "amount": 10000000,
+      "frequency": "one_time",
+      "type": "grant",
+      "benefit_summary": "Up to ₹1 crore seed funding for startups"
+    },
+    "application_url": "https://seedfund.startupindia.gov.in",
+    "offline_process": "Apply online through Startup India portal",
+    "documents_required": [
+      "DPIIT Recognition",
+      "PAN Card",
+      "Company Registration",
+      "Bank Account",
+      "Pitch Deck",
+      "Financial Projections"
+    ],
+    "deadline": null,
+    "is_active": true,
+    "launched_year": 2021
+  },
+  {
+    "scheme_code": "PM-ANMOL",
+    "name": "ANMOL — Mother & Child Health",
+    "name_hi": "अनमोल — मातृ एवं शिशु स्वास्थ्य",
+    "description": "Cash incentives for pregnant women for institutional delivery and child immunization",
+    "description_hi": "संस्थागत प्रसव और बच्चों के टीकाकरण के लिए गर्भवती महिलाओं को नकद प्रोत्साहन",
+    "level": "central",
+    "ministry": "Health & Family Welfare",
+    "category": "health",
+    "subcategory": "maternal_health",
+    "eligibility_rules": {
+      "gender": [
+        "female"
+      ],
+      "age": {
+        "min": 19,
+        "max": 45
+      },
+      "pregnant": true,
+      "income": {
+        "max": 300000
+      }
+    },
+    "benefits": {
+      "amount": 6000,
+      "frequency": "per_pregnancy",
+      "type": "cash_transfer",
+      "benefit_summary": "₹6,000 per pregnancy for institutional delivery"
+    },
+    "application_url": "https://nhm.gov.in",
+    "offline_process": "Register at nearest Anganwadi Centre or Health Sub-Centre",
+    "documents_required": [
+      "Aadhaar Card",
+      "Mother-Child Protection Card",
+      "Bank Account",
+      "Pregnancy Certificate"
+    ],
+    "deadline": null,
+    "is_active": true,
+    "launched_year": 2017
+  },
+  {
+    "scheme_code": "PM-NUTRITION",
+    "name": "Poshan Abhiyaan",
+    "name_hi": "पोषण अभियान",
+    "description": "Nutrition support for children (0-6 years), pregnant women, and lactating mothers",
+    "description_hi": "बच्चों (0-6 वर्ष), गर्भवती महिलाओं और स्तनपान कराने वाली माताओं के लिए पोषण सहायता",
+    "level": "central",
+    "ministry": "Women & Child Development",
+    "category": "health",
+    "subcategory": "nutrition",
+    "eligibility_rules": {
+      "age": {
+        "min": 0,
+        "max": 6
+      },
+      "income": {
+        "max": 300000
+      },
+      "or_pregnant": true,
+      "or_lactating": true
+    },
+    "benefits": {
+      "amount": 0,
+      "frequency": "daily",
+      "type": "nutrition_support",
+      "benefit_summary": "Free nutritious food + supplements at Anganwadi"
+    },
+    "application_url": "https://poshanabhiyaan.gov.in",
+    "offline_process": "Register at nearest Anganwadi Centre",
+    "documents_required": [
+      "Aadhaar Card",
+      "Birth Certificate",
+      "Ration Card"
+    ],
+    "deadline": null,
+    "is_active": true,
+    "launched_year": 2018
+  },
+  {
+    "scheme_code": "PM-SOIL",
+    "name": "Soil Health Card Scheme",
+    "name_hi": "स्वस्थ मृदा कार्ड योजना",
+    "description": "Free soil testing every 2 years + fertilizer recommendations for farmers",
+    "description_hi": "किसानों के लिए हर 2 साल में मुफ्त मिट्टी जांच + उर्वरक सिफारिश",
+    "level": "central",
+    "ministry": "Agriculture & Farmers Welfare",
+    "category": "agriculture",
+    "subcategory": "soil_health",
+    "eligibility_rules": {
+      "is_farmer": true,
+      "age": {
+        "min": 18,
+        "max": 100
+      }
+    },
+    "benefits": {
+      "amount": 0,
+      "frequency": "every_2_years",
+      "type": "testing",
+      "benefit_summary": "Free soil health card + fertilizer recommendations"
+    },
+    "application_url": "https://soilhealth.dac.gov.in",
+    "offline_process": "Contact Krishi Vigyan Kendra (KVK) or Agriculture Department",
+    "documents_required": [
+      "Aadhaar Card",
+      "Land Records",
+      "Bank Account"
+    ],
+    "deadline": null,
+    "is_active": true,
+    "launched_year": 2015
+  },
+  {
+    "scheme_code": "PM-FPO",
+    "name": "Formation & Promotion of FPOs",
+    "name_hi": "FPO का गठन और प्रोत्साहन",
+    "description": "₹15 lakh equity grant + credit guarantee for Farmer Producer Organizations",
+    "description_hi": "किसान उत्पादक संगठनों के लिए ₹15 लाख इक्विटी अनुदान + क्रेडिट गारंटी",
+    "level": "central",
+    "ministry": "Agriculture & Farmers Welfare",
+    "category": "agriculture",
+    "subcategory": "cooperative",
+    "eligibility_rules": {
+      "is_farmer": true,
+      "age": {
+        "min": 18,
+        "max": 100
+      },
+      "group_size": {
+        "min": 300
+      }
+    },
+    "benefits": {
+      "amount": 1500000,
+      "frequency": "one_time",
+      "type": "grant",
+      "benefit_summary": "₹15 lakh equity grant + credit guarantee for FPO"
+    },
+    "application_url": "https://fpo.gov.in",
+    "offline_process": "Apply through SFAC or NABARD",
+    "documents_required": [
+      "Group Registration",
+      "Member List",
+      "Bank Account",
+      "Business Plan",
+      "Bye-Laws"
+    ],
+    "deadline": null,
+    "is_active": true,
+    "launched_year": 2020
+  },
+  {
+    "scheme_code": "PM-AIF",
+    "name": "Agriculture Infrastructure Fund",
+    "name_hi": "कृषि अवसंरचना निधि",
+    "description": "3% interest subvention + credit guarantee for agri infrastructure projects",
+    "description_hi": "कृषि अवसंरचना परियोजनाओं के लिए 3% ब्याज सबवेंशन + क्रेडिट गारंटी",
+    "level": "central",
+    "ministry": "Agriculture & Farmers Welfare",
+    "category": "agriculture",
+    "subcategory": "infrastructure",
+    "eligibility_rules": {
+      "is_farmer": true,
+      "age": {
+        "min": 18,
+        "max": 70
+      },
+      "income": {
+        "max": 5000000
+      }
+    },
+    "benefits": {
+      "amount": 20000000,
+      "frequency": "one_time",
+      "type": "loan_subsidy",
+      "benefit_summary": "Up to ₹2 crore loan at 3% interest subvention"
+    },
+    "application_url": "https://agriinfra.dac.gov.in",
+    "offline_process": "Apply through participating banks",
+    "documents_required": [
+      "Aadhaar Card",
+      "PAN Card",
+      "Land Records",
+      "Project Report",
+      "Bank Account",
+      "GST Registration"
+    ],
+    "deadline": null,
+    "is_active": true,
+    "launched_year": 2020
+  },
+  {
+    "scheme_code": "PM-KCC",
+    "name": "Kisan Credit Card (KCC)",
+    "name_hi": "किसान क्रेडिट कार्ड",
+    "description": "Short-term credit up to ₹3 lakh at 7% interest for farmers",
+    "description_hi": "किसानों के लिए 7% ब्याज पर ₹3 लाख तक का अल्पकालिक ऋण",
+    "level": "central",
+    "ministry": "Agriculture & Farmers Welfare",
+    "category": "agriculture",
+    "subcategory": "credit",
+    "eligibility_rules": {
+      "is_farmer": true,
+      "age": {
+        "min": 18,
+        "max": 75
+      },
+      "land_area": {
+        "min": 0.01
+      }
+    },
+    "benefits": {
+      "amount": 300000,
+      "frequency": "yearly_renewable",
+      "type": "credit",
+      "benefit_summary": "₹3 lakh credit at 7% interest (subsidized)"
+    },
+    "application_url": "https://www.pmkisan.gov.in",
+    "offline_process": "Visit any bank branch with land records",
+    "documents_required": [
+      "Aadhaar Card",
+      "Land Records",
+      "Bank Account",
+      "Passport Photo",
+      "Crop Details"
+    ],
+    "deadline": null,
+    "is_active": true,
+    "launched_year": 1998
+  },
+  {
+    "scheme_code": "PM-NRLM",
+    "name": "Deendayal Antyodaya Yojana — NRLM",
+    "name_hi": "दीनदयाल अंत्योदय योजना — NRLM",
+    "description": "Self-help group formation + bank linkage + livelihood support for rural poor women",
+    "description_hi": "ग्रामीण गरीब महिलाओं के लिए स्वयं सहायता समूह + बैंक लिंकेज + आजीविका सहायता",
+    "level": "central",
+    "ministry": "Rural Development",
+    "category": "employment",
+    "subcategory": "livelihood",
+    "eligibility_rules": {
+      "gender": [
+        "female"
+      ],
+      "age": {
+        "min": 18,
+        "max": 60
+      },
+      "income": {
+        "max": 200000
+      },
+      "rural": true
+    },
+    "benefits": {
+      "amount": 100000,
+      "frequency": "one_time",
+      "type": "loan_plus_training",
+      "benefit_summary": "SHG formation + ₹1 lakh loan + skill training"
+    },
+    "application_url": "https://aajeevika.gov.in",
+    "offline_process": "Contact Block Mission Management Unit (BMMU)",
+    "documents_required": [
+      "Aadhaar Card",
+      "BPL Card",
+      "Bank Account",
+      "Passport Photo",
+      "SHG Registration"
+    ],
+    "deadline": null,
+    "is_active": true,
+    "launched_year": 2011
+  },
+  {
+    "scheme_code": "PM-NSAP",
+    "name": "National Social Assistance Programme",
+    "name_hi": "राष्ट्रीय सामाजिक सहायता कार्यक्रम",
+    "description": "Pension of ₹200-500/month for elderly, widows, and disabled persons",
+    "description_hi": "बुजुर्गों, विधवाओं और विकलांग व्यक्तियों के लिए ₹200-500/महीना पेंशन",
+    "level": "central",
+    "ministry": "Rural Development",
+    "category": "social_security",
+    "subcategory": "pension",
+    "eligibility_rules": {
+      "age": {
+        "min": 60,
+        "max": 100
+      },
+      "income": {
+        "max": 100000
+      },
+      "or_is_widow": true,
+      "or_is_disabled": true
+    },
+    "benefits": {
+      "amount": 500,
+      "frequency": "monthly_pension",
+      "type": "pension",
+      "benefit_summary": "₹200-500/month pension (varies by state)"
+    },
+    "application_url": "https://nsap.nic.in",
+    "offline_process": "Apply through Gram Panchayat or Block Development Office",
+    "documents_required": [
+      "Aadhaar Card",
+      "Age Proof",
+      "Income Certificate",
+      "Bank Account",
+      "Passport Photo"
+    ],
+    "deadline": null,
+    "is_active": true,
+    "launched_year": 1995
+  },
+  {
+    "scheme_code": "PM-MGNREGA",
+    "name": "MGNREGA — 100 Days Employment",
+    "name_hi": "मनरेगा — 100 दिन का रोजगार",
+    "description": "Guaranteed 100 days of wage employment per rural household per year",
+    "description_hi": "प्रति ग्रामीण परिवार प्रति वर्ष 100 दिन की गारंटीड मजदूरी रोजगार",
+    "level": "central",
+    "ministry": "Rural Development",
+    "category": "employment",
+    "subcategory": "wage_employment",
+    "eligibility_rules": {
+      "age": {
+        "min": 18,
+        "max": 60
+      },
+      "rural": true,
+      "income": {
+        "max": 500000
+      }
+    },
+    "benefits": {
+      "amount": 220,
+      "frequency": "daily_wage",
+      "type": "wage",
+      "benefit_summary": "₹220-350/day wage (varies by state) for 100 days/year"
+    },
+    "application_url": "https://nrega.nic.in",
+    "offline_process": "Apply at Gram Panchayat with Job Card application",
+    "documents_required": [
+      "Aadhaar Card",
+      "Ration Card",
+      "Passport Photo",
+      "Bank Account"
+    ],
+    "deadline": null,
+    "is_active": true,
+    "launched_year": 2005
+  },
+  {
+    "scheme_code": "PM-STREET",
+    "name": "National Urban Livelihoods Mission (DAY-NULM)",
+    "name_hi": "राष्ट्रीय शहरी आजीविका मिशन",
+    "description": "Skill training + self-employment + shelter for urban poor",
+    "description_hi": "शहरी गरीबों के लिए स्किल ट्रेनिंग + स्वरोजगार + आश्रय",
+    "level": "central",
+    "ministry": "Housing & Urban Affairs",
+    "category": "employment",
+    "subcategory": "livelihood",
+    "eligibility_rules": {
+      "age": {
+        "min": 18,
+        "max": 60
+      },
+      "urban": true,
+      "income": {
+        "max": 200000
+      }
+    },
+    "benefits": {
+      "amount": 200000,
+      "frequency": "one_time",
+      "type": "loan_plus_training",
+      "benefit_summary": "Skill training + ₹2 lakh loan + shelter support"
+    },
+    "application_url": "https://nulm.gov.in",
+    "offline_process": "Apply through Urban Local Body (ULB)",
+    "documents_required": [
+      "Aadhaar Card",
+      "BPL Card",
+      "Bank Account",
+      "Passport Photo",
+      "Address Proof"
+    ],
+    "deadline": null,
+    "is_active": true,
+    "launched_year": 2013
+  },
+  {
+    "scheme_code": "PM-DBT",
+    "name": "Direct Benefit Transfer (DBT)",
+    "name_hi": "डायरेक्ट बेनिफिट ट्रांसफर",
+    "description": "Direct cash transfer of subsidies to bank accounts linked with Aadhaar",
+    "description_hi": "आधार से लिंक बैंक खातों में सब्सिडी की सीधी नकद हस्तांतरण",
+    "level": "central",
+    "ministry": "Finance",
+    "category": "governance",
+    "subcategory": "cash_transfer",
+    "eligibility_rules": {
+      "bank_account": true,
+      "aadhaar_linked": true,
+      "age": {
+        "min": 0,
+        "max": 100
+      }
+    },
+    "benefits": {
+      "amount": 0,
+      "frequency": "varies",
+      "type": "cash_transfer",
+      "benefit_summary": "Direct subsidy transfer to bank account"
+    },
+    "application_url": "https://dbtbharat.gov.in",
+    "offline_process": "Automatic — link Aadhaar to bank account",
+    "documents_required": [
+      "Aadhaar Card",
+      "Bank Account",
+      "Mobile Number"
+    ],
+    "deadline": null,
+    "is_active": true,
+    "launched_year": 2013
+  },
+  {
+    "scheme_code": "PM-MSME-REG",
+    "name": "Udyam Registration for MSMEs",
+    "name_hi": "MSMEs के लिए उद्यम पंजीकरण",
+    "description": "Free online registration for Micro, Small & Medium Enterprises",
+    "description_hi": "सूक्ष्म, लघु और मध्यम उद्यमों के लिए मुफ्त ऑनलाइन पंजीकरण",
+    "level": "central",
+    "ministry": "MSME",
+    "category": "governance",
+    "subcategory": "registration",
+    "eligibility_rules": {
+      "occupation": [
+        "entrepreneur",
+        "small_business",
+        "manufacturer",
+        "service_provider"
+      ],
+      "investment": {
+        "max": 50000000
+      },
+      "age": {
+        "min": 18,
+        "max": 100
+      }
+    },
+    "benefits": {
+      "amount": 0,
+      "frequency": "one_time",
+      "type": "registration",
+      "benefit_summary": "Free MSME registration + eligibility for subsidies"
+    },
+    "application_url": "https://udyamregistration.gov.in",
+    "offline_process": "Fully online — no offline needed",
+    "documents_required": [
+      "Aadhaar Card",
+      "PAN Card",
+      "GSTIN (if applicable)",
+      "Bank Account"
+    ],
+    "deadline": null,
+    "is_active": true,
+    "launched_year": 2020
+  },
+  {
+    "scheme_code": "PM-GEM",
+    "name": "Government e-Marketplace (GeM)",
+    "name_hi": "सरकारी ई-मार्केटप्लेस (GeM)",
+    "description": "Online platform for MSMEs to sell directly to government departments",
+    "description_hi": "MSMEs के लिए सरकारी विभागों को सीधे बेचने का ऑनलाइन प्लेटफॉर्म",
+    "level": "central",
+    "ministry": "Commerce & Industry",
+    "category": "governance",
+    "subcategory": "marketplace",
+    "eligibility_rules": {
+      "occupation": [
+        "manufacturer",
+        "supplier",
+        "service_provider",
+        "trader"
+      ],
+      "age": {
+        "min": 18,
+        "max": 100
+      },
+      "udyam_registered": true
+    },
+    "benefits": {
+      "amount": 0,
+      "frequency": "ongoing",
+      "type": "marketplace",
+      "benefit_summary": "Direct government contracts + no middlemen"
+    },
+    "application_url": "https://gem.gov.in",
+    "offline_process": "Register online with Udyam certificate",
+    "documents_required": [
+      "Udyam Registration",
+      "PAN Card",
+      "GST Registration",
+      "Bank Account",
+      "Product Catalog"
+    ],
+    "deadline": null,
+    "is_active": true,
+    "launched_year": 2016
+  },
+  {
+    "scheme_code": "PM-SCHOLAR-GIRL",
+    "name": "Beti Bachao Beti Padhao — Scholarship",
+    "name_hi": "बेटी बचाओ बेटी पढ़ाओ — छात्रवृत्ति",
+    "description": "Cash incentive for girl child education — ₹500 at birth, ₹1000 at Class 1, ₹2000 at Class 6",
+    "description_hi": "बेटी की शिक्षा के लिए नकद प्रोत्साहन — जन्म पर ₹500, कक्षा 1 पर ₹1000, कक्षा 6 पर ₹2000",
+    "level": "central",
+    "ministry": "Women & Child Development",
+    "category": "education",
+    "subcategory": "girl_child",
+    "eligibility_rules": {
+      "gender": [
+        "female"
+      ],
+      "age": {
+        "min": 0,
+        "max": 14
+      },
+      "income": {
+        "max": 300000
+      }
+    },
+    "benefits": {
+      "amount": 3500,
+      "frequency": "milestone_based",
+      "type": "cash_transfer",
+      "benefit_summary": "₹500 at birth + ₹1000 at Class 1 + ₹2000 at Class 6"
+    },
+    "application_url": "https://wcd.nic.in",
+    "offline_process": "Register at Anganwadi Centre or District Child Protection Unit",
+    "documents_required": [
+      "Birth Certificate",
+      "Parent's Aadhaar",
+      "Ration Card",
+      "Bank Account"
+    ],
+    "deadline": null,
+    "is_active": true,
+    "launched_year": 2015
+  },
+  {
+    "scheme_code": "PM-MATERNITY",
+    "name": "Pradhan Mantri Matru Vandana Yojana",
+    "name_hi": "प्रधानमंत्री मातृ वंदना योजना",
+    "description": "₹5,000 cash incentive for first live birth to pregnant women and lactating mothers",
+    "description_hi": "पहले जीवित बच्चे के लिए गर्भवती महिलाओं और स्तनपान कराने वाली माताओं को ₹5,000 नकद प्रोत्साहन",
+    "level": "central",
+    "ministry": "Women & Child Development",
+    "category": "health",
+    "subcategory": "maternal_health",
+    "eligibility_rules": {
+      "gender": [
+        "female"
+      ],
+      "age": {
+        "min": 19,
+        "max": 45
+      },
+      "pregnant": true,
+      "first_child": true,
+      "income": {
+        "max": 500000
+      }
+    },
+    "benefits": {
+      "amount": 5000,
+      "frequency": "per_pregnancy",
+      "type": "cash_transfer",
+      "benefit_summary": "₹5,000 for first live birth (in 3 installments)"
+    },
+    "application_url": "https://pmmvy.wcd.gov.in",
+    "offline_process": "Register at Anganwadi Centre or Health Facility",
+    "documents_required": [
+      "Aadhaar Card",
+      "Mother-Child Protection Card",
+      "Bank Account",
+      "Pregnancy Certificate",
+      "Husband's Aadhaar"
+    ],
+    "deadline": null,
+    "is_active": true,
+    "launched_year": 2017
+  },
+  {
+    "scheme_code": "PM-WIDOW",
+    "name": "Indira Gandhi National Widow Pension Scheme",
+    "name_hi": "इंदिरा गांधी राष्ट्रीय विधवा पेंशन योजना",
+    "description": "Pension of ₹300-500/month for widows aged 40-79 years from BPL families",
+    "description_hi": "BPL परिवारों की 40-79 वर्ष की विधवाओं के लिए ₹300-500/महीना पेंशन",
+    "level": "central",
+    "ministry": "Rural Development",
+    "category": "social_security",
+    "subcategory": "pension",
+    "eligibility_rules": {
+      "gender": [
+        "female"
+      ],
+      "age": {
+        "min": 40,
+        "max": 79
+      },
+      "is_widow": true,
+      "bpl_status": true
+    },
+    "benefits": {
+      "amount": 500,
+      "frequency": "monthly_pension",
+      "type": "pension",
+      "benefit_summary": "₹300-500/month pension for widows"
+    },
+    "application_url": "https://nsap.nic.in",
+    "offline_process": "Apply through Gram Panchayat or Block Development Office",
+    "documents_required": [
+      "Aadhaar Card",
+      "Death Certificate (husband)",
+      "Income Certificate",
+      "Bank Account",
+      "Passport Photo"
+    ],
+    "deadline": null,
+    "is_active": true,
+    "launched_year": 1995
+  },
+  {
+    "scheme_code": "PM-DISABLED",
+    "name": "Indira Gandhi National Disability Pension",
+    "name_hi": "इंदिरा गांधी राष्ट्रीय विकलांगता पेंशन",
+    "description": "Pension of ₹300-500/month for disabled persons aged 18-79 from BPL families",
+    "description_hi": "BPL परिवारों के 18-79 वर्ष के विकलांग व्यक्तियों के लिए ₹300-500/महीना पेंशन",
+    "level": "central",
+    "ministry": "Rural Development",
+    "category": "social_security",
+    "subcategory": "pension",
+    "eligibility_rules": {
+      "age": {
+        "min": 18,
+        "max": 79
+      },
+      "is_disabled": true,
+      "disability_percentage": {
+        "min": 80
+      },
+      "bpl_status": true
+    },
+    "benefits": {
+      "amount": 500,
+      "frequency": "monthly_pension",
+      "type": "pension",
+      "benefit_summary": "₹300-500/month pension for severely disabled"
+    },
+    "application_url": "https://nsap.nic.in",
+    "offline_process": "Apply through Gram Panchayat or Social Welfare Department",
+    "documents_required": [
+      "Aadhaar Card",
+      "Disability Certificate",
+      "Income Certificate",
+      "Bank Account",
+      "Passport Photo"
+    ],
+    "deadline": null,
+    "is_active": true,
+    "launched_year": 1995
+  },
+  {
+    "scheme_code": "PM-OLD-AGE",
+    "name": "Indira Gandhi National Old Age Pension",
+    "name_hi": "इंदिरा गांधी राष्ट्रीय वृद्धावस्था पेंशन",
+    "description": "Pension of ₹200-500/month for senior citizens aged 60+ from BPL families",
+    "description_hi": "BPL परिवारों के 60+ वर्ष के वरिष्ठ नागरिकों के लिए ₹200-500/महीना पेंशन",
+    "level": "central",
+    "ministry": "Rural Development",
+    "category": "social_security",
+    "subcategory": "pension",
+    "eligibility_rules": {
+      "age": {
+        "min": 60,
+        "max": 100
+      },
+      "bpl_status": true,
+      "income": {
+        "max": 100000
+      }
+    },
+    "benefits": {
+      "amount": 500,
+      "frequency": "monthly_pension",
+      "type": "pension",
+      "benefit_summary": "₹200-500/month pension for senior citizens"
+    },
+    "application_url": "https://nsap.nic.in",
+    "offline_process": "Apply through Gram Panchayat or Block Development Office",
+    "documents_required": [
+      "Aadhaar Card",
+      "Age Proof",
+      "Income Certificate",
+      "Bank Account",
+      "Passport Photo"
+    ],
+    "deadline": null,
+    "is_active": true,
+    "launched_year": 1995
+  },
+  {
+    "scheme_code": "PM-ATAL",
+    "name": "Atal Pension Yojana (APY)",
+    "name_hi": "अटल पेंशन योजना",
+    "description": "Guaranteed pension of ₹1000-5000/month after 60 years for unorganized sector workers",
+    "description_hi": "असंगठित क्षेत्र के कर्मचारियों के लिए 60 साल के बाद ₹1000-5000/महीना गारंटीड पेंशन",
+    "level": "central",
+    "ministry": "Finance",
+    "category": "social_security",
+    "subcategory": "pension",
+    "eligibility_rules": {
+      "age": {
+        "min": 18,
+        "max": 40
+      },
+      "income": {
+        "max": 500000
+      },
+      "occupation": [
+        "unorganized_worker",
+        "daily_wage",
+        "self_employed",
+        "farmer"
+      ]
+    },
+    "benefits": {
+      "amount": 5000,
+      "frequency": "monthly_pension",
+      "type": "pension",
+      "benefit_summary": "₹1,000-5,000/month pension after age 60"
+    },
+    "application_url": "https://npscra.nsdl.co.in",
+    "offline_process": "Visit bank branch or apply through bank account",
+    "documents_required": [
+      "Aadhaar Card",
+      "Bank Account",
+      "Mobile Number",
+      "Age Proof"
+    ],
+    "deadline": null,
+    "is_active": true,
+    "launched_year": 2015
+  },
+  {
+    "scheme_code": "PM-STANDUP",
+    "name": "Stand-Up India Scheme",
+    "name_hi": "स्टैंड-अप इंडिया योजना",
+    "description": "Bank loan between ₹10 lakh to ₹1 crore for SC/ST and women entrepreneurs",
+    "description_hi": "SC/ST और महिला उद्यमियों के लिए ₹10 लाख से ₹1 करोड़ तक का बैंक ऋण",
+    "level": "central",
+    "ministry": "Finance",
+    "category": "employment",
+    "subcategory": "loan",
+    "eligibility_rules": {
+      "age": {
+        "min": 18,
+        "max": 55
+      },
+      "income": {
+        "max": 10000000
+      },
+      "or_gender": [
+        "female"
+      ],
+      "or_caste": [
+        "SC",
+        "ST"
+      ]
+    },
+    "benefits": {
+      "amount": 10000000,
+      "frequency": "one_time",
+      "type": "loan",
+      "benefit_summary": "₹10 lakh to ₹1 crore loan for SC/ST/women entrepreneurs"
+    },
+    "application_url": "https://www.standupmitra.in",
+    "offline_process": "Apply through scheduled commercial banks",
+    "documents_required": [
+      "Aadhaar Card",
+      "PAN Card",
+      "Caste Certificate (if applicable)",
+      "Business Plan",
+      "Bank Account",
+      "Project Report"
+    ],
+    "deadline": null,
+    "is_active": true,
+    "launched_year": 2016
+  },
+  {
+    "scheme_code": "PM-TUBERCULOSIS",
+    "name": "Nikshay Poshan Yojana",
+    "name_hi": "निक्षय पोषण योजना",
+    "description": "₹500/month nutritional support for TB patients during treatment",
+    "description_hi": "TB मरीजों के इलाज के दौरान ₹500/महीना पोषण सहायता",
+    "level": "central",
+    "ministry": "Health & Family Welfare",
+    "category": "health",
+    "subcategory": "disease_support",
+    "eligibility_rules": {
+      "age": {
+        "min": 0,
+        "max": 100
+      },
+      "has_tuberculosis": true,
+      "income": {
+        "max": 500000
+      }
+    },
+    "benefits": {
+      "amount": 500,
+      "frequency": "monthly",
+      "type": "cash_transfer",
+      "benefit_summary": "₹500/month for TB treatment nutrition"
+    },
+    "application_url": "https://nikshay.in",
+    "offline_process": "Register at DOTS Centre or Health Facility",
+    "documents_required": [
+      "Aadhaar Card",
+      "TB Diagnosis Report",
+      "Bank Account",
+      "Treatment Card"
+    ],
+    "deadline": null,
+    "is_active": true,
+    "launched_year": 2018
+  },
+  {
+    "scheme_code": "PM-DIABETES",
+    "name": "National Programme for Prevention of Diabetes",
+    "name_hi": "मधुमेह रोकथाम राष्ट्रीय कार्यक्रम",
+    "description": "Free screening, medicines, and glucometer for diabetes patients at government hospitals",
+    "description_hi": "सरकारी अस्पतालों में मधुमेह रोगियों के लिए मुफ्त जांच, दवाइयां और ग्लूकोमीटर",
+    "level": "central",
+    "ministry": "Health & Family Welfare",
+    "category": "health",
+    "subcategory": "disease_support",
+    "eligibility_rules": {
+      "age": {
+        "min": 30,
+        "max": 100
+      },
+      "has_diabetes": true,
+      "income": {
+        "max": 500000
+      }
+    },
+    "benefits": {
+      "amount": 0,
+      "frequency": "monthly",
+      "type": "medical_support",
+      "benefit_summary": "Free medicines + glucometer + quarterly checkup"
+    },
+    "application_url": "https://nhp.gov.in",
+    "offline_process": "Register at nearest Government Health Facility",
+    "documents_required": [
+      "Aadhaar Card",
+      "Diabetes Diagnosis",
+      "BPL Card (optional)",
+      "Bank Account"
+    ],
+    "deadline": null,
+    "is_active": true,
+    "launched_year": 2010
+  },
+  {
+    "scheme_code": "PM-CANCER",
+    "name": "Health Minister's Cancer Patient Fund",
+    "name_hi": "स्वास्थ्य मंत्री कैंसर रोगी निधि",
+    "description": "Financial assistance up to ₹1 lakh for cancer treatment at government hospitals",
+    "description_hi": "सरकारी अस्पतालों में कैंसर इलाज के लिए ₹1 लाख तक की आर्थिक सहायता",
+    "level": "central",
+    "ministry": "Health & Family Welfare",
+    "category": "health",
+    "subcategory": "disease_support",
+    "eligibility_rules": {
+      "age": {
+        "min": 0,
+        "max": 100
+      },
+      "has_cancer": true,
+      "income": {
+        "max": 300000
+      }
+    },
+    "benefits": {
+      "amount": 100000,
+      "frequency": "one_time",
+      "type": "financial_assistance",
+      "benefit_summary": "Up to ₹1 lakh for cancer treatment"
+    },
+    "application_url": "https://nhm.gov.in",
+    "offline_process": "Apply through treating hospital's Medical Social Worker",
+    "documents_required": [
+      "Aadhaar Card",
+      "Cancer Diagnosis Report",
+      "Income Certificate",
+      "Bank Account",
+      "Treatment Estimate"
+    ],
+    "deadline": null,
+    "is_active": true,
+    "launched_year": 2009
+  },
+  {
+    "scheme_code": "PM-DIGI-LOCKER",
+    "name": "DigiLocker",
+    "name_hi": "डिजिलॉकर",
+    "description": "Free digital document storage and sharing platform linked with Aadhaar",
+    "description_hi": "आधार से लिंक मुफ्त डिजिटल दस्तावेज़ संग्रहण और साझा करने का प्लेटफॉर्म",
+    "level": "central",
+    "ministry": "Electronics & IT",
+    "category": "governance",
+    "subcategory": "digital_service",
+    "eligibility_rules": {
+      "age": {
+        "min": 0,
+        "max": 100
+      },
+      "aadhaar": true
+    },
+    "benefits": {
+      "amount": 0,
+      "frequency": "ongoing",
+      "type": "digital_service",
+      "benefit_summary": "Free 1GB cloud storage for documents"
+    },
+    "application_url": "https://digilocker.gov.in",
+    "offline_process": "Register online with Aadhaar OTP",
+    "documents_required": [
+      "Aadhaar Card",
+      "Mobile Number"
+    ],
+    "deadline": null,
+    "is_active": true,
+    "launched_year": 2015
+  },
+  {
+    "scheme_code": "PM-UMANG",
+    "name": "UMANG App",
+    "name_hi": "उमंग ऐप",
+    "description": "Single mobile app for accessing 300+ government services",
+    "description_hi": "300+ सरकारी सेवाओं तक पहुंचने के लिए एक मोबाइल ऐप",
+    "level": "central",
+    "ministry": "Electronics & IT",
+    "category": "governance",
+    "subcategory": "digital_service",
+    "eligibility_rules": {
+      "age": {
+        "min": 0,
+        "max": 100
+      },
+      "smartphone": true
+    },
+    "benefits": {
+      "amount": 0,
+      "frequency": "ongoing",
+      "type": "digital_service",
+      "benefit_summary": "Access 300+ government services in one app"
+    },
+    "application_url": "https://web.umang.gov.in",
+    "offline_process": "Download app from Play Store/App Store",
+    "documents_required": [
+      "Aadhaar Card",
+      "Mobile Number"
+    ],
+    "deadline": null,
+    "is_active": true,
+    "launched_year": 2017
+  },
+  {
+    "scheme_code": "PM-ELECTRIC",
+    "name": "Saubhagya — Household Electrification",
+    "name_hi": "सौभाग्य — घरेलू विद्युतीकरण",
+    "description": "Free electricity connection to all remaining un-electrified households",
+    "description_hi": "बचे हुए सभी बिना बिजली के घरों को मुफ्त बिजली कनेक्शन",
+    "level": "central",
+    "ministry": "Power",
+    "category": "welfare",
+    "subcategory": "energy",
+    "eligibility_rules": {
+      "income": {
+        "max": 500000
+      },
+      "no_electricity": true,
+      "age": {
+        "min": 18,
+        "max": 100
+      }
+    },
+    "benefits": {
+      "amount": 0,
+      "frequency": "one_time",
+      "type": "infrastructure",
+      "benefit_summary": "Free electricity connection + LED bulbs"
+    },
+    "application_url": "https://saubhagya.gov.in",
+    "offline_process": "Contact DISCOM office or apply through Gram Panchayat",
+    "documents_required": [
+      "Aadhaar Card",
+      "Ration Card",
+      "Address Proof"
+    ],
+    "deadline": null,
+    "is_active": true,
+    "launched_year": 2017
+  },
+  {
+    "scheme_code": "PM-LED",
+    "name": "UJALA — LED Bulb Distribution",
+    "name_hi": "उजाला — LED बल्ब वितरण",
+    "description": "LED bulbs at ₹10-20 (market price ₹300-500) for energy saving",
+    "description_hi": "ऊर्जा बचत के लिए ₹10-20 में LED बल्ब (बाजार मूल्य ₹300-500)",
+    "level": "central",
+    "ministry": "Power",
+    "category": "welfare",
+    "subcategory": "energy",
+    "eligibility_rules": {
+      "age": {
+        "min": 18,
+        "max": 100
+      },
+      "income": {
+        "max": 10000000
+      }
+    },
+    "benefits": {
+      "amount": 0,
+      "frequency": "one_time",
+      "type": "subsidy",
+      "benefit_summary": "LED bulbs at 90% discount"
+    },
+    "application_url": "https://ujala.gov.in",
+    "offline_process": "Visit designated distribution centre with ID proof",
+    "documents_required": [
+      "Aadhaar Card",
+      "Electricity Bill"
+    ],
+    "deadline": null,
+    "is_active": true,
+    "launched_year": 2015
+  },
+  {
+    "scheme_code": "PM-SOLAR",
+    "name": "PM Surya Ghar Muft Bijli Yojana",
+    "name_hi": "पीएम सूर्य घर मुफ्त बिजली योजना",
+    "description": "Free electricity up to 300 units/month through rooftop solar panels with 60% subsidy",
+    "description_hi": "60% सब्सिडी के साथ छत पर सोलर पैनल से 300 यूनिट/महीना तक मुफ्त बिजली",
+    "level": "central",
+    "ministry": "New & Renewable Energy",
+    "category": "welfare",
+    "subcategory": "energy",
+    "eligibility_rules": {
+      "age": {
+        "min": 18,
+        "max": 100
+      },
+      "own_house": true,
+      "income": {
+        "max": 2000000
+      }
+    },
+    "benefits": {
+      "amount": 0,
+      "frequency": "monthly",
+      "type": "subsidy",
+      "benefit_summary": "60% subsidy on rooftop solar + free electricity up to 300 units"
+    },
+    "application_url": "https://pmsuryaghar.gov.in",
+    "offline_process": "Register online and get installation through empanelled vendor",
+    "documents_required": [
+      "Aadhaar Card",
+      "Property Documents",
+      "Electricity Bill",
+      "Bank Account",
+      "Passport Photo"
+    ],
+    "deadline": null,
+    "is_active": true,
+    "launched_year": 2024
+  },
+  {
+    "scheme_code": "PM-FIT",
+    "name": "Khelo India — Fitness Scheme",
+    "name_hi": "खेलो इंडिया — फिटनेस योजना",
+    "description": "Annual scholarship of ₹5 lakh for 1000 talented athletes + sports infrastructure",
+    "description_hi": "1000 प्रतिभाशाली एथलीट्स के लिए सालाना ₹5 लाख छात्रवृत्ति + खेल अवसंरचना",
+    "level": "central",
+    "ministry": "Youth Affairs & Sports",
+    "category": "education",
+    "subcategory": "sports",
+    "eligibility_rules": {
+      "age": {
+        "min": 8,
+        "max": 25
+      },
+      "is_athlete": true,
+      "income": {
+        "max": 5000000
+      }
+    },
+    "benefits": {
+      "amount": 500000,
+      "frequency": "yearly",
+      "type": "scholarship",
+      "benefit_summary": "₹5 lakh/year scholarship + training + equipment"
+    },
+    "application_url": "https://kheloindia.gov.in",
+    "offline_process": "Apply through State Sports Department or online portal",
+    "documents_required": [
+      "Aadhaar Card",
+      "Sports Certificate",
+      "Age Proof",
+      "Bank Account",
+      "Passport Photo",
+      "Coach Recommendation"
+    ],
+    "deadline": "2026-08-31",
+    "is_active": true,
+    "launched_year": 2018
+  },
+  {
+    "scheme_code": "PM-ITI",
+    "name": "Craftsman Training Scheme (ITI)",
+    "name_hi": "क्राफ्ट्समैन ट्रेनिंग स्कीम (ITI)",
+    "description": "Free vocational training in 137 trades at Industrial Training Institutes",
+    "description_hi": "औद्योगिक प्रशिक्षण संस्थानों में 137 ट्रेडों में मुफ्त व्यावसायिक प्रशिक्षण",
+    "level": "central",
+    "ministry": "Skill Development & Entrepreneurship",
+    "category": "education",
+    "subcategory": "vocational",
+    "eligibility_rules": {
+      "age": {
+        "min": 14,
+        "max": 40
+      },
+      "education_level": [
+        "class_8",
+        "class_10",
+        "class_12"
+      ],
+      "income": {
+        "max": 500000
+      }
+    },
+    "benefits": {
+      "amount": 0,
+      "frequency": "one_time",
+      "type": "training",
+      "benefit_summary": "Free ITI training + NCVT certificate + stipend ₹500-1000/month"
+    },
+    "application_url": "https://ncvtmis.gov.in",
+    "offline_process": "Apply through nearest ITI during admission period",
+    "documents_required": [
+      "Aadhaar Card",
+      "Marksheet",
+      "Age Proof",
+      "Caste Certificate",
+      "Passport Photo"
+    ],
+    "deadline": "2026-07-31",
+    "is_active": true,
+    "launched_year": 1950
+  },
+  {
+    "scheme_code": "PM-APPRENTICE",
+    "name": "National Apprenticeship Promotion Scheme",
+    "name_hi": "राष्ट्रीय अप्रेंटिसशिप प्रोत्साहन योजना",
+    "description": "Apprenticeship training with stipend of ₹5000-15000/month in industries",
+    "description_hi": "उद्योगों में ₹5000-15000/महीना स्टाइपेंड के साथ अप्रेंटिसशिप ट्रेनिंग",
+    "level": "central",
+    "ministry": "Skill Development & Entrepreneurship",
+    "category": "education",
+    "subcategory": "apprenticeship",
+    "eligibility_rules": {
+      "age": {
+        "min": 14,
+        "max": 35
+      },
+      "education_level": [
+        "class_10",
+        "class_12",
+        "ITI",
+        "diploma",
+        "undergraduate"
+      ],
+      "income": {
+        "max": 500000
+      }
+    },
+    "benefits": {
+      "amount": 15000,
+      "frequency": "monthly_stipend",
+      "type": "training",
+      "benefit_summary": "₹5,000-15,000/month stipend + NAPS certificate"
+    },
+    "application_url": "https://naps.gov.in",
+    "offline_process": "Register on NAPS portal and apply to companies",
+    "documents_required": [
+      "Aadhaar Card",
+      "Education Certificate",
+      "Bank Account",
+      "Passport Photo"
+    ],
+    "deadline": null,
+    "is_active": true,
+    "launched_year": 2016
+  },
+  {
+    "scheme_code": "PM-SIH",
+    "name": "Smart India Hackathon",
+    "name_hi": "स्मार्ट इंडिया हैकथॉन",
+    "description": "National-level hackathon for college students with prizes up to ₹1 lakh",
+    "description_hi": "कॉलेज छात्रों के लिए राष्ट्रीय स्तर का हैकथॉन — ₹1 लाख तक के पुरस्कार",
+    "level": "central",
+    "ministry": "Education",
+    "category": "education",
+    "subcategory": "competition",
+    "eligibility_rules": {
+      "is_student": true,
+      "age": {
+        "min": 18,
+        "max": 28
+      },
+      "education_level": [
+        "undergraduate",
+        "postgraduate"
+      ]
+    },
+    "benefits": {
+      "amount": 100000,
+      "frequency": "one_time",
+      "type": "prize",
+      "benefit_summary": "Cash prize + internship opportunities + mentorship"
+    },
+    "application_url": "https://sih.gov.in",
+    "offline_process": "Register online through college nodal center",
+    "documents_required": [
+      "Aadhaar Card",
+      "College ID",
+      "Team Details"
+    ],
+    "deadline": "2026-09-15",
+    "is_active": true,
+    "launched_year": 2017
+  }
+]
