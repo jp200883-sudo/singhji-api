@@ -422,7 +422,7 @@ def rate_limit_check(func):
             await safe_reply_text(
                 update.message,
                 "🚫 Rate Limit! Thoda slow karo! 1 minute mein try karo!",
-                parse_mode=ParseMode.MARKDOWN
+                parse_mode=None
             )
             return
         return await func(update, context, *args, **kwargs)
@@ -439,9 +439,9 @@ def error_handler_decorator(func):
             error_msg = "❌ Error! Kuch problem ho gayi! Admin ko bata diya hai. Thodi der mein try karo!"
             try:
                 if update.message:
-                    await safe_reply_text(update.message, error_msg, parse_mode=ParseMode.MARKDOWN)
+                    await safe_reply_text(update.message, error_msg, parse_mode=None)
                 elif update.callback_query:
-                    await safe_reply_text(update.callback_query.message, error_msg, parse_mode=ParseMode.MARKDOWN)
+                    await safe_reply_text(update.callback_query.message, error_msg, parse_mode=None)
             except:
                 pass
             raise
@@ -604,21 +604,21 @@ async def fetch_and_send_weather(update: Update, city: str):
                 f"☁️ Condition: {condition}\n"
                 f"💧 Humidity: {humidity}%\n\n"
                 f"Singh Ji AI - Har pal saath!",
-                parse_mode=ParseMode.MARKDOWN,
+                parse_mode=None,
                 reply_markup=KeyboardBuilder.main_menu()
             )
         else:
             await safe_reply_text(
                 update.message,
                 f"❌ {city} ka weather nahi mila! Sahi city name try karo!",
-                parse_mode=ParseMode.MARKDOWN
+                parse_mode=None
             )
     except Exception as e:
         logger.error(f"Weather fetch error: {e}")
         await safe_reply_text(
             update.message,
             "❌ Weather service down! Baad mein try karo!",
-            parse_mode=ParseMode.MARKDOWN
+            parse_mode=None
         )
 
 async def fetch_and_send_mandi(update: Update, state: str):
@@ -638,27 +638,27 @@ async def fetch_and_send_mandi(update: Update, state: str):
                 await safe_reply_text(
                     update.message,
                     msg,
-                    parse_mode=ParseMode.MARKDOWN,
+                    parse_mode=None,
                     reply_markup=KeyboardBuilder.main_menu()
                 )
             else:
                 await safe_reply_text(
                     update.message,
                     f"❌ {state.title()} ke liye koi data nahi mila!",
-                    parse_mode=ParseMode.MARKDOWN
+                    parse_mode=None
                 )
         else:
             await safe_reply_text(
                 update.message,
                 f"❌ {state} ka data nahi mila!",
-                parse_mode=ParseMode.MARKDOWN
+                parse_mode=None
             )
     except Exception as e:
         logger.error(f"Mandi fetch error: {e}")
         await safe_reply_text(
             update.message,
             "❌ Mandi service down! Baad mein try karo!",
-            parse_mode=ParseMode.MARKDOWN
+            parse_mode=None
         )
 
 async def calculate_and_send_tax(update: Update, income: float):
@@ -678,21 +678,21 @@ async def calculate_and_send_tax(update: Update, income: float):
                 f"Tax: Rs.{tax:,.0f}\n"
                 f"Regime: {regime}\n\n"
                 f"⚠️ Ye estimate hai, CA se confirm karo!",
-                parse_mode=ParseMode.MARKDOWN,
+                parse_mode=None,
                 reply_markup=KeyboardBuilder.main_menu()
             )
         else:
             await safe_reply_text(
                 update.message,
                 "❌ Tax calculation failed!",
-                parse_mode=ParseMode.MARKDOWN
+                parse_mode=None
             )
     except Exception as e:
         logger.error(f"Tax calc error: {e}")
         await safe_reply_text(
             update.message,
             "❌ Tax service down! Baad mein try karo!",
-            parse_mode=ParseMode.MARKDOWN
+            parse_mode=None
         )
 
 async def fetch_and_send_gold(update: Update, city: str = "India"):
@@ -713,14 +713,14 @@ async def fetch_and_send_gold(update: Update, city: str = "India"):
                 f"22K: Rs.{gold_22k}/10g\n"
                 f"Silver: Rs.{silver}/kg\n\n"
                 f"Rate change hote rehte hain!",
-                parse_mode=ParseMode.MARKDOWN,
+                parse_mode=None,
                 reply_markup=KeyboardBuilder.main_menu()
             )
         else:
-            await safe_reply_text(update.message, "❌ Gold rate nahi mila!", parse_mode=ParseMode.MARKDOWN)
+            await safe_reply_text(update.message, "❌ Gold rate nahi mila!", parse_mode=None)
     except Exception as e:
         logger.error(f"Gold fetch error: {e}")
-        await safe_reply_text(update.message, "❌ Gold service down!", parse_mode=ParseMode.MARKDOWN)
+        await safe_reply_text(update.message, "❌ Gold service down!", parse_mode=None)
 
 async def fetch_and_send_fuel(update: Update, city: str):
     try:
@@ -738,14 +738,14 @@ async def fetch_and_send_fuel(update: Update, city: str):
                 f"Petrol: Rs.{petrol}/L\n"
                 f"Diesel: Rs.{diesel}/L\n\n"
                 f"Aaj ka rate!",
-                parse_mode=ParseMode.MARKDOWN,
+                parse_mode=None,
                 reply_markup=KeyboardBuilder.main_menu()
             )
         else:
-            await safe_reply_text(update.message, "❌ Fuel price nahi mila!", parse_mode=ParseMode.MARKDOWN)
+            await safe_reply_text(update.message, "❌ Fuel price nahi mila!", parse_mode=None)
     except Exception as e:
         logger.error(f"Fuel fetch error: {e}")
-        await safe_reply_text(update.message, "❌ Fuel service down!", parse_mode=ParseMode.MARKDOWN)
+        await safe_reply_text(update.message, "❌ Fuel service down!", parse_mode=None)
 
 # ═══════════════════════════════════════════════════════
 # 🏛️ SCHEME SWARM HELPERS
@@ -965,7 +965,7 @@ Bas message bhejo, baaki main dekh lunga!
     """
     await update.message.reply_text(
         welcome_text,
-        parse_mode=ParseMode.MARKDOWN,
+        parse_mode=None,
         reply_markup=KeyboardBuilder.main_menu()
     )
 
@@ -1027,7 +1027,7 @@ Telegram: @SinghJiAI
     """
     await update.message.reply_text(
         help_text,
-        parse_mode=ParseMode.MARKDOWN,
+        parse_mode=None,
         reply_markup=KeyboardBuilder.main_menu()
     )
 
@@ -1036,7 +1036,7 @@ async def modules_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     analytics.track_message(update.effective_user.id, "command")
     await update.message.reply_text(
         f"📦 {len(ACTIVE_MODULES)} Active Modules\n\nModule select karo:",
-        parse_mode=ParseMode.MARKDOWN,
+        parse_mode=None,
         reply_markup=KeyboardBuilder.modules_keyboard(1)
     )
 
@@ -1049,7 +1049,7 @@ async def use_module_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if not args:
         await update.message.reply_text(
             "Usage: /use <module> <query>\n\nExample: /use weather Delhi\n\nModules list ke liye: /modules",
-            parse_mode=ParseMode.MARKDOWN
+            parse_mode=None
         )
         return
     module = args[0].lower()
@@ -1060,13 +1060,13 @@ async def use_module_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
         suggestion = "\n".join([f"- /{m}" for m in similar])
         await update.message.reply_text(
             f"❌ Module {module} nahi mila!\n\nSimilar modules:\n{suggestion}\n\nSab modules: /modules",
-            parse_mode=ParseMode.MARKDOWN
+            parse_mode=None
         )
         return
     analytics.track_module_usage(module)
     processing_msg = await update.message.reply_text(
         f"⏳ {module.upper()} module use kar raha hoon...",
-        parse_mode=ParseMode.MARKDOWN
+        parse_mode=None
     )
     try:
         response = requests.get(
@@ -1085,12 +1085,12 @@ async def use_module_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
             await safe_edit_text(
                 processing_msg,
                 f"📊 {module.upper()} Result:\n\n```json\n{formatted_data}\n```",
-                parse_mode=ParseMode.MARKDOWN
+                parse_mode=None
             )
         else:
             await processing_msg.edit_text(
                 f"❌ Module error! Status: {response.status_code}",
-                parse_mode=ParseMode.MARKDOWN
+                parse_mode=None
             )
     except requests.Timeout:
         await processing_msg.edit_text("⏳ Module timeout! Baad mein try karo!")
@@ -1104,7 +1104,7 @@ async def remember_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not text:
         await update.message.reply_text(
             "Usage: /remember <text>\n\nExample: /remember Mera naam Ram hai, main kisaan hoon\n\nFir /recall se puch sakte ho!",
-            parse_mode=ParseMode.MARKDOWN
+            parse_mode=None
         )
         return
     user_memory.set(user.id, text, metadata={
@@ -1113,7 +1113,7 @@ async def remember_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     })
     await update.message.reply_text(
         f"✅ Yaad rakh liya!\n\nMemory: {text}\n\nKabhi bhi /recall se puch sakte ho!\nClear karne ke liye: /settings",
-        parse_mode=ParseMode.MARKDOWN
+        parse_mode=None
     )
 
 @error_handler_decorator
@@ -1129,7 +1129,7 @@ async def recall_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         time_str = "Unknown"
     await update.message.reply_text(
         f"🧠 Tumhari Memory:\n\n{content}\n\nLast Updated: {time_str}\nMetadata: {json.dumps(metadata, indent=2)}\n\nNaya memory: /remember <text>\nClear: /settings",
-        parse_mode=ParseMode.MARKDOWN
+        parse_mode=None
     )
 
 @error_handler_decorator
@@ -1174,7 +1174,7 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     await update.message.reply_text(
         status_text,
-        parse_mode=ParseMode.MARKDOWN,
+        parse_mode=None,
         reply_markup=InlineKeyboardMarkup([[
             InlineKeyboardButton("🔄 Refresh", callback_data="refresh_status"),
             InlineKeyboardButton("📊 Full Stats", callback_data="bot_stats")
@@ -1186,7 +1186,7 @@ async def settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     await update.message.reply_text(
         "⚙️ Settings\n\nApni preferences customize karo:",
-        parse_mode=ParseMode.MARKDOWN,
+        parse_mode=None,
         reply_markup=KeyboardBuilder.settings_menu(user.id)
     )
 
@@ -1239,7 +1239,7 @@ Contact: @SinghJiAI
     ])
     await update.message.reply_text(
         about_text,
-        parse_mode=ParseMode.MARKDOWN,
+        parse_mode=None,
         reply_markup=keyboard
     )
 
@@ -1285,7 +1285,7 @@ async def bachpan_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("📝 Report", callback_data="bachpan_report"),
          InlineKeyboardButton("🔙 Menu", callback_data="main_menu")]
     ])
-    await update.message.reply_text(bachpan_text, parse_mode=ParseMode.MARKDOWN, reply_markup=keyboard)
+    await update.message.reply_text(bachpan_text, parse_mode=None, reply_markup=keyboard)
 
 # ═══════════════════════════════════════════════════════
 # 🌾 KISAAN DOCTOR — Photo Handler
@@ -1335,7 +1335,7 @@ async def yojana_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if len(args) < 3:
         await update.message.reply_text(
             "Usage: /yojana <age> <income> <occupation>\nExample: /yojana 45 150000 farmer",
-            parse_mode=ParseMode.MARKDOWN
+            parse_mode=None
         )
         return
     try:
@@ -1352,7 +1352,7 @@ async def yojana_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text = f"🏛️ {result['eligible_count']} schemes mile!\n\n"
         for s in result["schemes"]:
             text += f"✅ {s['name']}\nAmount: Rs {s['amount']} ({s['frequency']})\nNext step: {s['next_step']}\n\n"
-        await safe_reply_text(update.message, text[:4000], parse_mode=ParseMode.MARKDOWN)
+        await safe_reply_text(update.message, text[:4000], parse_mode=None)
     except ValueError:
         await update.message.reply_text("❌ Age aur income number mein bhejo.\nExample: /yojana 45 150000 farmer")
     except Exception as e:
@@ -1375,7 +1375,7 @@ async def scheme_profile_command(update: Update, context: ContextTypes.DEFAULT_T
         "Apni *umr* batao (in years):\n"
         "Example: 35\n\n"
         "❌ Cancel karne ke liye /start dabao",
-        parse_mode=ParseMode.MARKDOWN,
+        parse_mode=None,
         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel", callback_data="main_menu")]])
     )
 
@@ -1391,7 +1391,7 @@ async def schemes_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             "🏛️ Pehle apna profile banayein!\n\n"
             "/scheme_profile se 6-step wizard start karo!",
-            parse_mode=ParseMode.MARKDOWN,
+            parse_mode=None,
             reply_markup=KeyboardBuilder.schemes_menu_keyboard()
         )
         return
@@ -1407,7 +1407,7 @@ async def schemes_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             "❌ Filhaal koi scheme match nahi hui!\n"
             "Profile update karo: /scheme_profile",
-            parse_mode=ParseMode.MARKDOWN
+            parse_mode=None
         )
         return
     conversation_mgr.set_state(user.id, ConversationState.NONE, {"matched_schemes": matched})
@@ -1419,7 +1419,7 @@ async def schemes_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text += f"   📋 {s['category']}\n\n"
     await update.message.reply_text(
         text,
-        parse_mode=ParseMode.MARKDOWN,
+        parse_mode=None,
         reply_markup=KeyboardBuilder.scheme_list_keyboard(matched, 0)
     )
 
@@ -1434,7 +1434,7 @@ async def scheme_status_command(update: Update, context: ContextTypes.DEFAULT_TY
             "Usage: /scheme_status <scheme_id>\n\n"
             "Example: /scheme_status pmkisan\n\n"
             "Scheme ID ke liye /schemes se list dekho!",
-            parse_mode=ParseMode.MARKDOWN
+            parse_mode=None
         )
         return
     scheme_id = args[0].lower()
@@ -1443,7 +1443,7 @@ async def scheme_status_command(update: Update, context: ContextTypes.DEFAULT_TY
         await update.message.reply_text(
             f"❌ Scheme '{scheme_id}' nahi mili!\n"
             "Sahi ID ke liye /schemes dekho.",
-            parse_mode=ParseMode.MARKDOWN
+            parse_mode=None
         )
         return
     status_text = f"""
@@ -1470,7 +1470,7 @@ Category: {scheme['category']}
     await safe_reply_text(
         update.message,
         status_text,
-        parse_mode=ParseMode.MARKDOWN,
+        parse_mode=None,
         reply_markup=KeyboardBuilder.scheme_detail_keyboard(scheme_id)
     )
 
@@ -1485,7 +1485,7 @@ async def voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     analytics.track_message(user.id, "voice")
     processing_msg = await update.message.reply_text(
         "🎤 Voice sun raha hoon...",
-        parse_mode=ParseMode.MARKDOWN
+        parse_mode=None
     )
     try:
         voice_file = await update.message.voice.get_file()
@@ -1533,7 +1533,7 @@ async def voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await safe_reply_text(
                 update.message,
                 f"🎙️ *Aapne kaha:* {transcript}\n\n*Singh Ji:* {ai_response['text']}",
-                parse_mode=ParseMode.MARKDOWN
+                parse_mode=None
             )
         user_memory.set(user.id, f"Voice: {transcript[:50]}... | AI: {ai_response['text'][:50]}...",
                        metadata={"type": "voice_chat"})
@@ -1582,7 +1582,7 @@ async def text_chat_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except ValueError:
             await update.message.reply_text(
                 "❌ Galat number! Sirf digits bhejo (jaise: 500000)",
-                parse_mode=ParseMode.MARKDOWN
+                parse_mode=None
             )
         conversation_mgr.clear_state(user.id)
         return
@@ -1602,7 +1602,7 @@ async def text_chat_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif conv_state["state"] == ConversationState.CURRENCY_PAIR:
         await update.message.reply_text(
             f"💰 Currency rate for {user_text} fetch kar raha hoon...",
-            parse_mode=ParseMode.MARKDOWN
+            parse_mode=None
         )
         conversation_mgr.clear_state(user.id)
         return
@@ -1611,7 +1611,7 @@ async def text_chat_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         query = user_text.strip()
         await update.message.reply_text(
             f"🔍 {query} ke liye search kar raha hoon...",
-            parse_mode=ParseMode.MARKDOWN
+            parse_mode=None
         )
         conversation_mgr.clear_state(user.id)
         return
@@ -1627,7 +1627,7 @@ async def text_chat_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "Apni *saalana income* batao (in Rs):\n"
                 "Example: 150000\n\n"
                 "❌ Cancel: /start",
-                parse_mode=ParseMode.MARKDOWN
+                parse_mode=None
             )
         except ValueError:
             await update.message.reply_text("❌ Sirf number bhejo! Example: 35")
@@ -1643,7 +1643,7 @@ async def text_chat_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "Apna *state* batao:\n"
                 "Example: Uttar Pradesh, Bihar, Maharashtra\n\n"
                 "❌ Cancel: /start",
-                parse_mode=ParseMode.MARKDOWN
+                parse_mode=None
             )
         except ValueError:
             await update.message.reply_text("❌ Sirf number bhejo! Example: 150000")
@@ -1658,7 +1658,7 @@ async def text_chat_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Apni *occupation* batao:\n"
             "Options: farmer, student, business, self-employed, unemployed, employed\n\n"
             "❌ Cancel: /start",
-            parse_mode=ParseMode.MARKDOWN
+            parse_mode=None
         )
         return
     elif conv_state["state"] == ConversationState.SCHEME_OCCUPATION:
@@ -1671,7 +1671,7 @@ async def text_chat_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Apni *caste category* batao:\n"
             "Options: general, obc, sc, st, all\n\n"
             "❌ Cancel: /start",
-            parse_mode=ParseMode.MARKDOWN
+            parse_mode=None
         )
         return
     elif conv_state["state"] == ConversationState.SCHEME_CASTE:
@@ -1684,7 +1684,7 @@ async def text_chat_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "*Family size* batao (total members):\n"
             "Example: 5\n\n"
             "❌ Cancel: /start",
-            parse_mode=ParseMode.MARKDOWN
+            parse_mode=None
         )
         return
     elif conv_state["state"] == ConversationState.SCHEME_FAMILY:
@@ -1716,7 +1716,7 @@ async def text_chat_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await safe_reply_text(
                     update.message,
                     text,
-                    parse_mode=ParseMode.MARKDOWN,
+                    parse_mode=None,
                     reply_markup=KeyboardBuilder.scheme_list_keyboard(matched, 0)
                 )
             else:
@@ -1724,7 +1724,7 @@ async def text_chat_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     "✅ *Profile Complete!*\n\n"
                     "❌ Filhaal koi scheme match nahi hui.\n"
                     "Profile update karo: /scheme_profile",
-                    parse_mode=ParseMode.MARKDOWN,
+                    parse_mode=None,
                     reply_markup=KeyboardBuilder.schemes_menu_keyboard()
                 )
         except ValueError:
@@ -1747,7 +1747,7 @@ async def text_chat_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     sent_message = await safe_reply_text(
         update.message,
         f"{ai_response['text']}",
-        parse_mode=ParseMode.MARKDOWN,
+        parse_mode=None,
         reply_to_message_id=update.message.message_id
     )
     if not ai_response.get('error') and tts_engine.get_language(user.id) != "off":
@@ -1782,7 +1782,7 @@ async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYP
         await safe_reply_text(
             message,
             f"{ai_response['text']}",
-            parse_mode=ParseMode.MARKDOWN
+            parse_mode=None
         )
 
 # ═══════════════════════════════════════════════════════
@@ -1801,7 +1801,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             conversation_mgr.clear_state(user.id)
             await query.edit_message_text(
                 "🏠 Main Menu\n\nKya karna chahte ho?",
-                parse_mode=ParseMode.MARKDOWN,
+                parse_mode=None,
                 reply_markup=KeyboardBuilder.main_menu()
             )
         # HELP / ABOUT
@@ -1813,21 +1813,21 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         elif data == "list_modules":
             await query.edit_message_text(
                 f"📦 {len(ACTIVE_MODULES)} Active Modules\n\nModule select karo:",
-                parse_mode=ParseMode.MARKDOWN,
+                parse_mode=None,
                 reply_markup=KeyboardBuilder.modules_keyboard(1)
             )
         elif data.startswith("modules_page_"):
             page = int(data.split("_")[-1])
             await query.edit_message_text(
                 f"📦 Modules (Page {page})\n\nModule select karo:",
-                parse_mode=ParseMode.MARKDOWN,
+                parse_mode=None,
                 reply_markup=KeyboardBuilder.modules_keyboard(page)
             )
         elif data.startswith("use_module_"):
             module = data.replace("use_module_", "")
             await query.edit_message_text(
                 f"🔧 {module.upper()} Module\n\nUsage: /use {module} <query>\n\nExample: /use {module} test",
-                parse_mode=ParseMode.MARKDOWN,
+                parse_mode=None,
                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("📦 Modules List", callback_data="list_modules")]])
             )
         # QUICK ACTIONS
@@ -1835,7 +1835,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             conversation_mgr.set_state(user.id, ConversationState.WEATHER_CITY)
             await query.edit_message_text(
                 "🌤️ Weather\n\nKaunsa city?\nExample: Delhi, Mumbai, Patna",
-                parse_mode=ParseMode.MARKDOWN,
+                parse_mode=None,
                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel", callback_data="main_menu")]])
             )
         elif data == "quick_news":
@@ -1848,7 +1848,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await safe_edit_text(
                     query,
                     f"📰 Latest News\n\n{json.dumps(news_data, indent=2)[:3000]}",
-                    parse_mode=ParseMode.MARKDOWN
+                    parse_mode=None
                 )
             except:
                 await query.edit_message_text(
@@ -1859,14 +1859,14 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             conversation_mgr.set_state(user.id, ConversationState.GOLD_CITY)
             await query.edit_message_text(
                 "🥇 Gold Rate\n\nKaunsa city? (ya 'India' for national rate)\nExample: Delhi, Mumbai",
-                parse_mode=ParseMode.MARKDOWN,
+                parse_mode=None,
                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel", callback_data="main_menu")]])
             )
         # SETTINGS
         elif data == "settings":
             await query.edit_message_text(
                 "⚙️ Settings\n\nPreferences customize karo:",
-                parse_mode=ParseMode.MARKDOWN,
+                parse_mode=None,
                 reply_markup=KeyboardBuilder.settings_menu(user.id)
             )
         elif data == "toggle_voice":
@@ -1879,13 +1879,13 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 status = "OFF"
             await query.edit_message_text(
                 f"🔊 Voice: {status}",
-                parse_mode=ParseMode.MARKDOWN,
+                parse_mode=None,
                 reply_markup=KeyboardBuilder.settings_menu(user.id)
             )
         elif data == "change_language":
             await query.edit_message_text(
                 "🌐 Select Language\n\nApni bhasha chuno:\n\nCurrent: " + lang_mgr.get_lang_name(user.id),
-                parse_mode=ParseMode.MARKDOWN,
+                parse_mode=None,
                 reply_markup=lang_mgr.get_all_langs_keyboard()
             )
         elif data.startswith("set_lang_"):
@@ -1894,7 +1894,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 tts_engine.set_language(user.id, lang_code)
                 await query.edit_message_text(
                     f"✅ Language set to: {lang_mgr.get_lang_name(user.id)}\n\nAb main isi bhasha mein jawab dunga!",
-                    parse_mode=ParseMode.MARKDOWN,
+                    parse_mode=None,
                     reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⚙️ Back to Settings", callback_data="settings")]])
                 )
             else:
@@ -1913,13 +1913,13 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             stats = user_memory.stats
             await query.edit_message_text(
                 f"🧠 Memory Stats\n\nYour Memory: {memory_data['content'][:100]}...\nLast Updated: {memory_data['timestamp']}\n\nTotal Users: {stats['total_users']}\nMax Size: {stats['max_size']}\nTTL: {stats['ttl_hours']} hours",
-                parse_mode=ParseMode.MARKDOWN,
+                parse_mode=None,
                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="settings")]])
             )
         elif data == "voice_mode":
             await query.edit_message_text(
                 "🎤 Voice Mode\n\nVoice message bhejo aur main sunuga!\nFir bolke jawab dunga!\n\nTry karo:\n- Mausam kaisa hai?\n- News sunao\n- Gold rate batao\n- Kya haal hai?\n\nYa text se bhi puch sakte ho!",
-                parse_mode=ParseMode.MARKDOWN,
+                parse_mode=None,
                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Main Menu", callback_data="main_menu")]])
             )
         # STATS
@@ -1927,7 +1927,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             summary = analytics.get_summary()
             await query.edit_message_text(
                 f"📊 Bot Statistics\n\nTotal Messages: {summary['total_messages']}\nUnique Users: {summary['unique_users']}\nActive 24h: {summary['active_users_24h']}\nVoice: {summary['voice_messages']}\nText: {summary['text_messages']}\nCommands: {summary['commands']}\nErrors: {summary['errors']}\nUptime: {summary['uptime']}\n\nTop 5 Modules:\n" + "\n".join([f"- {m}: {c}" for m, c in summary['top_modules'][:5]]),
-                parse_mode=ParseMode.MARKDOWN,
+                parse_mode=None,
                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔄 Refresh", callback_data="bot_stats"), InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]])
             )
         # AI MODE
@@ -1940,7 +1940,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ai_brain.current_modes[user.id] = next_mode
             await query.edit_message_text(
                 f"🤖 AI Mode: {next_mode.upper()}\n\nAb main {next_mode} mode mein jawab dunga!",
-                parse_mode=ParseMode.MARKDOWN,
+                parse_mode=None,
                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔄 Change Mode", callback_data="mode_ai"), InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]])
             )
 
@@ -1949,7 +1949,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text(
                 "🏛️ *Scheme Swarm* — Sarkari Yojana Finder\n\n"
                 "Apne profile ke hisaab se schemes paayein!",
-                parse_mode=ParseMode.MARKDOWN,
+                parse_mode=None,
                 reply_markup=KeyboardBuilder.schemes_menu_keyboard()
             )
         elif data == "scheme_profile_start":
@@ -1959,7 +1959,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "Apni *umr* batao (in years):\n"
                 "Example: 35\n\n"
                 "❌ Cancel: /start",
-                parse_mode=ParseMode.MARKDOWN
+                parse_mode=None
             )
         elif data == "scheme_search":
             mem = user_memory.get(user.id)
@@ -1968,7 +1968,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await query.edit_message_text(
                     "🏛️ Pehle apna profile banayein!\n\n"
                     "📋 Profile Banayein button dabao!",
-                    parse_mode=ParseMode.MARKDOWN,
+                    parse_mode=None,
                     reply_markup=KeyboardBuilder.schemes_menu_keyboard()
                 )
                 return
@@ -1991,14 +1991,14 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await safe_edit_text(
                     query,
                     text,
-                    parse_mode=ParseMode.MARKDOWN,
+                    parse_mode=None,
                     reply_markup=KeyboardBuilder.scheme_list_keyboard(matched, 0)
                 )
             else:
                 await query.edit_message_text(
                     "❌ Filhaal koi scheme match nahi hui!\n"
                     "Profile update karo!",
-                    parse_mode=ParseMode.MARKDOWN,
+                    parse_mode=None,
                     reply_markup=KeyboardBuilder.schemes_menu_keyboard()
                 )
         elif data == "scheme_status":
@@ -2007,7 +2007,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "Scheme ID batao:\n"
                 "Example: pmkisan, ayushman, pmay\n\n"
                 "Ya /scheme_status <id> command use karo!",
-                parse_mode=ParseMode.MARKDOWN,
+                parse_mode=None,
                 reply_markup=KeyboardBuilder.schemes_menu_keyboard()
             )
         elif data.startswith("scheme_page_"):
@@ -2025,7 +2025,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await safe_edit_text(
                     query,
                     text,
-                    parse_mode=ParseMode.MARKDOWN,
+                    parse_mode=None,
                     reply_markup=KeyboardBuilder.scheme_list_keyboard(matched, page)
                 )
         elif data.startswith("scheme_detail_"):
@@ -2044,7 +2044,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await safe_edit_text(
                     query,
                     text,
-                    parse_mode=ParseMode.MARKDOWN,
+                    parse_mode=None,
                     reply_markup=KeyboardBuilder.scheme_detail_keyboard(scheme_id)
                 )
         elif data.startswith("scheme_docs_"):
@@ -2058,7 +2058,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await safe_edit_text(
                     query,
                     docs_text,
-                    parse_mode=ParseMode.MARKDOWN,
+                    parse_mode=None,
                     reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data=f"scheme_detail_{scheme_id}")]])
                 )
 
@@ -2075,7 +2075,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 9152987821 — आत्महत्या रोकथाम
 
 सभी FREE और 24x7!"""
-            await query.edit_message_text(text, parse_mode=ParseMode.MARKDOWN, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="bachpan_back")]]))
+            await query.edit_message_text(text, parse_mode=None, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="bachpan_back")]]))
         elif data == "bachpan_good":
             text = """🟢 *GOOD TOUCH* 🟢
 
@@ -2090,7 +2090,7 @@ Examples:
 • नानी-दादी का आशीर्वाद
 
 Rule: Good Touch = Safe + Happy + Comfortable"""
-            await query.edit_message_text(text, parse_mode=ParseMode.MARKDOWN, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="bachpan_back")]]))
+            await query.edit_message_text(text, parse_mode=None, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="bachpan_back")]]))
         elif data == "bachpan_bad":
             text = """🔴 *BAD TOUCH* 🔴
 
@@ -2107,7 +2107,7 @@ Examples:
 Rule: Bad Touch = Uncomfortable + Scared + Secret
 
 🚨 *तुरंत मम्मी-पापा को बताओ!*"""
-            await query.edit_message_text(text, parse_mode=ParseMode.MARKDOWN, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="bachpan_back")]]))
+            await query.edit_message_text(text, parse_mode=None, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="bachpan_back")]]))
         elif data == "bachpan_emergency":
             text = """🚨 *EMERGENCY STEPS* 🚨
 
@@ -2121,7 +2121,7 @@ Rule: Bad Touch = Uncomfortable + Scared + Secret
 📞 *100 — Police*
 
 *तुम बहादुर हो!* 💪"""
-            await query.edit_message_text(text, parse_mode=ParseMode.MARKDOWN, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="bachpan_back")]]))
+            await query.edit_message_text(text, parse_mode=None, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="bachpan_back")]]))
         elif data == "bachpan_report":
             text = """📝 *REPORT INCIDENT* 📝
 
@@ -2135,7 +2135,7 @@ Rule: Bad Touch = Uncomfortable + Scared + Secret
 *24 घंटे में कार्रवाई होगी*
 
 *तुम्हारी आवाज़ सुनी जाएगी!* 🛡️"""
-            await query.edit_message_text(text, parse_mode=ParseMode.MARKDOWN, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="bachpan_back")]]))
+            await query.edit_message_text(text, parse_mode=None, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="bachpan_back")]]))
         elif data == "bachpan_back":
             bachpan_text = """🛡️ *BACHPAN — बच्चों की सुरक्षा* 🛡️
 
@@ -2168,7 +2168,7 @@ Rule: Bad Touch = Uncomfortable + Scared + Secret
                 [InlineKeyboardButton("🔴 Bad Touch", callback_data="bachpan_bad"), InlineKeyboardButton("🚨 Emergency", callback_data="bachpan_emergency")],
                 [InlineKeyboardButton("📝 Report", callback_data="bachpan_report"), InlineKeyboardButton("🔙 Menu", callback_data="main_menu")]
             ])
-            await query.edit_message_text(bachpan_text, parse_mode=ParseMode.MARKDOWN, reply_markup=keyboard)
+            await query.edit_message_text(bachpan_text, parse_mode=None, reply_markup=keyboard)
     except Exception as e:
         logger.error(f"Callback error: {e}")
         try:
@@ -2191,7 +2191,7 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
             await safe_reply_text(
                 update.effective_message,
                 "❌ Oops! Kuch unexpected error ho gaya! Team ko bata diya hai. Jaldi fix karenge! Tab tak /start karo.",
-                parse_mode=ParseMode.MARKDOWN
+                parse_mode=None
             )
         except:
             pass
@@ -2396,7 +2396,7 @@ async def broadcast_message(request: Request):
                 await application.bot.send_message(
                     chat_id=user_id,
                     text=f"📢 Broadcast from Singh Ji AI\n\n{message}",
-                    parse_mode=ParseMode.MARKDOWN
+                    parse_mode=None
                 )
                 sent_count += 1
                 await asyncio.sleep(0.05)
@@ -2501,7 +2501,7 @@ async def agentic_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "AGENTIC-A SYSTEM\n\nMain apne aap content banaunga!\n\n"
             "Usage: /agentic <goal>\n"
             "Example: /agentic kisaano ke liye content banao",
-            parse_mode=ParseMode.MARKDOWN,
+            parse_mode=None,
             reply_markup=keyboard
         )
         return
@@ -2516,7 +2516,7 @@ async def agentic_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"Done!\n\nGoal: {result.get('goal', 'N/A')[:50]}\n"
             f"Category: {result.get('category', 'general').title()}\n\n"
             f"{content[:800]}",
-            parse_mode=ParseMode.MARKDOWN
+            parse_mode=None
         )
         for action in result.get('actions', []):
             if action['type'] == 'video' and action['result'].get('success'):
@@ -2537,7 +2537,7 @@ async def video_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not args:
         await update.message.reply_text(
             "Video Generator\n\nUsage: /video <prompt>\nExample: /video kisaan ki zindagi",
-            parse_mode=ParseMode.MARKDOWN
+            parse_mode=None
         )
         return
     prompt = " ".join(args)
@@ -2569,7 +2569,7 @@ async def post_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not args:
         await update.message.reply_text(
             "Social Media Poster\n\nUsage: /post <message>\nExample: /post Kisaano ke liye nayi scheme!",
-            parse_mode=ParseMode.MARKDOWN
+            parse_mode=None
         )
         return
     message = " ".join(args)
