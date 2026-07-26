@@ -364,6 +364,40 @@ class BotAnalytics:
 analytics = BotAnalytics()
 
 # ═══════════════════════════════════════════════════════
+# SAFE SEND HELPERS — parse_mode entity crash से बचने के लिए
+# ═══════════════════════════════════════════════════════
+
+async def safe_reply_text(message_obj, text: str, parse_mode=None, reply_markup=None, **kwargs):
+    """
+    update.message.reply_text की जगह इसे इस्तेमाल करो। अगर parse_mode
+    (Markdown/HTML) के साथ भेजने पर 'Can't parse entities' जैसी BadRequest
+    एरर आती है (क्योंकि टेक्स्ट में * _ ` [ जैसे unmatched characters हैं
+    — जो अक्सर AI response, news headline, या यूज़र-इनपुट में होते हैं),
+    तो यह अपने आप बिना parse_mode के प्लेन टेक्स्ट भेज देगा — ताकि मैसेज
+    कम से कम पहुँचे तो सही, भले फॉर्मैटिंग (bold/italic) चली जाए।
+    """
+    from telegram.error import BadRequest
+    try:
+        return await message_obj.reply_text(text, parse_mode=parse_mode, reply_markup=reply_markup, **kwargs)
+    except BadRequest as e:
+        if "can't parse entities" in str(e).lower() or "can't find end" in str(e).lower():
+            logger.warning(f"[SAFE_SEND] parse_mode एंटिटी एरर, plain text से भेजा जा रहा है: {e}")
+            return await message_obj.reply_text(text, parse_mode=None, reply_markup=reply_markup, **kwargs)
+        raise
+
+
+async def safe_edit_text(query_obj, text: str, parse_mode=None, reply_markup=None, **kwargs):
+    """query.edit_message_text के लिए वही सुरक्षा — ऊपर safe_reply_text जैसा"""
+    from telegram.error import BadRequest
+    try:
+        return await query_obj.edit_message_text(text, parse_mode=parse_mode, reply_markup=reply_markup, **kwargs)
+    except BadRequest as e:
+        if "can't parse entities" in str(e).lower() or "can't find end" in str(e).lower():
+            logger.warning(f"[SAFE_SEND] parse_mode एंटिटी एरर (edit), plain text से भेजा जा रहा है: {e}")
+            return await query_obj.edit_message_text(text, parse_mode=None, reply_markup=reply_markup, **kwargs)
+        raise
+
+# ═══════════════════════════════════════════════════════
 # DECORATORS
 # ═══════════════════════════════════════════════════════
 
@@ -1023,7 +1057,11 @@ async def use_module_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
             formatted_data = json.dumps(data, indent=2, ensure_ascii=False)
             if len(formatted_data) > 3500:
                 formatted_data = formatted_data[:3500] + "\n... (truncated)"
-            await processing_msg.edit_text(
+            # ⚠️ JSON में ``` से जुड़ा markdown code-block होने से पहले भी
+            # entity-parse crash हो सकता था अगर JSON में ` या * हों —
+            # safe_edit_text इसे प्लेन टेक्स्ट में गिरा देगा तो भी मैसेज पहुँचेगा
+            await safe_edit_text(
+                processing_msg,
                 f"📊 {module.upper()} Result:\n\n```json\n{formatted_data}\n```",
                 parse_mode=ParseMode.MARKDOWN
             )
@@ -1465,7 +1503,12 @@ async def voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 caption=f"🎙️ {transcript[:50]}... → {ai_response['text'][:50]}..."
             )
         else:
-            await update.message.reply_text(
+            # ⚠️ ai_response['text'] AI मॉडल का dynamic output है — इसमें
+            # markdown special chars (* _ ` [) unmatched आ सकते हैं और
+            # ParseMode.MARKDOWN के साथ पूरा मैसेज crash कर सकता है।
+            # safe_reply_text इसे handle करेगा — असफल होने पर plain टेक्स्ट भेजेगा
+            await safe_reply_text(
+                update.message,
                 f"🎙️ *Aapne kaha:* {transcript}\n\n*Singh Ji:* {ai_response['text']}",
                 parse_mode=ParseMode.MARKDOWN
             )
@@ -1674,7 +1717,11 @@ async def text_chat_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user.first_name,
         chat_type
     )
-    sent_message = await update.message.reply_text(
+    # ⚠️ ai_response['text'] Groq से आया dynamic output है — इसमें
+    # markdown-breaking characters आ सकते हैं (जैसे कोड, बुलेट में * आदि)।
+    # safe_reply_text इस्तेमाल करके entity-parse crash से बचाया गया है।
+    sent_message = await safe_reply_text(
+        update.message,
         f"{ai_response['text']}",
         parse_mode=ParseMode.MARKDOWN,
         reply_to_message_id=update.message.message_id
@@ -1707,7 +1754,9 @@ async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYP
             user.first_name,
             "group"
         )
-        await message.reply_text(
+        # ⚠️ यहाँ भी AI का dynamic output है — safe_reply_text से भेजो
+        await safe_reply_text(
+            message,
             f"{ai_response['text']}",
             parse_mode=ParseMode.MARKDOWN
         )
@@ -1769,7 +1818,11 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             try:
                 response = requests.get(f"{config.API_BASE_URL}/modules/news/", timeout=10)
                 news_data = response.json()
-                await query.edit_message_text(
+                # ⚠️ news_data JSON में headline/description जैसे dynamic
+                # टेक्स्ट होते हैं जिनमें * _ ` जैसे characters unmatched आ
+                # सकते हैं — safe_edit_text से crash नहीं होगा
+                await safe_edit_text(
+                    query,
                     f"📰 Latest News\n\n{json.dumps(news_data, indent=2)[:3000]}",
                     parse_mode=ParseMode.MARKDOWN
                 )
@@ -2427,7 +2480,9 @@ async def agentic_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         result = await agentic.run(prompt)
         content = result.get('content', 'No content generated')
-        await msg.edit_text(
+        # ⚠️ agentic result AI-generated है — safe_edit_text इस्तेमाल करो
+        await safe_edit_text(
+            msg,
             f"Done!\n\nGoal: {result.get('goal', 'N/A')[:50]}\n"
             f"Category: {result.get('category', 'general').title()}\n\n"
             f"{content[:800]}",
