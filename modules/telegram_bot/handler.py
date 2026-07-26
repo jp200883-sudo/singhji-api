@@ -1,3 +1,4 @@
+
 import logging
 import os
 import json
@@ -397,6 +398,18 @@ async def safe_edit_text(query_obj, text: str, parse_mode=None, reply_markup=Non
             return await query_obj.edit_message_text(text, parse_mode=None, reply_markup=reply_markup, **kwargs)
         raise
 
+
+async def safe_edit_text_msg(msg_obj, text: str, parse_mode=None, reply_markup=None, **kwargs):
+    """Message.edit_text के लिए सुरक्षा — video/post commands में use होगा"""
+    from telegram.error import BadRequest
+    try:
+        return await msg_obj.edit_text(text, parse_mode=parse_mode, reply_markup=reply_markup, **kwargs)
+    except BadRequest as e:
+        if "can't parse entities" in str(e).lower() or "can't find end" in str(e).lower():
+            logger.warning(f"[SAFE_SEND] parse_mode एंटिटी एरर (msg edit), plain text से भेजा जा रहा है: {e}")
+            return await msg_obj.edit_text(text, parse_mode=None, reply_markup=reply_markup, **kwargs)
+        raise
+
 # ═══════════════════════════════════════════════════════
 # DECORATORS
 # ═══════════════════════════════════════════════════════
@@ -406,7 +419,8 @@ def rate_limit_check(func):
     async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
         user = update.effective_user
         if not await rate_limiter.is_allowed(user.id):
-            await update.message.reply_text(
+            await safe_reply_text(
+                update.message,
                 "🚫 Rate Limit! Thoda slow karo! 1 minute mein try karo!",
                 parse_mode=ParseMode.MARKDOWN
             )
@@ -425,9 +439,9 @@ def error_handler_decorator(func):
             error_msg = "❌ Error! Kuch problem ho gayi! Admin ko bata diya hai. Thodi der mein try karo!"
             try:
                 if update.message:
-                    await update.message.reply_text(error_msg, parse_mode=ParseMode.MARKDOWN)
+                    await safe_reply_text(update.message, error_msg, parse_mode=ParseMode.MARKDOWN)
                 elif update.callback_query:
-                    await update.callback_query.message.reply_text(error_msg, parse_mode=ParseMode.MARKDOWN)
+                    await safe_reply_text(update.callback_query.message, error_msg, parse_mode=ParseMode.MARKDOWN)
             except:
                 pass
             raise
@@ -594,13 +608,15 @@ async def fetch_and_send_weather(update: Update, city: str):
                 reply_markup=KeyboardBuilder.main_menu()
             )
         else:
-            await update.message.reply_text(
+            await safe_reply_text(
+                update.message,
                 f"❌ {city} ka weather nahi mila! Sahi city name try karo!",
                 parse_mode=ParseMode.MARKDOWN
             )
     except Exception as e:
         logger.error(f"Weather fetch error: {e}")
-        await update.message.reply_text(
+        await safe_reply_text(
+            update.message,
             "❌ Weather service down! Baad mein try karo!",
             parse_mode=ParseMode.MARKDOWN
         )
@@ -619,24 +635,28 @@ async def fetch_and_send_mandi(update: Update, state: str):
                 msg = f"🌾 Mandi Rates - {state.title()}\n\n"
                 for rate in rates[:10]:
                     msg += f"- {rate.get('commodity', 'N/A')}: Rs.{rate.get('price', 'N/A')}/quintal\n"
-                await update.message.reply_text(
+                await safe_reply_text(
+                    update.message,
                     msg,
                     parse_mode=ParseMode.MARKDOWN,
                     reply_markup=KeyboardBuilder.main_menu()
                 )
             else:
-                await update.message.reply_text(
+                await safe_reply_text(
+                    update.message,
                     f"❌ {state.title()} ke liye koi data nahi mila!",
                     parse_mode=ParseMode.MARKDOWN
                 )
         else:
-            await update.message.reply_text(
+            await safe_reply_text(
+                update.message,
                 f"❌ {state} ka data nahi mila!",
                 parse_mode=ParseMode.MARKDOWN
             )
     except Exception as e:
         logger.error(f"Mandi fetch error: {e}")
-        await update.message.reply_text(
+        await safe_reply_text(
+            update.message,
             "❌ Mandi service down! Baad mein try karo!",
             parse_mode=ParseMode.MARKDOWN
         )
@@ -662,13 +682,15 @@ async def calculate_and_send_tax(update: Update, income: float):
                 reply_markup=KeyboardBuilder.main_menu()
             )
         else:
-            await update.message.reply_text(
+            await safe_reply_text(
+                update.message,
                 "❌ Tax calculation failed!",
                 parse_mode=ParseMode.MARKDOWN
             )
     except Exception as e:
         logger.error(f"Tax calc error: {e}")
-        await update.message.reply_text(
+        await safe_reply_text(
+            update.message,
             "❌ Tax service down! Baad mein try karo!",
             parse_mode=ParseMode.MARKDOWN
         )
@@ -695,10 +717,10 @@ async def fetch_and_send_gold(update: Update, city: str = "India"):
                 reply_markup=KeyboardBuilder.main_menu()
             )
         else:
-            await update.message.reply_text("❌ Gold rate nahi mila!", parse_mode=ParseMode.MARKDOWN)
+            await safe_reply_text(update.message, "❌ Gold rate nahi mila!", parse_mode=ParseMode.MARKDOWN)
     except Exception as e:
         logger.error(f"Gold fetch error: {e}")
-        await update.message.reply_text("❌ Gold service down!", parse_mode=ParseMode.MARKDOWN)
+        await safe_reply_text(update.message, "❌ Gold service down!", parse_mode=ParseMode.MARKDOWN)
 
 async def fetch_and_send_fuel(update: Update, city: str):
     try:
@@ -720,10 +742,10 @@ async def fetch_and_send_fuel(update: Update, city: str):
                 reply_markup=KeyboardBuilder.main_menu()
             )
         else:
-            await update.message.reply_text("❌ Fuel price nahi mila!", parse_mode=ParseMode.MARKDOWN)
+            await safe_reply_text(update.message, "❌ Fuel price nahi mila!", parse_mode=ParseMode.MARKDOWN)
     except Exception as e:
         logger.error(f"Fuel fetch error: {e}")
-        await update.message.reply_text("❌ Fuel service down!", parse_mode=ParseMode.MARKDOWN)
+        await safe_reply_text(update.message, "❌ Fuel service down!", parse_mode=ParseMode.MARKDOWN)
 
 # ═══════════════════════════════════════════════════════
 # 🏛️ SCHEME SWARM HELPERS
@@ -1325,17 +1347,17 @@ async def yojana_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         result = response.json()
         if result.get("eligible_count", 0) == 0:
-            await update.message.reply_text("❌ Filhaal koi scheme match nahi hui.")
+            await safe_reply_text(update.message, "❌ Filhaal koi scheme match nahi hui.")
             return
         text = f"🏛️ {result['eligible_count']} schemes mile!\n\n"
         for s in result["schemes"]:
             text += f"✅ {s['name']}\nAmount: Rs {s['amount']} ({s['frequency']})\nNext step: {s['next_step']}\n\n"
-        await update.message.reply_text(text[:4000], parse_mode=ParseMode.MARKDOWN)
+        await safe_reply_text(update.message, text[:4000], parse_mode=ParseMode.MARKDOWN)
     except ValueError:
         await update.message.reply_text("❌ Age aur income number mein bhejo.\nExample: /yojana 45 150000 farmer")
     except Exception as e:
         logger.error(f"Yojana command error: {e}")
-        await update.message.reply_text("❌ Error aa gaya, dobara try karo.")
+        await safe_reply_text(update.message, "❌ Error aa gaya, dobara try karo.")
 
 # ═══════════════════════════════════════════════════════
 # 🏛️ SCHEME SWARM COMMANDS
@@ -1445,7 +1467,8 @@ Category: {scheme['category']}
 
 🌐 [Official Website](https://{scheme['website']})
     """
-    await update.message.reply_text(
+    await safe_reply_text(
+        update.message,
         status_text,
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=KeyboardBuilder.scheme_detail_keyboard(scheme_id)
@@ -1690,7 +1713,8 @@ async def text_chat_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     text += f"{i}. *{s['name']}* — {s['match_score']}% match\n"
                     text += f"   💰 Rs {s['amount']} ({s['frequency']})\n"
                     text += f"   📋 {s['category']}\n\n"
-                await update.message.reply_text(
+                await safe_reply_text(
+                    update.message,
                     text,
                     parse_mode=ParseMode.MARKDOWN,
                     reply_markup=KeyboardBuilder.scheme_list_keyboard(matched, 0)
@@ -1964,7 +1988,8 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     text += f"{i}. *{s['name']}* — {s['match_score']}% match\n"
                     text += f"   💰 Rs {s['amount']} ({s['frequency']})\n"
                     text += f"   📋 {s['category']}\n\n"
-                await query.edit_message_text(
+                await safe_edit_text(
+                    query,
                     text,
                     parse_mode=ParseMode.MARKDOWN,
                     reply_markup=KeyboardBuilder.scheme_list_keyboard(matched, 0)
@@ -1997,7 +2022,8 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     text += f"{i}. *{s['name']}* — {s['match_score']}% match\n"
                     text += f"   💰 Rs {s['amount']} ({s['frequency']})\n"
                     text += f"   📋 {s['category']}\n\n"
-                await query.edit_message_text(
+                await safe_edit_text(
+                    query,
                     text,
                     parse_mode=ParseMode.MARKDOWN,
                     reply_markup=KeyboardBuilder.scheme_list_keyboard(matched, page)
@@ -2015,7 +2041,8 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 text += f"👔 Occupations: {', '.join(scheme['occupations'])}\n"
                 text += f"🏷️ Caste: {', '.join(scheme['castes'])}\n\n"
                 text += f"🌐 Website: {scheme['website']}"
-                await query.edit_message_text(
+                await safe_edit_text(
+                    query,
                     text,
                     parse_mode=ParseMode.MARKDOWN,
                     reply_markup=KeyboardBuilder.scheme_detail_keyboard(scheme_id)
@@ -2028,7 +2055,8 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 for i, doc in enumerate(scheme['documents'], 1):
                     docs_text += f"{i}. {doc}\n"
                 docs_text += f"\n🌐 [Apply Online](https://{scheme['website']})"
-                await query.edit_message_text(
+                await safe_edit_text(
+                    query,
                     docs_text,
                     parse_mode=ParseMode.MARKDOWN,
                     reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data=f"scheme_detail_{scheme_id}")]])
@@ -2160,7 +2188,8 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
     analytics.track_error()
     if update and isinstance(update, Update) and update.effective_message:
         try:
-            await update.effective_message.reply_text(
+            await safe_reply_text(
+                update.effective_message,
                 "❌ Oops! Kuch unexpected error ho gaya! Team ko bata diya hai. Jaldi fix karenge! Tab tak /start karo.",
                 parse_mode=ParseMode.MARKDOWN
             )
@@ -2534,7 +2563,7 @@ async def agentic_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
     except Exception as e:
         logger.error(f"Agentic error: {e}")
-        await msg.edit_text(f"Error: {str(e)[:100]}")
+        await safe_edit_text_msg(msg, f"Error: {str(e)[:100]}")
 
 @error_handler_decorator
 @rate_limit_check
@@ -2566,7 +2595,7 @@ async def video_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
     except Exception as e:
         logger.error(f"Video error: {e}")
-        await msg.edit_text(f"Error: {str(e)[:100]}")
+        await safe_edit_text_msg(msg, f"Error: {str(e)[:100]}")
 
 @error_handler_decorator
 @rate_limit_check
@@ -2596,7 +2625,7 @@ async def post_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     except Exception as e:
         logger.error(f"Post error: {e}")
-        await msg.edit_text(f"Error: {str(e)[:100]}")
+        await safe_edit_text_msg(msg, f"Error: {str(e)[:100]}")
 
 # ═══════════════════════════════════════════════════════
 # STARTUP/SHUTDOWN EVENTS
