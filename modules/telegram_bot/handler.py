@@ -741,18 +741,20 @@ class KeyboardBuilder:
     def main_menu():
        @staticmethod
 def main_menu():
+    @staticmethod
+def main_menu():
     keyboard = [
         [InlineKeyboardButton("🤖 AI Chat", callback_data="mode_ai"),
          InlineKeyboardButton("🌤️ Weather", callback_data="quick_weather")],
         [InlineKeyboardButton("📰 News", callback_data="quick_news"),
          InlineKeyboardButton("🥇 Gold Rate", callback_data="quick_gold")],
+        # 👇 YEH BUTTON ADD KARO
         [InlineKeyboardButton("🏛️ Schemes", callback_data="schemes_menu"),
          InlineKeyboardButton("📦 All Modules", callback_data="list_modules")],
         [InlineKeyboardButton("⚙️ Settings", callback_data="settings"),
          InlineKeyboardButton("📊 Stats", callback_data="bot_stats")],
     ]
     return InlineKeyboardMarkup(keyboard)
-
     @staticmethod
     def settings_menu(user_id: int):
         voice_status = "ON" if tts_engine.get_language(user_id) != "off" else "OFF"
