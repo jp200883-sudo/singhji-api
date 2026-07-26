@@ -552,7 +552,7 @@ ACTIVE_MODULES = {
     "Plant ID": "plant_id", "Search": "search", "Analytics": "analytics",
     "Guard Agent": "guard_agent", "Trishul": "trishul", "Trolley": "trolley",
     "Schedule": "schedule", "Daily Report": "daily_report", "Emergency": "emergency",
-    "Govt Schemes": "govt", "Singh Ji TV": "singhji_tv", "Voice": "voice",
+    "Scheme Swarm": "scheme_swarm", "Singh Ji TV": "singhji_tv", "Voice": "voice",
     "UPI": "upi", "Banking": "banking", "WhatsApp": "whatsapp",
     "Language Hub": "language_hub", "Horoscope": "horoscope", "Bachpan": "bachpan",
     "Aavishkar": "aavishkar", "Meta Agent": "meta_agent", "Supreme Agent": "supreme_agent",
