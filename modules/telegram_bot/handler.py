@@ -739,19 +739,19 @@ async def fetch_and_send_fuel(update: Update, city: str):
 class KeyboardBuilder:
     @staticmethod
     def main_menu():
-        keyboard = [
-            [InlineKeyboardButton("🤖 AI Chat", callback_data="mode_ai"),
-             InlineKeyboardButton("🌤️ Weather", callback_data="quick_weather")],
-            [InlineKeyboardButton("📰 News", callback_data="quick_news"),
-             InlineKeyboardButton("🥇 Gold Rate", callback_data="quick_gold")],
-            [InlineKeyboardButton("📦 All Modules", callback_data="list_modules"),
-             InlineKeyboardButton("⚙️ Settings", callback_data="settings")],
-            [InlineKeyboardButton("🎤 Voice Mode", callback_data="voice_mode"),
-             InlineKeyboardButton("📊 Stats", callback_data="bot_stats")],
-            [InlineKeyboardButton("🛡️ Bachpan", callback_data="bachpan_back"),
-             InlineKeyboardButton("ℹ️ About", callback_data="about")]
-        ]
-        return InlineKeyboardMarkup(keyboard)
+       @staticmethod
+def main_menu():
+    keyboard = [
+        [InlineKeyboardButton("🤖 AI Chat", callback_data="mode_ai"),
+         InlineKeyboardButton("🌤️ Weather", callback_data="quick_weather")],
+        [InlineKeyboardButton("📰 News", callback_data="quick_news"),
+         InlineKeyboardButton("🥇 Gold Rate", callback_data="quick_gold")],
+        [InlineKeyboardButton("🏛️ Schemes", callback_data="schemes_menu"),
+         InlineKeyboardButton("📦 All Modules", callback_data="list_modules")],
+        [InlineKeyboardButton("⚙️ Settings", callback_data="settings"),
+         InlineKeyboardButton("📊 Stats", callback_data="bot_stats")],
+    ]
+    return InlineKeyboardMarkup(keyboard)
 
     @staticmethod
     def settings_menu(user_id: int):
