@@ -2,21 +2,6 @@
 🦁 SINGH JI AI ULTRA v8.0 — HYBRID SYSTEM
 100% REAL | Railway Primary | All APIs Live
 Master Scheduler Integrated | Auto-Broadcast Enabled
-
-इस पैच में तीन फिक्स:
-  1. USER_PREFERENCES (broadcast subscriber list) अब startup पर Supabase
-     से वापस लोड होती है — पहले सिर्फ़ RAM में थी, हर restart पर खाली हो
-     जाती थी और morning/evening digest किसी को नहीं जाता था।
-  2. Startup पर Telegram getWebhookInfo चेक करके लॉग में साफ़ बताता है कि
-     असल में कौन सा webhook path (इस फ़ाइल का /telegram/webhook या
-     modules/telegram_bot का /modules/telegram_bot/webhook) एक्टिव है,
-     ताकि पता चले कौन सा dead code है।
-  3. faster-whisper अब requirements.txt में जोड़ने की ज़रूरत है (नीचे
-     फ़ाइल के अंत में नोट है) — कोड में पहले से इस्तेमाल हो रहा था पर
-     requirements.txt में नहीं था, इसलिए voice transcription चुपचाप fail
-     हो रहा था।
-"""
-
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -465,6 +450,41 @@ async def _check_webhook_config():
     except Exception as e:
         logger.warning(f"[WEBHOOK CHECK] getWebhookInfo कॉल फेल: {e}")
 
+# ─── FIX #4 (नया): हर startup पर Telegram को अपने आप सही webhook पर पॉइंट करो ──
+async def _ensure_correct_webhook():
+    """
+    Telegram को हमेशा इसी फाइल के /telegram/webhook पर पॉइंट रखता है —
+    ताकि modules/telegram_bot/webhook (जो USER_PREFERENCES में यूज़र सेव
+    नहीं करता, इसलिए broadcast को कभी recipient नहीं मिलता) कभी गलती से
+    एक्टिव न रह जाए। Railway पर APP_URL env var (पूरा https URL) सेट
+    होना ज़रूरी है, वरना यह फंक्शन सिर्फ़ warning देकर रुक जाएगा।
+    """
+    if not TELEGRAM_TOKEN or not HTTP_CLIENT:
+        return
+    app_url = os.getenv("APP_URL", "")
+    if not app_url:
+        logger.warning("[WEBHOOK FIX] APP_URL env var सेट नहीं है — webhook auto-set स्किप हुआ")
+        return
+    correct_url = f"{app_url.rstrip('/')}/telegram/webhook"
+    try:
+        resp = await HTTP_CLIENT.get(f"{TELEGRAM_API_BASE}/getWebhookInfo", timeout=10)
+        current_url = resp.json().get("result", {}).get("url", "")
+        if current_url.rstrip("/") == correct_url.rstrip("/"):
+            logger.info(f"[WEBHOOK FIX] पहले से सही सेट है: {correct_url}")
+            return
+        set_resp = await HTTP_CLIENT.get(
+            f"{TELEGRAM_API_BASE}/setWebhook",
+            params={"url": correct_url},
+            timeout=10
+        )
+        result = set_resp.json()
+        if result.get("ok"):
+            logger.info(f"[WEBHOOK FIX] Webhook सही जगह सेट हुआ: {correct_url}")
+        else:
+            logger.error(f"[WEBHOOK FIX] setWebhook फेल: {result}")
+    except Exception as e:
+        logger.error(f"[WEBHOOK FIX] Webhook auto-fix में त्रुटि: {e}")
+
 MAIN_KEYBOARD = {
     "inline_keyboard": [
         [{"text": "Weather", "callback_data": "weather"}, {"text": "News", "callback_data": "news"}],
@@ -823,6 +843,9 @@ async def lifespan(app):
 
     # ─── FIX #2: कौन सा webhook असल में एक्टिव है, यह लॉग में बताओ ───
     await _check_webhook_config()
+
+    # ─── FIX #4: Telegram को हमेशा इसी फाइल के /telegram/webhook पर सेट रखो ───
+    await _ensure_correct_webhook()
 
     MASTER_SCHEDULER = SinghJiMasterScheduler(
         http_client=HTTP_CLIENT,
