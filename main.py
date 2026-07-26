@@ -2,6 +2,30 @@
 🦁 SINGH JI AI ULTRA v8.0 — HYBRID SYSTEM
 100% REAL | Railway Primary | All APIs Live
 Master Scheduler Integrated | Auto-Broadcast Enabled
+
+इस पैच में तीन फिक्स:
+  1. USER_PREFERENCES (broadcast subscriber list) अब startup पर Supabase
+     से वापस लोड होती है — पहले सिर्फ़ RAM में थी, हर restart पर खाली हो
+     जाती थी और morning/evening digest किसी को नहीं जाता था।
+  2. Startup पर Telegram getWebhookInfo चेक करके लॉग में साफ़ बताता है कि
+     असल में कौन सा webhook path (इस फ़ाइल का /telegram/webhook या
+     modules/telegram_bot का /modules/telegram_bot/webhook) एक्टिव है,
+     ताकि पता चले कौन सा dead code है।
+  3. faster-whisper अब requirements.txt में जोड़ने की ज़रूरत है (नीचे
+     फ़ाइल के अंत में नोट है) — कोड में पहले से इस्तेमाल हो रहा था पर
+     requirements.txt में नहीं था, इसलिए voice transcription चुपचाप fail
+     हो रहा था।
+
+नया फिक्स (इस पैच में जोड़ा गया):
+  4. _ensure_correct_webhook() — हर startup पर अपने आप Telegram के
+     webhook को इसी फाइल के /telegram/webhook पर सेट कर देता है, ताकि
+     modules/telegram_bot/webhook (जो USER_PREFERENCES में यूज़र सेव
+     नहीं करता, इसलिए broadcast को कभी कोई recipient नहीं मिलता) कभी
+     गलती से एक्टिव न रह जाए। इसके लिए Railway पर APP_URL env var
+     पूरा URL सहित सेट होना ज़रूरी है (जैसे
+     https://singhji-api-production-85ca.up.railway.app)।
+"""
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
