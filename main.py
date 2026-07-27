@@ -53,7 +53,6 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.events import EVENT_JOB_ERROR, EVENT_JOB_EXECUTED
 
-
 from modules.kisaan_doctor.handler import router as kisaan_router
 from modules.sarkari_yojana.handler import router as yojana_router
 from modules.banking.handler import handler as banking_handler
@@ -424,8 +423,12 @@ async def _telegram_send_message(chat_id, text, reply_markup=None, parse_mode=No
         if reply_markup:
             payload["reply_markup"] = json.dumps(reply_markup)
         resp = await HTTP_CLIENT.post(f"{TELEGRAM_API_BASE}/sendMessage", json=payload)
-        return resp.json()
+        result = resp.json()
+        if not result.get("ok"):
+            logger.error(f"[TELEGRAM SEND FAIL] chat_id={chat_id} | {result}")
+        return result
     except Exception as e:
+        logger.error(f"[TELEGRAM SEND EXCEPTION] chat_id={chat_id} | {e}")
         return {"error": str(e)}
 
 async def _telegram_send_voice(chat_id, audio_b64, caption=""):
@@ -914,7 +917,6 @@ app.add_middleware(
 # ==========================================
 app.include_router(kisaan_router, prefix="/modules/kisaan_doctor")
 app.include_router(yojana_router, prefix="/modules/sarkari_yojana")
-
 app.include_router(currency_router, prefix="/api")
 app.include_router(aavishkar_router, prefix="/modules/aavishkar")
 app.add_api_route("/api/banking", banking_handler, methods=["GET"])
@@ -1137,7 +1139,7 @@ async def _call_groq(prompt: str, timeout=30):
     resp = await HTTP_CLIENT.post(
         "https://api.groq.com/openai/v1/chat/completions",
         headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"},
-      json={"model": "openai/gpt-oss-20b", "messages": [{"role": "user", "content": prompt}]},
+        json={"model": "openai/gpt-oss-20b", "messages": [{"role": "user", "content": prompt}]},
         timeout=timeout
     )
     result = resp.json()
@@ -1408,6 +1410,7 @@ async def telegram_webhook(request: Request):
         if "callback_query" in data:
             callback = data["callback_query"]
             chat_id = callback["message"]["chat"]["id"]
+            user_id = callback["from"]["id"]
             query_data = callback["data"]
 
             if query_data == "status":
@@ -1419,6 +1422,7 @@ async def telegram_webhook(request: Request):
                 text += f"APIs: {sum(1 for v in AVAILABLE_KEYS.values() if v)}/{len(AVAILABLE_KEYS)}"
                 await _telegram_send_message(chat_id, text)
             elif query_data == "weather":
+                USER_PREFERENCES.setdefault(user_id, {})["waiting_for"] = "weather"
                 await _telegram_send_message(chat_id, "Weather\n\nCity batao!")
             elif query_data == "news":
                 if NEWSDATA_API_KEY:
@@ -1438,12 +1442,14 @@ async def telegram_webhook(request: Request):
                 else:
                     await _telegram_send_message(chat_id, "News API key missing")
             elif query_data == "mandi":
+                USER_PREFERENCES.setdefault(user_id, {})["waiting_for"] = "mandi"
                 await _telegram_send_message(chat_id, "Mandi Bhav\n\nState batao!")
             elif query_data == "ai_chat":
                 await _telegram_send_message(chat_id, "AI Chat\n\nKuch bhi poochho!")
             elif query_data == "voice":
                 await _telegram_send_message(chat_id, "Voice\n\nVoice message bhejo!")
             elif query_data == "tax":
+                USER_PREFERENCES.setdefault(user_id, {})["waiting_for"] = "tax"
                 await _telegram_send_message(chat_id, "Tax Calculator\n\nIncome batao!")
             elif query_data == "plant":
                 await _telegram_send_message(chat_id, "Plant ID\n\nPlant ki photo bhejo!")
@@ -1461,6 +1467,17 @@ async def telegram_webhook(request: Request):
         if user_id not in USER_PREFERENCES:
             USER_PREFERENCES[user_id] = {"language": "hi", "location": None}
             await _memory_save(f"user_pref:{user_id}", USER_PREFERENCES[user_id], table="user_memory")
+
+        # ─── बटन-प्रेस के बाद आई प्लेन टेक्स्ट को सही मॉड्यूल कमांड में बदलो ───
+        pending = USER_PREFERENCES.get(user_id, {}).pop("waiting_for", None)
+        if pending and text and not text.startswith("/"):
+            if pending == "weather":
+                text = "/weather " + text.strip()
+            elif pending == "mandi":
+                text = "/mandi " + text.strip()
+            elif pending == "tax":
+                text = "/tax " + text.strip()
+        # ────────────────────────────────────────────────────────────
 
         if _rate_check(f"tg_user:{user_id}", *RATE_LIMIT_TELEGRAM_USER):
             await _telegram_send_message(chat_id, "Thoda slow karo! 1 minute mein try karo.")
