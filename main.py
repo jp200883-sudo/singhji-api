@@ -1137,7 +1137,7 @@ async def _call_groq(prompt: str, timeout=30):
     resp = await HTTP_CLIENT.post(
         "https://api.groq.com/openai/v1/chat/completions",
         headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"},
-        json={"model": "llama3-8b-8192", "messages": [{"role": "user", "content": prompt}]},
+       json={"model": "openai/gpt-oss-20b", "messages": [{"role": "user", "content": prompt}]}
         timeout=timeout
     )
     result = resp.json()
