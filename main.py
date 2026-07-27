@@ -53,7 +53,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.events import EVENT_JOB_ERROR, EVENT_JOB_EXECUTED
 
-from modules.telegram_bot.handler import router as telegram_router
+
 from modules.kisaan_doctor.handler import router as kisaan_router
 from modules.sarkari_yojana.handler import router as yojana_router
 from modules.banking.handler import handler as banking_handler
@@ -914,7 +914,7 @@ app.add_middleware(
 # ==========================================
 app.include_router(kisaan_router, prefix="/modules/kisaan_doctor")
 app.include_router(yojana_router, prefix="/modules/sarkari_yojana")
-app.include_router(telegram_router, prefix="/modules/telegram_bot")
+
 app.include_router(currency_router, prefix="/api")
 app.include_router(aavishkar_router, prefix="/modules/aavishkar")
 app.add_api_route("/api/banking", banking_handler, methods=["GET"])
