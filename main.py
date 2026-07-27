@@ -56,8 +56,16 @@ from apscheduler.events import EVENT_JOB_ERROR, EVENT_JOB_EXECUTED
 from modules.kisaan_doctor.handler import router as kisaan_router
 from modules.sarkari_yojana.handler import router as yojana_router
 from modules.banking.handler import handler as banking_handler
-from modules.currency.handler import router as currency_router
+from modules.currency.handler import router as currency_router, singhji_currency
 from modules.aavishkar.handler import router as aavishkar_router
+from modules.goldrate.handler import router as goldrate_router, gold_rate_city
+from modules.fuel.handler import router as fuel_router, fuel_price
+from modules.horoscope.handler import get_horoscope, format_telegram as _format_horoscope_telegram
+from modules.language.handler import LanguageModule
+from modules.emergency.handler import EMERGENCY_DATA
+from modules.pani.handler import handler as pani_handler
+from modules.sewer.handler import handler as sewer_handler
+from modules.upi.handler import handler as upi_handler
 from miniprogram.portal import router as miniprogram_router
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
@@ -520,6 +528,9 @@ MAIN_KEYBOARD = {
         [{"text": "Mandi Bhav", "callback_data": "mandi"}, {"text": "AI Chat", "callback_data": "ai_chat"}],
         [{"text": "Voice", "callback_data": "voice"}, {"text": "Status", "callback_data": "status"}],
         [{"text": "Tax Calc", "callback_data": "tax"}, {"text": "Plant ID", "callback_data": "plant"}],
+        [{"text": "Gold Rate", "callback_data": "gold"}, {"text": "Fuel Price", "callback_data": "fuel"}],
+        [{"text": "Horoscope", "callback_data": "horoscope"}, {"text": "Currency", "callback_data": "currency"}],
+        [{"text": "Emergency", "callback_data": "emergency"}, {"text": "UPI Info", "callback_data": "upi"}],
     ]
 }
 
@@ -919,8 +930,15 @@ app.include_router(kisaan_router, prefix="/modules/kisaan_doctor")
 app.include_router(yojana_router, prefix="/modules/sarkari_yojana")
 app.include_router(currency_router, prefix="/api")
 app.include_router(aavishkar_router, prefix="/modules/aavishkar")
+app.include_router(goldrate_router, prefix="/api/goldrate")
+app.include_router(fuel_router, prefix="/api/fuel")
 app.add_api_route("/api/banking", banking_handler, methods=["GET"])
+app.add_api_route("/api/pani", pani_handler, methods=["GET", "POST"])
+app.add_api_route("/api/sewer", sewer_handler, methods=["GET", "POST"])
+app.add_api_route("/api/upi", upi_handler, methods=["GET", "POST"])
 app.include_router(miniprogram_router, prefix="/api/v1/miniprogram")
+
+LANG_MODULE = LanguageModule()
 
 @app.middleware("http")
 async def rate_limit_middleware(request, call_next):
@@ -1453,6 +1471,27 @@ async def telegram_webhook(request: Request):
                 await _telegram_send_message(chat_id, "Tax Calculator\n\nIncome batao!")
             elif query_data == "plant":
                 await _telegram_send_message(chat_id, "Plant ID\n\nPlant ki photo bhejo!")
+            elif query_data == "gold":
+                USER_PREFERENCES.setdefault(user_id, {})["waiting_for"] = "gold"
+                await _telegram_send_message(chat_id, "Gold Rate\n\nCity batao! (ya sirf Enter dabao Delhi ke liye)")
+            elif query_data == "fuel":
+                USER_PREFERENCES.setdefault(user_id, {})["waiting_for"] = "fuel"
+                await _telegram_send_message(chat_id, "Fuel Price\n\nCity batao!")
+            elif query_data == "horoscope":
+                USER_PREFERENCES.setdefault(user_id, {})["waiting_for"] = "horoscope"
+                await _telegram_send_message(chat_id, "Horoscope\n\nRashi batao! (jaise: Mesh, Simha, Tula)")
+            elif query_data == "currency":
+                USER_PREFERENCES.setdefault(user_id, {})["waiting_for"] = "currency"
+                await _telegram_send_message(chat_id, "Currency Convert\n\nFormat: USD INR 100")
+            elif query_data == "emergency":
+                emg_text = "Emergency Numbers\n\n"
+                for k, v in EMERGENCY_DATA.items():
+                    emg_text += f"{k.title()}: {v['number']}" + (f" / {v['alt']}" if v.get("alt") else "") + "\n"
+                await _telegram_send_message(chat_id, emg_text)
+            elif query_data == "upi":
+                upi_id = os.getenv("UPI_ID", "jp200883@sbi")
+                upi_text = f"UPI Info\n\nUPI ID: {upi_id}\nApps: PhonePe, Google Pay, Paytm, BHIM\nDaily Limit: Rs 1,00,000"
+                await _telegram_send_message(chat_id, upi_text)
 
             return {"status": "ok"}
 
@@ -1477,6 +1516,14 @@ async def telegram_webhook(request: Request):
                 text = "/mandi " + text.strip()
             elif pending == "tax":
                 text = "/tax " + text.strip()
+            elif pending == "gold":
+                text = "/gold " + text.strip()
+            elif pending == "fuel":
+                text = "/fuel " + text.strip()
+            elif pending == "horoscope":
+                text = "/horoscope " + text.strip()
+            elif pending == "currency":
+                text = "/currency " + text.strip()
         # ────────────────────────────────────────────────────────────
 
         if _rate_check(f"tg_user:{user_id}", *RATE_LIMIT_TELEGRAM_USER):
@@ -1527,7 +1574,12 @@ async def telegram_webhook(request: Request):
             return {"status": "ok"}
 
         elif text == "/help":
-            help_text = "Commands\n\n/start\n/weather city\n/news\n/mandi state\n/tax income\n/status\n/ai question"
+            help_text = (
+                "Commands\n\n"
+                "/start\n/weather city\n/news\n/mandi state\n/tax income\n/status\n/ai question\n"
+                "/gold city\n/fuel city\n/horoscope rashi\n/currency USD INR 100\n"
+                "/translate en text\n/emergency type\n/upi\n/pani\n/sewer"
+            )
             await _telegram_send_message(chat_id, help_text)
             return {"status": "ok"}
 
@@ -1619,6 +1671,125 @@ async def telegram_webhook(request: Request):
                 await _telegram_send_message(chat_id, tax_text)
             except Exception:
                 await _telegram_send_message(chat_id, "Invalid income. Example: /tax 500000")
+            return {"status": "ok"}
+
+        elif text.startswith("/gold"):
+            city = text.replace("/gold", "").strip() or "delhi"
+            try:
+                resp = await gold_rate_city(city)
+                body = json.loads(bytes(resp.body))
+                d = body["data"]
+                cr = d.get("city_rates", {})
+                gold_text = f"Gold Rate - {cr.get('city', city.title())}\n\n"
+                gold_text += f"Source: {d.get('source', 'N/A')}\n"
+                gold_text += f"24K (1g): Rs {cr.get('price_gram_24k', 'N/A')}\n"
+                gold_text += f"22K (1g): Rs {cr.get('price_gram_22k', 'N/A')}\n"
+                gold_text += f"24K (10g): Rs {cr.get('price_10g_24k', 'N/A')}\n"
+                gold_text += f"Updated: {d.get('last_updated', 'N/A')}"
+                await _telegram_send_message(chat_id, gold_text)
+            except Exception as e:
+                await _telegram_send_message(chat_id, f"Gold rate error: {str(e)[:100]}")
+            return {"status": "ok"}
+
+        elif text.startswith("/fuel"):
+            city = text.replace("/fuel", "").strip() or "delhi"
+            try:
+                resp = await fuel_price(city)
+                body = json.loads(bytes(resp.body))
+                d = body["data"]
+                fuel_text = f"Fuel Price - {d.get('city', city.title())}\n\n"
+                fuel_text += f"Petrol: Rs {d.get('petrol', 'N/A')}/L\n"
+                fuel_text += f"Diesel: Rs {d.get('diesel', 'N/A')}/L\n"
+                fuel_text += f"Source: {d.get('source', 'N/A')}\n"
+                fuel_text += f"Updated: {d.get('last_updated', 'N/A')}"
+                await _telegram_send_message(chat_id, fuel_text)
+            except Exception as e:
+                await _telegram_send_message(chat_id, f"Fuel price error: {str(e)[:100]}")
+            return {"status": "ok"}
+
+        elif text.startswith("/horoscope"):
+            rashi = text.replace("/horoscope", "").strip() or "मेष"
+            try:
+                h = get_horoscope(rashi, "daily", "hi")
+                horo_text = _format_horoscope_telegram(h)
+                await _telegram_send_message(chat_id, horo_text)
+            except Exception as e:
+                await _telegram_send_message(chat_id, f"Horoscope error: {str(e)[:100]}")
+            return {"status": "ok"}
+
+        elif text.startswith("/currency"):
+            parts = text.replace("/currency", "").strip().split()
+            try:
+                base = parts[0].upper() if len(parts) > 0 else "USD"
+                target = parts[1].upper() if len(parts) > 1 else "INR"
+                amount = float(parts[2]) if len(parts) > 2 else 1.0
+                result = await singhji_currency.convert(base, target, amount)
+                cur_text = f"Currency Convert\n\n{amount} {base} = {result.converted} {target}\n"
+                cur_text += f"Rate: 1 {base} = {result.rate} {target}\n"
+                cur_text += f"Source: {result.source}"
+                await _telegram_send_message(chat_id, cur_text)
+            except Exception as e:
+                await _telegram_send_message(chat_id, f"Currency error: {str(e)[:100]}\n\nFormat: /currency USD INR 100")
+            return {"status": "ok"}
+
+        elif text.startswith("/translate "):
+            parts = text.replace("/translate ", "").strip().split(" ", 1)
+            try:
+                target_lang = parts[0].lower()
+                to_translate = parts[1] if len(parts) > 1 else ""
+                if not to_translate:
+                    await _telegram_send_message(chat_id, "Format: /translate en Namaste kaise ho")
+                    return {"status": "ok"}
+                result = await run_in_threadpool(LANG_MODULE.translate, to_translate, target_lang, "auto")
+                if result.get("success"):
+                    await _telegram_send_message(chat_id, f"Translation ({result.get('target_name', target_lang)})\n\n{result['translated']}")
+                else:
+                    await _telegram_send_message(chat_id, f"Translate error: {result.get('error', 'unknown')[:100]}")
+            except Exception as e:
+                await _telegram_send_message(chat_id, f"Translate error: {str(e)[:100]}\n\nFormat: /translate en Namaste kaise ho")
+            return {"status": "ok"}
+
+        elif text.startswith("/emergency"):
+            type_ = text.replace("/emergency", "").strip().lower()
+            if type_ and type_ in EMERGENCY_DATA:
+                v = EMERGENCY_DATA[type_]
+                emg_text = f"{type_.title()}\n\nNumber: {v['number']}"
+                if v.get("alt"):
+                    emg_text += f"\nAlt: {v['alt']}"
+                emg_text += f"\n{v.get('info', '')}"
+            else:
+                emg_text = "Emergency Numbers\n\n"
+                for k, v in EMERGENCY_DATA.items():
+                    emg_text += f"{k.title()}: {v['number']}" + (f" / {v['alt']}" if v.get("alt") else "") + "\n"
+            await _telegram_send_message(chat_id, emg_text)
+            return {"status": "ok"}
+
+        elif text == "/upi":
+            upi_id = os.getenv("UPI_ID", "jp200883@sbi")
+            upi_text = f"UPI Info\n\nUPI ID: {upi_id}\nApps: PhonePe, Google Pay, Paytm, BHIM\nDaily Limit: Rs 1,00,000"
+            await _telegram_send_message(chat_id, upi_text)
+            return {"status": "ok"}
+
+        elif text == "/pani":
+            pani_text = (
+                "Pani (Water) Helplines\n\n"
+                "National: 1800-180-1818\n"
+                "Jal Jeevan Mission: 1800-111-555\n\n"
+                "Schemes: Jal Jeevan Mission, AMRUT 2.0, Swajal Scheme\n"
+                "Complaint: jaljeevanmission.gov.in"
+            )
+            await _telegram_send_message(chat_id, pani_text)
+            return {"status": "ok"}
+
+        elif text == "/sewer":
+            sewer_text = (
+                "Sewer/Sanitation Helplines\n\n"
+                "Swachh Bharat: 1800-180-1818\n"
+                "Urban Sewer: 1800-111-555\n"
+                "Complaint: 1969\n\n"
+                "Portal: swachhbharaturban.gov.in"
+            )
+            await _telegram_send_message(chat_id, sewer_text)
             return {"status": "ok"}
 
         elif text.startswith("/ai "):
