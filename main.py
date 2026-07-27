@@ -70,6 +70,7 @@ from miniprogram.portal import router as miniprogram_router
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
 logger = logging.getLogger(__name__)
+logging.getLogger("httpx").setLevel(logging.WARNING)   # token URLs अब लॉग में नहीं दिखेंगे
 
 ADMIN_API_KEY = os.getenv("ADMIN_API_KEY")
 CEREBRAS_API_KEY = os.getenv("CEREBRAS_API_KEY")
