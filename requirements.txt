@@ -1,7 +1,13 @@
+# ═══════════════════════════════════════════════════════
+# 🦁 SINGH JI AI ULTRA v8.0 — REQUIREMENTS
+# ═══════════════════════════════════════════════════════
+
 # ─── CORE WEB FRAMEWORK ───
 fastapi==0.139.0
 uvicorn[standard]==0.34.0
 python-multipart==0.0.21
+starlette==0.46.2
+jinja2==3.1.6
 
 # ─── HTTP CLIENTS ───
 httpx==0.28.1
@@ -16,39 +22,34 @@ passlib[bcrypt]==1.7.4
 
 # ─── AI / LLM ───
 groq==0.22.0
-google-generativeai==0.8.5
-openai==1.75.0
 
 # ─── TTS ───
 gtts==2.5.4
 edge-tts==7.0.0
-# piper-tts/pocket-tts HATAO — PyPI pe nahi hain
 
-# ─── ASR ───
-faster-whisper==1.2.1
-speechrecognition==3.14.2
+# ─── ASR (Whisper — optional, build heavy hai) ───
+# faster-whisper==1.2.1      # ← Uncomment jab voice test karo
+# torch==2.5.1+cpu            # ← Saath mein chahiye hoga
+# --extra-index-url https://download.pytorch.org/whl/cpu
+
 pydub==0.25.1
 
 # ─── VIDEO / IMAGE ───
 pillow==11.2.1
-ffmpeg-python==0.2.0  # wrapper only, actual ffmpeg binary alag chahiye
+ffmpeg-python==0.2.0
 
 # ─── DATA ───
 numpy==2.2.6
-pandas==2.3.0
 
 # ─── SCHEDULER ───
 APScheduler==3.10.4
 
 # ─── MESSAGING ───
-python-telegram-bot==22.0
+python-telegram-bot==21.10    # v22 se safe, v21 stable hai
 twilio==9.5.0
 
 # ─── SOCIAL MEDIA ───
-facebook-sdk==3.1.0
-tweepy==4.15.0
-instaloader==4.14.1
-yt-dlp>=2026.07.01  # fixed date
+yt-dlp>=2025.07.21
 
 # ─── YOUTUBE UPLOAD ───
 google-api-python-client==2.160.0
@@ -68,3 +69,4 @@ lxml==5.4.0
 python-dotenv==1.0.1
 websockets==14.2
 orjson==3.11.8
+typing-extensions==4.14.1
