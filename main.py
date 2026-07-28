@@ -1928,3 +1928,83 @@ Wind: {d['wind_speed']} m/s
     except Exception as e:
         logger.error(f"[WEBHOOK] Error: {e}")
         return JSONResponse(status_code=500, content={"error": str(e)})
+        # ═══════════════════════════════════════════════════════════════
+# MODULE ROUTER INCLUDES
+# ═══════════════════════════════════════════════════════════════
+
+app.include_router(scheme_swarm_router, prefix="/api/scheme_swarm", tags=["scheme_swarm"])
+app.include_router(trishul_router, prefix="/api/trishul", tags=["trishul"])
+app.include_router(kisaan_router, prefix="/api/kisaan", tags=["kisaan"])
+app.include_router(yojana_router, prefix="/api/yojana", tags=["yojana"])
+app.include_router(currency_router, prefix="/api/currency", tags=["currency"])
+app.include_router(goldrate_router, prefix="/api/gold", tags=["gold"])
+app.include_router(fuel_router, prefix="/api/fuel", tags=["fuel"])
+app.include_router(aavishkar_router, prefix="/api/aavishkar", tags=["aavishkar"])
+app.include_router(miniprogram_router, prefix="/api/miniprogram", tags=["miniprogram"])
+
+# ═══════════════════════════════════════════════════════════════
+# TELEGRAM CALLBACK HANDLERS
+# ═══════════════════════════════════════════════════════════════
+
+async def _handle_callback(chat_id: int, callback_data: str):
+    handlers = {
+        "weather": "Send: /weather <city_name>",
+        "news": "Latest news: /news",
+        "mandi": "Mandi rates: /mandi <commodity>",
+        "ai_chat": "AI Chat: Just type your question!",
+        "voice": "Voice: /voice <text>",
+        "status": "System status: /status",
+        "tax": "Tax calc: /tax <income>",
+        "plant": "Plant ID: Upload photo with /plant",
+        "gold": "Gold rates: /gold",
+        "fuel": "Fuel prices: /fuel <city>",
+        "horoscope": "Horoscope: /horoscope <sign>",
+        "currency": "Currency: /currency",
+        "emergency": "Emergency: /emergency",
+        "upi": "UPI ID: jp200883@sbi",
+        "pani": "Pani service active!",
+        "sewer": "Sewer service active!",
+        "govt": "Govt services: /govt",
+        "yojana": "Yojana: /yojana <scheme_name>",
+        "search": "Search: /search <query>",
+        "tv": "SinghJi TV: /singhji-tv",
+        "banking": "Banking: /banking",
+        "social": "Social media: /social",
+        "swarm": "Smart Swarm: /swarm",
+        "admin": "Admin panel: /admin (auth required)",
+        "payment": "Payment gateway: ON HOLD (1000+ users needed)",
+        "gmail": "Gmail: /gmail",
+        "translate": "Translate: /bhashini",
+        "whisper": "Speech-to-text: /whisper",
+        "tts": "Text-to-speech: /tts <text>",
+        "stt": "Speech-to-text: /stt",
+        "rozgar": "Jobs: /rozgar",
+        "supreme": "Supreme AI active!",
+        "scheme_swarm": "Scheme Swarm: 15 schemes available! /yojana",
+        "trishul": "Trishul Security: Active!",
+        "kisaan": "Kisaan Doctor: Active!",
+        "aavishkar": "Aavishkar: Active!",
+        "bachpan": "Bachpan: Active!",
+        "trolley": "Trolley: Active!",
+        "analytics": "Analytics: /analytics",
+        "daily_report": "Daily Report: /daily-report",
+        "guard": "Guard Agent: /guard",
+        "meta": "Meta Agent: /meta",
+        "lang_hub": "Language Hub: /lang-hub",
+        "whatsapp": "WhatsApp: /whatsapp",
+        "voice_tts": "Voice TTS: /voice-tts",
+        "voice_cmd": "Voice CMD: /voice-cmd",
+        "singhji_tv": "SinghJi TV: /singhji-tv",
+        "music": "Music: Coming soon!",
+    }
+    msg = handlers.get(callback_data, f"Module '{callback_data}' selected!")
+    await _telegram_send_message(chat_id, msg, reply_markup=MAIN_KEYBOARD)
+
+# ═══════════════════════════════════════════════════════════════
+# MAIN BLOCK
+# ═══════════════════════════════════════════════════════════════
+
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
