@@ -5,7 +5,7 @@ Track application status across multiple scheme portals
 import aiohttp
 import asyncio
 from bs4 import BeautifulSoup
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 
 class StatusTracker:
     """Track scheme application status from various portals"""
