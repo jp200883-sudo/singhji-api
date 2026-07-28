@@ -3,7 +3,7 @@ Automated reminders and notifications for schemes
 """
 
 from datetime import datetime, timedelta
-from typing import List
+from typing import List, Dict
 import asyncio
 
 class SchemeNotifier:
