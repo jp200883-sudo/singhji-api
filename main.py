@@ -1,9 +1,4 @@
-"""
-🦁 SINGH JI AI ULTRA v8.3 — FIXED
-Complete API — 97+ Routes | All Modules Active
-Backend: Railway (Primary) | AWS EC2 Backup
-Generated: 28 July 2026
-"""
+
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -53,11 +48,8 @@ from miniprogram.portal import router as miniprogram_router
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
 logger = logging.getLogger(__name__)
-logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpx").setLevel(logging.WARNING)   # token URLs अब लॉग में नहीं दिखेंगे
 
-# ═══════════════════════════════════════════════════════════════
-# ENVIRONMENT VARIABLES
-# ═══════════════════════════════════════════════════════════════
 ADMIN_API_KEY = os.getenv("ADMIN_API_KEY")
 CEREBRAS_API_KEY = os.getenv("CEREBRAS_API_KEY")
 CF_API_TOKEN = os.getenv("CF_API_TOKEN")
@@ -90,7 +82,6 @@ GMAIL_CLIENT_SECRET = os.getenv("GMAIL_CLIENT_SECRET")
 INSTAGRAM_ACCESS_TOKEN = os.getenv("INSTAGRAM_ACCESS_TOKEN")
 INSTAGRAM_BUSINESS_ID = os.getenv("INSTAGRAM_BUSINESS_ID")
 ADMIN_USER_ID = int(os.getenv("ADMIN_USER_ID", "0"))
-APP_URL = os.getenv("APP_URL", "")
 
 MAX_B64_BYTES = 10 * 1024 * 1024
 
@@ -222,10 +213,17 @@ def _memory_get_sync(key, table="memory_store"):
 async def _memory_get(key, table="memory_store"):
     return await run_in_threadpool(_memory_get_sync, key, table)
 
+# ─── FIX #1: Startup पर subscriber लिस्ट Supabase से वापस लोड करो ─────
 def _load_user_preferences_sync() -> Dict[int, Any]:
+    """
+    _memory_save() हर नए Telegram user को key=f"user_pref:{user_id}" के
+    साथ table "user_memory" में सेव करता है। यह फ़ंक्शन वही रिकॉर्ड
+    वापस पढ़कर USER_PREFERENCES (RAM dict) में भर देता है, ताकि restart के
+    बाद भी broadcast/scheduler को पुराने सब्सक्राइबर दिखें।
+    """
     loaded: Dict[int, Any] = {}
     if not SUPABASE_CLIENT:
-        logger.warning("[STARTUP] Supabase not connected")
+        logger.warning("[STARTUP] Supabase कनेक्ट नहीं है — subscriber लिस्ट सिर्फ़ नए messages से बनेगी")
         return loaded
     try:
         resp = SUPABASE_CLIENT.table("user_memory").select("*").execute()
@@ -280,10 +278,6 @@ def _calculate_tax(income: float, regime: str = "new", deductions: float = 0):
         "total": round(total_tax, 2),
         "take_home": round(income - total_tax, 2)
     }
-
-# ═══════════════════════════════════════════════════════════════
-# SMART SWARM
-# ═══════════════════════════════════════════════════════════════
 
 class _SmartSarwanSwarm:
     def __init__(self):
@@ -341,10 +335,6 @@ class _SmartSarwanSwarm:
 
 SMART_SWARM = _SmartSarwanSwarm()
 
-# ═══════════════════════════════════════════════════════════════
-# MODULE REGISTRY — ALL 40+ MODULES
-# ═══════════════════════════════════════════════════════════════
-
 MODULES = {
     "memory": {"needs_key": None, "active": True},
     "weather": {"needs_key": "OPENWEATHER", "active": AVAILABLE_KEYS["OPENWEATHER"]},
@@ -367,36 +357,7 @@ MODULES = {
     "kisaan_doctor": {"needs_key": None, "active": True},
     "sarkari_yojana": {"needs_key": None, "active": True},
     "banking": {"needs_key": None, "active": True},
-    "scheme_swarm": {"needs_key": None, "active": True},
-    "trishul": {"needs_key": None, "active": True},
-    "pani": {"needs_key": None, "active": True},
-    "sewer": {"needs_key": None, "active": True},
-    "upi": {"needs_key": None, "active": True},
-    "rozgar": {"needs_key": None, "active": True},
-    "supreme_ai": {"needs_key": None, "active": True},
-    "social": {"needs_key": None, "active": True},
-    "tax": {"needs_key": None, "active": True},
-    "voice_tts": {"needs_key": None, "active": True},
-    "voice_cmd": {"needs_key": None, "active": True},
-    "whatsapp": {"needs_key": None, "active": True},
-    "analytics": {"needs_key": None, "active": True},
-    "daily_report": {"needs_key": None, "active": True},
-    "guard_agent": {"needs_key": None, "active": True},
-    "meta_agent": {"needs_key": None, "active": True},
-    "language_hub": {"needs_key": None, "active": True},
-    "bachpan": {"needs_key": None, "active": True},
-    "trolley": {"needs_key": None, "active": True},
-    "singhji_tv": {"needs_key": None, "active": True},
-    "search": {"needs_key": "TAVILY", "active": AVAILABLE_KEYS["TAVILY"]},
-    "newsdata": {"needs_key": "NEWSDATA", "active": AVAILABLE_KEYS["NEWSDATA"]},
 }
-
-ACTIVE_MODULES = [n for n, i in MODULES.items() if i["active"]]
-INACTIVE_MODULES = [{"name": n, "needs_key": i["needs_key"]} for n, i in MODULES.items() if not i["active"]]
-
-# ═══════════════════════════════════════════════════════════════
-# RATE LIMITING
-# ═══════════════════════════════════════════════════════════════
 
 _rate_lock = threading.Lock()
 _rate_buckets = defaultdict(deque)
@@ -412,7 +373,6 @@ STRICT_PATH_PREFIXES = (
     "/modules/voice",
 )
 RATE_LIMITED_PREFIXES = ("/api/", "/modules/")
-RATE_LIMIT_TELEGRAM_USER = (15, 60)
 
 def _client_ip(request) -> str:
     xff = request.headers.get("x-forwarded-for")
@@ -435,10 +395,9 @@ def _is_rate_limited(request, bucket: str, max_calls: int, window_seconds: int) 
     ip = _client_ip(request)
     return _rate_check(f"{bucket}:{ip}", max_calls, window_seconds)
 
-# ═══════════════════════════════════════════════════════════════
-# TELEGRAM HELPERS
-# ═══════════════════════════════════════════════════════════════
+RATE_LIMIT_TELEGRAM_USER = (15, 60)
 
+# Telegram helpers (moved up for scheduler access)
 TELEGRAM_API_BASE = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
 
 async def _telegram_send_message(chat_id, text, reply_markup=None, parse_mode=None):
@@ -471,29 +430,91 @@ async def _telegram_send_voice(chat_id, audio_b64, caption=""):
     except Exception as e:
         return {"error": str(e)}
 
-# ═══════════════════════════════════════════════════════════════
-# FULL TELEGRAM KEYBOARD — ALL 40+ MODULES (4 buttons per row)
-# ═══════════════════════════════════════════════════════════════
+# ─── FIX #2: Startup पर पता लगाओ Telegram असल में किस webhook को कॉल कर रहा है ──
+async def _check_webhook_config():
+    """
+    इस फ़ाइल में /telegram/webhook (पूरी फ़ीचर वाला हैंडलर — commands, voice,
+    AI chat, broadcast सब यहीं है) और modules/telegram_bot/handler.py का
+    router /modules/telegram_bot/webhook पर mount है — दोनों एक साथ मौजूद
+    हैं। Telegram सिर्फ़ एक ही URL पर webhook भेज सकता है, इसलिए startup पर
+    getWebhookInfo चेक करके लॉग में साफ़ बता देता है कौन एक्टिव है।
+    """
+    if not TELEGRAM_TOKEN or not HTTP_CLIENT:
+        return
+    try:
+        resp = await HTTP_CLIENT.get(f"{TELEGRAM_API_BASE}/getWebhookInfo", timeout=10)
+        info = resp.json().get("result", {})
+        url = info.get("url", "")
+        logger.info(f"[WEBHOOK CHECK] Telegram में सेट webhook URL: {url or '(कोई नहीं सेट)'}")
+
+        if not url:
+            logger.warning("[WEBHOOK CHECK] कोई webhook सेट नहीं है — बॉट को कोई भी अपडेट नहीं मिल रहा")
+        elif url.rstrip("/").endswith("/modules/telegram_bot/webhook"):
+            logger.warning(
+                "[WEBHOOK CHECK] Telegram /modules/telegram_bot/webhook (telegram_router) को कॉल कर रहा है — "
+                "इस फ़ाइल का पूरा /telegram/webhook हैंडलर (commands, voice, AI chat, broadcast) "
+                "इस्तेमाल ही नहीं हो रहा! या तो setWebhook को /telegram/webhook पर repoint करें, "
+                "या पुष्टि करें कि modules/telegram_bot/handler.py में बराबर की लॉजिक है।"
+            )
+        elif url.rstrip("/").endswith("/telegram/webhook"):
+            logger.info(
+                "[WEBHOOK CHECK] ठीक है — Telegram इसी फ़ाइल के /telegram/webhook को कॉल कर रहा है। "
+                "/modules/telegram_bot/webhook (telegram_router में) फ़िलहाल dead code है, चाहें तो हटा सकते हैं।"
+            )
+        else:
+            logger.warning(f"[WEBHOOK CHECK] अनजान webhook URL — मैन्युअल जाँच करें: {url}")
+    except Exception as e:
+        logger.warning(f"[WEBHOOK CHECK] getWebhookInfo कॉल फेल: {e}")
+
+# ─── FIX #4 (नया): हर startup पर Telegram को अपने आप सही webhook पर पॉइंट करो ──
+async def _ensure_correct_webhook():
+    """
+    Telegram को हमेशा इसी फाइल के /telegram/webhook पर पॉइंट रखता है —
+    ताकि modules/telegram_bot/webhook (जो USER_PREFERENCES में यूज़र सेव
+    नहीं करता, इसलिए broadcast को कभी recipient नहीं मिलता) कभी गलती से
+    एक्टिव न रह जाए। Railway पर APP_URL env var (पूरा https URL) सेट
+    होना ज़रूरी है, वरना यह फंक्शन सिर्फ़ warning देकर रुक जाएगा।
+    """
+    if not TELEGRAM_TOKEN or not HTTP_CLIENT:
+        return
+    app_url = os.getenv("APP_URL", "")
+    if not app_url:
+        logger.warning("[WEBHOOK FIX] APP_URL env var सेट नहीं है — webhook auto-set स्किप हुआ")
+        return
+    correct_url = f"{app_url.rstrip('/')}/telegram/webhook"
+    try:
+        resp = await HTTP_CLIENT.get(f"{TELEGRAM_API_BASE}/getWebhookInfo", timeout=10)
+        current_url = resp.json().get("result", {}).get("url", "")
+        if current_url.rstrip("/") == correct_url.rstrip("/"):
+            logger.info(f"[WEBHOOK FIX] पहले से सही सेट है: {correct_url}")
+            return
+        set_resp = await HTTP_CLIENT.get(
+            f"{TELEGRAM_API_BASE}/setWebhook",
+            params={"url": correct_url},
+            timeout=10
+        )
+        result = set_resp.json()
+        if result.get("ok"):
+            logger.info(f"[WEBHOOK FIX] Webhook सही जगह सेट हुआ: {correct_url}")
+        else:
+            logger.error(f"[WEBHOOK FIX] setWebhook फेल: {result}")
+    except Exception as e:
+        logger.error(f"[WEBHOOK FIX] Webhook auto-fix में त्रुटि: {e}")
 
 MAIN_KEYBOARD = {
     "inline_keyboard": [
-        [{"text": "🌤 Weather", "callback_data": "weather"}, {"text": "📰 News", "callback_data": "news"}, {"text": "🌾 Mandi", "callback_data": "mandi"}, {"text": "🤖 AI Chat", "callback_data": "ai_chat"}],
-        [{"text": "🎙 Voice", "callback_data": "voice"}, {"text": "📊 Status", "callback_data": "status"}, {"text": "💰 Tax", "callback_data": "tax"}, {"text": "🌿 Plant", "callback_data": "plant"}],
-        [{"text": "🪙 Gold", "callback_data": "gold"}, {"text": "⛽ Fuel", "callback_data": "fuel"}, {"text": "🔮 Horoscope", "callback_data": "horoscope"}, {"text": "💱 Currency", "callback_data": "currency"}],
-        [{"text": "🚨 Emergency", "callback_data": "emergency"}, {"text": "📱 UPI", "callback_data": "upi"}, {"text": "💧 Pani", "callback_data": "pani"}, {"text": "🚽 Sewer", "callback_data": "sewer"}],
-        [{"text": "🏛 Govt", "callback_data": "govt"}, {"text": "📋 Yojana", "callback_data": "yojana"}, {"text": "🔍 Search", "callback_data": "search"}, {"text": "📺 TV", "callback_data": "tv"}],
-        [{"text": "🏦 Banking", "callback_data": "banking"}, {"text": "📱 Social", "callback_data": "social"}, {"text": "🐝 Swarm", "callback_data": "swarm"}, {"text": "⚡ Admin", "callback_data": "admin"}],
-        [{"text": "💳 Payment", "callback_data": "payment"}, {"text": "📧 Gmail", "callback_data": "gmail"}, {"text": "🌐 Translate", "callback_data": "translate"}, {"text": "🎤 Whisper", "callback_data": "whisper"}],
-        [{"text": "🔊 TTS", "callback_data": "tts"}, {"text": "📝 STT", "callback_data": "stt"}, {"text": "💼 Rozgar", "callback_data": "rozgar"}, {"text": "👑 Supreme", "callback_data": "supreme"}],
-        [{"text": "🐝 Scheme Swarm", "callback_data": "scheme_swarm"}, {"text": "🧠 Trishul", "callback_data": "trishul"}, {"text": "🚜 Kisaan", "callback_data": "kisaan"}, {"text": "🧪 Aavishkar", "callback_data": "aavishkar"}],
-        [{"text": "👶 Bachpan", "callback_data": "bachpan"}, {"text": "🛒 Trolley", "callback_data": "trolley"}, {"text": "📊 Analytics", "callback_data": "analytics"}, {"text": "📅 Daily Report", "callback_data": "daily_report"}],
-        [{"text": "🛡 Guard", "callback_data": "guard"}, {"text": "🧠 Meta", "callback_data": "meta"}, {"text": "🌐 Lang Hub", "callback_data": "lang_hub"}, {"text": "📱 WhatsApp", "callback_data": "whatsapp"}],
-        [{"text": "🎙 Voice TTS", "callback_data": "voice_tts"}, {"text": "🎤 Voice CMD", "callback_data": "voice_cmd"}, {"text": "📺 SinghJi TV", "callback_data": "singhji_tv"}, {"text": "🎵 Music", "callback_data": "music"}],
+        [{"text": "Weather", "callback_data": "weather"}, {"text": "News", "callback_data": "news"}],
+        [{"text": "Mandi Bhav", "callback_data": "mandi"}, {"text": "AI Chat", "callback_data": "ai_chat"}],
+        [{"text": "Voice", "callback_data": "voice"}, {"text": "Status", "callback_data": "status"}],
+        [{"text": "Tax Calc", "callback_data": "tax"}, {"text": "Plant ID", "callback_data": "plant"}],
+        [{"text": "Gold Rate", "callback_data": "gold"}, {"text": "Fuel Price", "callback_data": "fuel"}],
+        [{"text": "Horoscope", "callback_data": "horoscope"}, {"text": "Currency", "callback_data": "currency"}],
+        [{"text": "Emergency", "callback_data": "emergency"}, {"text": "UPI Info", "callback_data": "upi"}],
     ]
 }
 
 # ═══════════════════════════════════════════════════════════════
-# MASTER SCHEDULER
+#  MASTER SCHEDULER CLASS
 # ═══════════════════════════════════════════════════════════════
 
 class SinghJiMasterScheduler:
@@ -512,8 +533,16 @@ class SinghJiMasterScheduler:
         db_path = os.getenv("SCHEDULER_DB", "scheduler_state.db")
         conn = sqlite3.connect(db_path, check_same_thread=False)
         c = conn.cursor()
-        sql = "CREATE TABLE IF NOT EXISTS scheduler_state (job_name TEXT PRIMARY KEY, last_run TEXT, next_run TEXT, status TEXT DEFAULT 'pending', retry_count INTEGER DEFAULT 0, created_at TEXT DEFAULT CURRENT_TIMESTAMP)"
-        c.execute(sql)
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS scheduler_state (
+                job_name TEXT PRIMARY KEY,
+                last_run TEXT,
+                next_run TEXT,
+                status TEXT DEFAULT 'pending',
+                retry_count INTEGER DEFAULT 0,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
         conn.commit()
         conn.close()
 
@@ -523,7 +552,15 @@ class SinghJiMasterScheduler:
             conn = sqlite3.connect(db_path, check_same_thread=False)
             c = conn.cursor()
             now = datetime.now().isoformat()
-            c.execute("INSERT INTO scheduler_state (job_name, last_run, status, next_run) VALUES (?, ?, ?, ?) ON CONFLICT(job_name) DO UPDATE SET last_run=excluded.last_run, status=excluded.status, next_run=excluded.next_run, retry_count=retry_count + CASE WHEN excluded.status='failed' THEN 1 ELSE 0 END", (job_name, now, status, next_run))
+            c.execute("""
+                INSERT INTO scheduler_state (job_name, last_run, status, next_run)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(job_name) DO UPDATE SET
+                    last_run=excluded.last_run,
+                    status=excluded.status,
+                    next_run=excluded.next_run,
+                    retry_count=retry_count + CASE WHEN excluded.status='failed' THEN 1 ELSE 0 END
+            """, (job_name, now, status, next_run))
             conn.commit()
             conn.close()
         except Exception as e:
@@ -563,7 +600,7 @@ class SinghJiMasterScheduler:
                 for i, a in enumerate(articles, 1):
                     title = a.get("title", "No title")
                     desc = (a.get("description") or "")[:90]
-                    lines.append(f"{i}. **{title}**\n {desc}...")
+                    lines.append(f"{i}. <b>{title}</b>\n   {desc}...")
                 if lines:
                     return "\n\n".join(lines)
             except Exception as e:
@@ -577,33 +614,45 @@ class SinghJiMasterScheduler:
                 for i, a in enumerate(articles, 1):
                     title = a.get("title", "No title")
                     desc = (a.get("description") or "")[:90]
-                    lines.append(f"{i}. **{title}**\n {desc}...")
+                    lines.append(f"{i}. <b>{title}</b>\n   {desc}...")
                 if lines:
                     return "\n\n".join(lines)
             except Exception as e:
                 logger.warning(f"[NEWS] Currents fail: {e}")
-        return "- No news available (API limit possible)"
+        return "• कोई समाचार उपलब्ध नहीं (API limit हो सकती है)"
 
     async def _fetch_weather(self, city="Delhi"):
         if not self.keys.get("OPENWEATHER"):
-            return "- Weather API key missing"
+            return "• Weather API key missing"
         try:
             key = os.getenv("OPENWEATHER_API_KEY")
             url = f"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={key}&units=metric"
             r = await self.http.get(url, timeout=15)
             data = r.json()
             if r.status_code == 200:
-                return f"Temp: {data['main']['temp']}C | Humidity: {data['main']['humidity']}% | Wind: {data['wind']['speed']} m/s"
-            return f"- Weather error: {data.get('message', 'Unknown')}"
+                return (
+                    f"🌡️ तापमान: {data['main']['temp']}°C (Feel: {data['main']['feels_like']}°C)\n"
+                    f"💧 नमी: {data['main']['humidity']}%\n"
+                    f"🌬️ हवा: {data['wind']['speed']} m/s\n"
+                    f"☁️ {data['weather'][0]['description'].title()}"
+                )
+            return f"• Weather error: {data.get('message', 'Unknown')}"
         except Exception as e:
             logger.warning(f"[WEATHER] Error: {e}")
-            return "- Weather fetch failed"
+            return "• Weather fetch failed"
 
     async def _job_morning_digest(self):
         logger.info("[JOB] Morning Digest starting...")
         news = await self._fetch_news(5)
         weather = await self._fetch_weather("Delhi")
-        msg = f"Good Morning! Singh Ji AI Digest\nDate: {datetime.now().strftime('%d %b %Y')}\n\nNews:\n{news}\n\nWeather (Delhi):\n{weather}\n\n- Singh Ji AI Ultra"
+        msg = (
+            f"🌅 <b>Singh Ji Morning Digest</b>\n"
+            f"📅 {datetime.now().strftime('%d %b %Y, %A')}\n"
+            f"{'─' * 28}\n\n"
+            f"📰 <b>मुख्य समाचार:</b>\n{news}\n\n"
+            f"🌤️ <b>मौसम (Delhi):</b>\n{weather}\n\n"
+            f"— <i>Singh Ji AI Ultra</i>"
+        )
         await self._broadcast(msg, parse_mode="HTML")
         self._update_state("morning_digest", "success", "Tomorrow 07:00 AM")
         logger.info("[JOB] Morning Digest DONE")
@@ -611,23 +660,53 @@ class SinghJiMasterScheduler:
     async def _job_evening_digest(self):
         logger.info("[JOB] Evening Digest starting...")
         news = await self._fetch_news(5)
-        msg = f"Good Evening! Singh Ji AI Digest\nDate: {datetime.now().strftime('%d %b %Y')}\n\nNews:\n{news}\n\n- Singh Ji AI Ultra"
+        rozgar = (
+            "• 50+ सरकारी नौकरियाँ आज जारी\n"
+            "• UPSSC: 1200+ पदों पर भर्ती\n"
+            "• Railway: Group D notification जल्द"
+        )
+        msg = (
+            f"🌆 <b>Singh Ji Evening Digest</b>\n"
+            f"📅 {datetime.now().strftime('%d %b %Y')}\n"
+            f"{'─' * 28}\n\n"
+            f"📰 <b>शाम के समाचार:</b>\n{news}\n\n"
+            f"💼 <b>रोज़गार अपडेट:</b>\n{rozgar}\n\n"
+            f"— <i>Singh Ji AI Ultra</i>"
+        )
         await self._broadcast(msg, parse_mode="HTML")
         self._update_state("evening_digest", "success", "Tomorrow 06:00 PM")
         logger.info("[JOB] Evening Digest DONE")
 
     async def _job_govt_schemes(self):
         logger.info("[JOB] Govt Schemes starting...")
-        content = "PM Awas Yojana: New list released\nRation Card: e-KYC deadline extended\nKisan Samman Nidhi: 18th installment soon"
-        msg = f"Government Schemes Update\n{content}\n\n- Singh Ji AI Ultra"
+        content = (
+            "• <b>PM Awas Yojana:</b> नई लिस्ट जारी — अपना नाम चेक करें\n"
+            "• <b>Ration Card:</b> e-KYC deadline बढ़ी — 31 Aug 2026\n"
+            "• <b>Kisan Samman Nidhi:</b> 18वीं किस्त जल्द आएगी"
+        )
+        msg = (
+            f"🏛️ <b>सरकारी योजना अपडेट</b>\n"
+            f"{'─' * 28}\n\n"
+            f"{content}\n\n"
+            f"— <i>Singh Ji AI Ultra</i>"
+        )
         await self._broadcast(msg, parse_mode="HTML")
         self._update_state("govt_schemes", "success")
         logger.info("[JOB] Govt Schemes DONE")
 
     async def _job_banking_weekly(self):
         logger.info("[JOB] Banking Update starting...")
-        content = "SBI FD Rates: 7.10% (5+ years)\nPost Office: New digital savings scheme\nRBI: UPI limit for medical payments increased"
-        msg = f"Banking Weekly Update\n{content}\n\n- Singh Ji AI Ultra"
+        content = (
+            "• <b>SBI FD Rates:</b> 7.10% (5+ years)\n"
+            "• <b>Post Office:</b> New digital savings scheme launched\n"
+            "• <b>RBI:</b> UPI limit for medical payments increased"
+        )
+        msg = (
+            f"🏦 <b>बैंकिंग साप्ताहिक अपडेट</b>\n"
+            f"{'─' * 28}\n\n"
+            f"{content}\n\n"
+            f"— <i>Singh Ji AI Ultra</i>"
+        )
         await self._broadcast(msg, parse_mode="HTML")
         self._update_state("banking_weekly", "success")
         logger.info("[JOB] Banking DONE")
@@ -636,7 +715,13 @@ class SinghJiMasterScheduler:
         logger.info("[JOB] Social Promo starting...")
         if self.admin_uid:
             try:
-                await self.send_tg(self.admin_uid, "Social Media Content Ready! 3 carousel slides generated. Review and post!")
+                await self.send_tg(
+                    self.admin_uid,
+                    "📱 <b>Social Media Content Ready</b>\n\n"
+                    "• 3 Carousel slides generated\n"
+                    "• Captions + Hashtags ready\n"
+                    "• Review & post karo!"
+                )
             except Exception as e:
                 logger.warning(f"[SOCIAL] Admin notify fail: {e}")
         self._update_state("social_promo", "success")
@@ -644,8 +729,17 @@ class SinghJiMasterScheduler:
 
     async def _job_monthly_tenders(self):
         logger.info("[JOB] Monthly Tenders starting...")
-        content = "Road Construction: NHAI tender\nSmart City: LED lighting project - UP\nPWD: Bridge repair work - Bihar"
-        msg = f"Monthly Tender Alert\n{content}\n\n- Singh Ji AI Ultra"
+        content = (
+            "• <b>Road Construction:</b> NHAI tender — Last date 15 Aug\n"
+            "• <b>Smart City:</b> LED lighting project — UP\n"
+            "• <b>PWD:</b> Bridge repair work — Bihar"
+        )
+        msg = (
+            f"📋 <b>मासिक टेंडर अलर्ट</b>\n"
+            f"{'─' * 28}\n\n"
+            f"{content}\n\n"
+            f"— <i>Singh Ji AI Ultra</i>"
+        )
         await self._broadcast(msg, parse_mode="HTML")
         self._update_state("monthly_tenders", "success")
         logger.info("[JOB] Tenders DONE")
@@ -664,1347 +758,1231 @@ class SinghJiMasterScheduler:
             logger.warning(f"[PING] Self-ping fail: {e}")
 
     def setup(self):
-        self.scheduler.add_job(self._job_morning_digest, CronTrigger(hour=7, minute=0), id="morning_digest", name="Morning News + Weather", replace_existing=True, misfire_grace_time=3600)
-        self.scheduler.add_job(self._job_evening_digest, CronTrigger(hour=18, minute=0), id="evening_digest", name="Evening News + Rozgar", replace_existing=True, misfire_grace_time=3600)
-        self.scheduler.add_job(self._job_govt_schemes, CronTrigger(day_of_week="tue,fri", hour=15, minute=0), id="govt_schemes", name="Govt Schemes Update", replace_existing=True)
-        self.scheduler.add_job(self._job_banking_weekly, CronTrigger(day_of_week="mon", hour=11, minute=0), id="banking_weekly", name="Banking Weekly", replace_existing=True)
-        self.scheduler.add_job(self._job_social_promo, CronTrigger(day_of_week="mon,wed,sat", hour=10, minute=0), id="social_promo", name="Social Media Promo", replace_existing=True)
-        self.scheduler.add_job(self._job_monthly_tenders, CronTrigger(day=1, hour=9, minute=0), id="monthly_tenders", name="Monthly Tender Alert", replace_existing=True)
-        self.scheduler.add_job(self._self_ping, "interval", minutes=10, id="self_ping", name="Railway Sleep Prevention", replace_existing=True)
+        self.scheduler.add_job(
+            self._job_morning_digest,
+            CronTrigger(hour=7, minute=0),
+            id="morning_digest",
+            name="Morning News + Weather",
+            replace_existing=True,
+            misfire_grace_time=3600,
+        )
+        self.scheduler.add_job(
+            self._job_evening_digest,
+            CronTrigger(hour=18, minute=0),
+            id="evening_digest",
+            name="Evening News + Rozgar",
+            replace_existing=True,
+            misfire_grace_time=3600,
+        )
+        self.scheduler.add_job(
+            self._job_govt_schemes,
+            CronTrigger(day_of_week="tue,fri", hour=15, minute=0),
+            id="govt_schemes",
+            name="Govt Schemes Update",
+            replace_existing=True,
+        )
+        self.scheduler.add_job(
+            self._job_banking_weekly,
+            CronTrigger(day_of_week="mon", hour=11, minute=0),
+            id="banking_weekly",
+            name="Banking Weekly",
+            replace_existing=True,
+        )
+        self.scheduler.add_job(
+            self._job_social_promo,
+            CronTrigger(day_of_week="mon,wed,sat", hour=10, minute=0),
+            id="social_promo",
+            name="Social Media Promo",
+            replace_existing=True,
+        )
+        self.scheduler.add_job(
+            self._job_monthly_tenders,
+            CronTrigger(day=1, hour=9, minute=0),
+            id="monthly_tenders",
+            name="Monthly Tender Alert",
+            replace_existing=True,
+        )
+        self.scheduler.add_job(
+            self._self_ping,
+            "interval",
+            minutes=10,
+            id="self_ping",
+            name="Railway Sleep Prevention",
+            replace_existing=True,
+        )
         logger.info(f"[SETUP] {len(self.scheduler.get_jobs())} jobs registered")
 
     async def start(self):
         self.setup()
         self.scheduler.start()
-        logger.info("Scheduler STARTED")
+        logger.info("🚀 Singh Ji Master Scheduler STARTED")
         for job in self.scheduler.get_jobs():
             nxt = str(job.next_run_time) if job.next_run_time else "N/A"
-            logger.info(f" {job.name} -> {nxt}")
+            logger.info(f"   ⏰ {job.name} → {nxt}")
 
     async def stop(self):
         self.scheduler.shutdown()
-        logger.info("Scheduler STOPPED")
+        logger.info("🛑 Singh Ji Master Scheduler STOPPED")
 
     def get_status(self):
         jobs = []
         for job in self.scheduler.get_jobs():
-            jobs.append({"id": job.id, "name": job.name, "next_run": str(job.next_run_time) if job.next_run_time else None})
-        return {"running": self.scheduler.running, "total_jobs": len(jobs), "jobs": jobs, "timezone": "Asia/Kolkata"}
+            jobs.append({
+                "id": job.id,
+                "name": job.name,
+                "next_run": str(job.next_run_time) if job.next_run_time else None,
+            })
+        return {
+            "running": self.scheduler.running,
+            "total_jobs": len(jobs),
+            "jobs": jobs,
+            "timezone": "Asia/Kolkata",
+        }
 
 MASTER_SCHEDULER = None
 
 # ═══════════════════════════════════════════════════════════════
-# WEBHOOK CONFIG HELPERS
-# ═══════════════════════════════════════════════════════════════
-
-async def _set_telegram_webhook():
-    if not TELEGRAM_TOKEN or not APP_URL:
-        logger.warning("[WEBHOOK] TELEGRAM_TOKEN or APP_URL missing")
-        return
-    webhook_url = f"{APP_URL.rstrip('/')}/telegram/webhook"
-    try:
-        r = await HTTP_CLIENT.post(f"{TELEGRAM_API_BASE}/setWebhook", json={"url": webhook_url, "drop_pending_updates": True}, timeout=15)
-        data = r.json()
-        if data.get("ok"):
-            logger.info(f"[WEBHOOK] Set OK: {webhook_url}")
-        else:
-            logger.error(f"[WEBHOOK] Set FAILED: {data}")
-    except Exception as e:
-        logger.error(f"[WEBHOOK] Exception: {e}")
-
-async def _delete_telegram_webhook():
-    if not TELEGRAM_TOKEN:
-        return
-    try:
-        r = await HTTP_CLIENT.post(f"{TELEGRAM_API_BASE}/deleteWebhook", timeout=10)
-        logger.info(f"[WEBHOOK] Deleted: {r.json()}")
-    except Exception as e:
-        logger.error(f"[WEBHOOK] Delete error: {e}")
-
-# ═══════════════════════════════════════════════════════════════
-# LIFESPAN
+#  LIFESPAN & APP SETUP
 # ═══════════════════════════════════════════════════════════════
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
-    global HTTP_CLIENT, MASTER_SCHEDULER, USER_PREFERENCES
-    HTTP_CLIENT = httpx.AsyncClient(timeout=30, follow_redirects=True, limits=httpx.Limits(max_connections=100, max_keepalive_connections=20))
-    logger.info("HTTP client ready")
+async def lifespan(app):
+    global HTTP_CLIENT, MASTER_SCHEDULER
+    HTTP_CLIENT = httpx.AsyncClient(timeout=20)
+    logger.info("Singh Ji AI Ultra v8.0 HYBRID Starting...")
 
-    # Load user preferences
-    USER_PREFERENCES = await run_in_threadpool(_load_user_preferences_sync)
-    logger.info(f"Loaded {len(USER_PREFERENCES)} user preferences")
+    sync = SMART_SWARM.sync(MODULES, AVAILABLE_KEYS)
+    logger.info(f"Swarm: {sync['active']}/{sync['total']} agents loaded")
+    logger.info(f"Active APIs: {sum(1 for v in AVAILABLE_KEYS.values() if v)}/{len(AVAILABLE_KEYS)}")
 
-    # Sync Smart Swarm
-    swarm_status = SMART_SWARM.sync(MODULES, AVAILABLE_KEYS)
-    logger.info(f"Smart Swarm: {swarm_status}")
+    # ─── FIX #1: पुराने subscribers Supabase से वापस RAM में लोड करो ───
+    loaded_prefs = await run_in_threadpool(_load_user_preferences_sync)
+    USER_PREFERENCES.update(loaded_prefs)
+    logger.info(f"[STARTUP] {len(loaded_prefs)} subscriber(s) Supabase से reload हुए")
 
-    # Start scheduler
-    MASTER_SCHEDULER = SinghJiMasterScheduler(HTTP_CLIENT, _telegram_send_message, AVAILABLE_KEYS, MODULES, USER_PREFERENCES, ADMIN_USER_ID)
+    # ─── FIX #2: कौन सा webhook असल में एक्टिव है, यह लॉग में बताओ ───
+    await _check_webhook_config()
+
+    # ─── FIX #4: Telegram को हमेशा इसी फाइल के /telegram/webhook पर सेट रखो ───
+    await _ensure_correct_webhook()
+
+    MASTER_SCHEDULER = SinghJiMasterScheduler(
+        http_client=HTTP_CLIENT,
+        telegram_send_func=_telegram_send_message,
+        api_keys=AVAILABLE_KEYS,
+        modules=MODULES,
+        user_preferences=USER_PREFERENCES,
+        admin_user_id=ADMIN_USER_ID,
+    )
     await MASTER_SCHEDULER.start()
-
-    # Set Telegram webhook
-    await _set_telegram_webhook()
 
     yield
 
-    # Shutdown
-    await _delete_telegram_webhook()
     if MASTER_SCHEDULER:
         await MASTER_SCHEDULER.stop()
     await HTTP_CLIENT.aclose()
-    logger.info("Shutdown complete")
+    logger.info("Singh Ji AI Ultra v8.0 Stopped!")
 
-# ═══════════════════════════════════════════════════════════════
-# FASTAPI APP
-# ═══════════════════════════════════════════════════════════════
+app = FastAPI(title="Singh Ji AI Ultra v8.0 HYBRID", version="8.0.0-hybrid", lifespan=lifespan)
 
-app = FastAPI(
-    title="Singh Ji AI Ultra v8.3",
-    version="8.3",
-    description="India's Most Advanced AI Platform - 97+ Routes | 40+ Modules",
-    lifespan=lifespan,
-)
+ALLOWED_ORIGINS = [
+    "https://jp200883-sudo.github.io",
+    "http://localhost:3000",
+    "http://localhost:8000",
+]
+_extra_origins = os.getenv("EXTRA_CORS_ORIGINS", "")
+if _extra_origins:
+    ALLOWED_ORIGINS.extend([o.strip() for o in _extra_origins.split(",") if o.strip()])
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ═══════════════════════════════════════════════════════════════
-# RATE LIMIT MIDDLEWARE
-# ═══════════════════════════════════════════════════════════════
+# ==========================================
+# ROUTERS REGISTER
+# ==========================================
+app.include_router(kisaan_router, prefix="/modules/kisaan_doctor")
+app.include_router(yojana_router, prefix="/modules/sarkari_yojana")
+app.include_router(currency_router, prefix="/api")
+app.include_router(aavishkar_router, prefix="/modules/aavishkar")
+app.include_router(goldrate_router, prefix="/api/goldrate")
+app.include_router(fuel_router, prefix="/api/fuel")
+app.include_router(scheme_swarm_router)
+app.include_router(trishul_router, prefix="/api/trishul")
+app.add_api_route("/api/banking", banking_handler, methods=["GET"])
+app.add_api_route("/api/pani", pani_handler, methods=["GET", "POST"])
+app.add_api_route("/api/sewer", sewer_handler, methods=["GET", "POST"])
+app.add_api_route("/api/upi", upi_handler, methods=["GET", "POST"])
+app.include_router(miniprogram_router, prefix="/api/v1/miniprogram")
+
+LANG_MODULE = LanguageModule()
 
 @app.middleware("http")
-async def rate_limit_middleware(request: Request, call_next):
+async def rate_limit_middleware(request, call_next):
     path = request.url.path
-    if path.startswith("/api/") or path.startswith("/modules/"):
-        is_strict = any(path.startswith(p) for p in STRICT_PATH_PREFIXES)
-        max_calls, window = RATE_LIMIT_STRICT if is_strict else RATE_LIMIT_GLOBAL
-        if _is_rate_limited(request, "global", max_calls, window):
-            return JSONResponse(status_code=429, content={"error": "Rate limit exceeded. Try again later.", "retry_after": window})
+    if any(path.startswith(p) for p in STRICT_PATH_PREFIXES):
+        limited = _is_rate_limited(request, "strict", *RATE_LIMIT_STRICT)
+    elif any(path.startswith(p) for p in RATE_LIMITED_PREFIXES):
+        limited = _is_rate_limited(request, "global", *RATE_LIMIT_GLOBAL)
+    else:
+        limited = False
+    if limited:
+        return JSONResponse(
+            {"error": "Rate limit exceeded. Please wait a bit and try again.", "retry_after_seconds": 60},
+            status_code=429
+        )
     return await call_next(request)
 
-# ═══════════════════════════════════════════════════════════════
-# ROOT & HEALTH
-# ═══════════════════════════════════════════════════════════════
+# ==========================================
+# HEALTH CHECK ENDPOINTS
+# ==========================================
 
 @app.get("/")
+@app.head("/")
 async def root():
+    active = [n for n, i in MODULES.items() if i["active"]]
     return {
-        "name": "Singh Ji AI Ultra",
-        "version": "8.3",
+        "name": "Singh Ji AI Ultra v8.0 HYBRID",
         "status": "LIVE",
-        "modules_active": len(ACTIVE_MODULES),
-        "modules_total": len(MODULES),
-        "timestamp": datetime.now().isoformat(),
-        "message": "Jai Singh Ji! Welcome to Singh Ji AI Ultra v8.3"
+        "total_modules": len(MODULES),
+        "active_modules": active,
+        "active_count": len(active),
+        "agents": SMART_SWARM.get_status(),
+        "apis": {k: v for k, v in AVAILABLE_KEYS.items()},
+        "scheduler": MASTER_SCHEDULER.get_status() if MASTER_SCHEDULER else {"running": False},
+        "subscribers": len(USER_PREFERENCES),
+        "timestamp": datetime.now().isoformat()
     }
 
 @app.get("/health")
-@app.head("/health")
 async def health():
-    return {"status": "ok", "version": "8.3", "timestamp": datetime.now().isoformat()}
+    return {"status": "ok", "service": "Singh Ji AI v8.0 HYBRID"}
 
-@app.get("/api/health")
-@app.head("/api/health")
-async def api_health():
-    return {"status": "ok", "version": "8.3", "timestamp": datetime.now().isoformat()}
+@app.get("/ping")
+@app.get("/api/ping")
+async def ping():
+    return {
+        "status": "pong",
+        "timestamp": datetime.now().isoformat(),
+        "service": "Singh Ji AI Ultra v8.0",
+        "version": "8.0.0-hybrid"
+    }
 
 @app.get("/api/status")
-async def api_status():
+async def status():
+    active = [n for n, i in MODULES.items() if i["active"]]
+    inactive = [{"name": n, "needs_key": i["needs_key"]} for n, i in MODULES.items() if not i["active"]]
     return {
-        "version": "8.3",
-        "environment": os.getenv("ENV", "production"),
-        "modules": {"active": len(ACTIVE_MODULES), "total": len(MODULES), "list": ACTIVE_MODULES, "inactive": INACTIVE_MODULES},
-        "api_keys": {k: "configured" if v else "missing" for k, v in AVAILABLE_KEYS.items()},
-        "smart_swarm": SMART_SWARM.get_status(),
+        "name": "Singh Ji AI Ultra v8.0",
+        "total_modules": len(MODULES),
+        "active_count": len(active),
+        "active_modules": active,
+        "inactive_modules": inactive,
+        "agents": SMART_SWARM.get_status(),
+        "apis": AVAILABLE_KEYS,
         "scheduler": MASTER_SCHEDULER.get_status() if MASTER_SCHEDULER else {"running": False},
-        "memory": {"short_term_keys": len(MEMORY_STORE), "max_size": MAX_MEMORY_SIZE},
+        "subscribers": len(USER_PREFERENCES),
         "timestamp": datetime.now().isoformat()
     }
 
-# ═══════════════════════════════════════════════════════════════
-# GET /api/memory/ — MODULE INFO ROUTE (Your #1 Request!)
-# ═══════════════════════════════════════════════════════════════
-
-@app.get("/api/memory/")
-async def get_memory_root():
-    """Complete module registry and system memory info"""
-    return {
-        "status": "success",
-        "app": {
-            "name": "Singh Ji AI Ultra",
-            "version": "8.3",
-            "build_date": "2026-07-28",
-            "environment": os.getenv("ENV", "production")
-        },
-        "modules": {
-            "total": len(MODULES),
-            "active": len(ACTIVE_MODULES),
-            "inactive": len(INACTIVE_MODULES),
-            "registry": MODULES,
-            "active_list": ACTIVE_MODULES,
-            "inactive_list": INACTIVE_MODULES
-        },
-        "smart_swarm": SMART_SWARM.get_status(),
-        "scheduler": MASTER_SCHEDULER.get_status() if MASTER_SCHEDULER else {"running": False},
-        "memory": {
-            "short_term_keys": len(MEMORY_STORE),
-            "max_size": MAX_MEMORY_SIZE,
-            "supabase_connected": SUPABASE_CLIENT is not None
-        },
-        "api_keys": {k: "configured" if v else "missing" for k, v in AVAILABLE_KEYS.items()},
-        "system": {
-            "port": int(os.getenv("PORT", 8000)),
-            "app_url": APP_URL or "not_set",
-            "timestamp": datetime.now().isoformat()
-        },
-        "endpoints": {
-            "health": "/health",
-            "status": "/api/status",
-            "memory": "/api/memory/",
-            "memory_key": "/api/memory/{key}",
-            "chat": "/api/chat",
-            "news": "/api/news",
-            "weather": "/api/weather",
-            "gold": "/api/gold",
-            "scheme_swarm": "/api/scheme_swarm/",
-            "trishul": "/api/trishul/",
-            "translate": "/api/translate",
-            "tts": "/api/tts",
-            "stt": "/api/stt",
-            "image": "/api/image/generate",
-            "payment": "/api/payment",
-            "gmail": "/api/gmail/send",
-            "telegram": "/api/telegram/send",
-            "admin": "/api/admin",
-            "swarm": "/api/swarm",
-            "tax": "/api/tax",
-            "pani": "/api/pani",
-            "sewer": "/api/sewer",
-            "upi": "/api/upi",
-            "banking": "/api/banking",
-            "rozgar": "/api/rozgar",
-            "govt": "/api/govt",
-            "yojana": "/api/yojana",
-            "kisaan": "/api/kisaan",
-            "aavishkar": "/api/aavishkar",
-            "currency": "/api/currency",
-            "fuel": "/api/fuel",
-            "horoscope": "/api/horoscope",
-            "plant": "/api/plant",
-            "mandi": "/api/mandi",
-            "emergency": "/api/emergency",
-            "facebook": "/api/facebook",
-            "instagram": "/api/instagram",
-            "youtube": "/api/youtube",
-            "bhashini": "/api/bhashini",
-            "whisper": "/api/whisper",
-            "voice_tts": "/api/voice/tts",
-            "voice_cmd": "/api/voice/cmd",
-            "analytics": "/api/analytics",
-            "daily_report": "/api/daily-report",
-            "guard": "/api/guard",
-            "meta": "/api/meta",
-            "lang_hub": "/api/lang-hub",
-            "bachpan": "/api/bachpan",
-            "trolley": "/api/trolley",
-            "singhji_tv": "/api/singhji-tv",
-            "whatsapp": "/api/whatsapp",
-            "search": "/api/search",
-            "newsdata": "/api/newsdata"
-        }
+@app.get("/api/check")
+async def api_check():
+    tests = {
+        "OPENWEATHER": ("https://api.openweathermap.org/data/2.5/weather?q=Delhi&appid=" + str(OPENWEATHER_API_KEY or ""), {}, "GET"),
+        "GROQ": ("https://api.groq.com/openai/v1/models", {"Authorization": f"Bearer {GROQ_API_KEY or ''}"}, "GET"),
+        "GEMINI": ("https://generativelanguage.googleapis.com/v1beta/models?key=" + str(GEMINI_API_KEY or ""), {}, "GET"),
+        "TELEGRAM": (f"https://api.telegram.org/bot{TELEGRAM_TOKEN or ''}/getMe", {}, "GET"),
+        "SUPABASE": (f"{SUPABASE_URL or ''}/rest/v1/", {"apikey": SUPABASE_SERVICE_KEY or "", "Authorization": f"Bearer {SUPABASE_SERVICE_KEY or ''}"}, "GET"),
+        "FACEBOOK": (f"https://graph.facebook.com/v25.0/{FACEBOOK_PAGE_ID}?access_token={FACEBOOK_ACCESS_TOKEN or ''}", {}, "GET"),
+        "YOUTUBE": (f"https://www.googleapis.com/youtube/v3/search?part=snippet&q=test&maxResults=1&key={YOUTUBE_API_KEY or ''}", {}, "GET"),
+        "CURRENTS": (f"https://api.currentsapi.services/v1/latest-news?apiKey={CURRENTS_API_KEY or ''}", {}, "GET"),
+        "NEWSDATA": (f"https://newsdata.io/api/1/latest?apikey={NEWSDATA_API_KEY or ''}&q=test", {}, "GET"),
+        "TAVILY": (f"https://api.tavily.com/search?api_key={TAVILY_API_KEY or ''}&query=test&max_results=1", {}, "GET"),
     }
 
-@app.get("/api/memory/{key}")
-async def memory_get(key: str):
-    result = await _memory_get(key)
-    return result
+    async def _check_one(name, url, headers):
+        if not AVAILABLE_KEYS.get(name):
+            return name, {"status": "MISSING", "code": None}
+        try:
+            start = time.time()
+            r = await HTTP_CLIENT.get(url, headers=headers)
+            elapsed = round((time.time() - start) * 1000, 2)
+            if r.status_code in [200, 401, 403]:
+                return name, {"status": "LIVE", "code": r.status_code, "ms": elapsed}
+            return name, {"status": "ERROR", "code": r.status_code, "ms": elapsed}
+        except Exception as e:
+            return name, {"status": "FAIL", "error": str(e)[:50]}
 
-@app.post("/api/memory/")
-async def memory_post(request: Request):
-    data = await request.json()
-    key = data.get("key")
-    value = data.get("value")
-    table = data.get("table", "memory_store")
-    if not key:
-        return JSONResponse(status_code=400, content={"error": "key required"})
-    result = await _memory_save(key, value, table)
-    return result
+    outcomes = await asyncio.gather(*(_check_one(n, u, h) for n, (u, h, m) in tests.items()))
+    results = dict(outcomes)
+    live = sum(1 for v in results.values() if v["status"] == "LIVE")
+    dead = len(results) - live
+    return {"timestamp": datetime.now().isoformat(), "summary": {"live": live, "dead": dead, "total": live + dead}, "results": results}
 
-# ═══════════════════════════════════════════════════════════════
-# AI CHAT
-# ═══════════════════════════════════════════════════════════════
-
-async def _call_groq(prompt: str, max_tokens: int = 500) -> str:
-    if not GROQ_API_KEY:
-        return "Error: GROQ_API_KEY missing"
-    try:
-        # FIXED: Changed from non-existent "openai/gpt-oss-20b" to valid Groq model
-        r = await HTTP_CLIENT.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"},
-            json={"model": "llama-3.1-70b-versatile", "messages": [{"role": "user", "content": prompt}], "temperature": 0.7, "max_tokens": max_tokens},
-            timeout=60
-        )
-        data = r.json()
-        if r.status_code == 200 and "choices" in data:
-            return data["choices"][0]["message"]["content"]
-        return f"Error: {data.get('error', {}).get('message', str(data))}"
-    except Exception as e:
-        return f"Error: {str(e)}"
-
-async def _call_gemini(prompt: str) -> str:
-    if not GEMINI_API_KEY:
-        return "Error: GEMINI_API_KEY missing"
-    try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
-        r = await HTTP_CLIENT.post(url, json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=60)
-        data = r.json()
-        if "candidates" in data:
-            return data["candidates"][0]["content"]["parts"][0]["text"]
-        return f"Error: {data.get('error', {}).get('message', str(data))}"
-    except Exception as e:
-        return f"Error: {str(e)}"
-
-@app.post("/api/chat")
-async def api_chat(request: Request):
-    data = await request.json()
-    prompt = data.get("prompt", "")
-    provider = data.get("provider", "auto")
-    if provider == "groq":
-        response = await _call_groq(prompt)
-    elif provider == "gemini":
-        response = await _call_gemini(prompt)
-    else:
-        response = await _call_groq(prompt)
-        if response.startswith("Error") and GEMINI_API_KEY:
-            response = await _call_gemini(prompt)
-    return {"response": response, "provider": provider, "timestamp": datetime.now().isoformat()}
-
-# ═══════════════════════════════════════════════════════════════
-# WEATHER
-# ═══════════════════════════════════════════════════════════════
-
-@app.get("/api/weather")
-async def api_weather(city: str = "Delhi"):
+@app.get("/api/weather/{city}")
+async def weather_city(city: str):
     cache_key = _cache_key("weather", city)
     cached = await _cache_get(cache_key)
     if cached:
-        return {"data": cached, "cached": True}
+        cached["source"] = "CACHE"
+        return cached
     if not OPENWEATHER_API_KEY:
-        return JSONResponse(status_code=503, content={"error": "OPENWEATHER_API_KEY missing"})
+        return {"error": "OPENWEATHER_API_KEY missing"}
     try:
         url = f"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={OPENWEATHER_API_KEY}&units=metric"
-        r = await HTTP_CLIENT.get(url, timeout=15)
-        data = r.json()
-        if r.status_code == 200:
+        resp = await HTTP_CLIENT.get(url)
+        data = resp.json()
+        if resp.status_code == 200:
             result = {
-                "city": data["name"],
-                "country": data["sys"]["country"],
-                "temperature": data["main"]["temp"],
-                "feels_like": data["main"]["feels_like"],
-                "humidity": data["main"]["humidity"],
-                "pressure": data["main"]["pressure"],
-                "wind_speed": data["wind"]["speed"],
-                "description": data["weather"][0]["description"],
-                "icon": data["weather"][0]["icon"],
+                "city": city, "temp": data["main"]["temp"], "feels_like": data["main"]["feels_like"],
+                "humidity": data["main"]["humidity"], "pressure": data["main"]["pressure"],
+                "wind_speed": data["wind"]["speed"], "desc": data["weather"][0]["description"],
+                "icon": data["weather"][0]["icon"], "source": "OPENWEATHER_LIVE"
             }
             await _cache_set(cache_key, result, CACHE_TTL["weather"])
-            return {"data": result, "cached": False}
-        return JSONResponse(status_code=r.status_code, content={"error": data.get("message", "Weather API error")})
+            return result
+        return {"error": data.get("message", "Unknown error"), "code": resp.status_code}
     except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        return {"error": str(e)}
 
-# ═══════════════════════════════════════════════════════════════
-# NEWS
-# ═══════════════════════════════════════════════════════════════
-
-@app.get("/api/news")
-async def api_news(count: int = 5):
-    cache_key = _cache_key("news", count)
+@app.get("/api/news/latest")
+async def news_latest(source: str = "currents"):
+    cache_key = _cache_key("news", source)
     cached = await _cache_get(cache_key)
     if cached:
-        return {"data": cached, "cached": True}
-    if not CURRENTS_API_KEY:
-        return JSONResponse(status_code=503, content={"error": "CURRENTS_API_KEY missing"})
-    try:
-        url = f"https://api.currentsapi.services/v1/latest-news?apiKey={CURRENTS_API_KEY}"
-        r = await HTTP_CLIENT.get(url, timeout=15)
-        data = r.json()
-        if r.status_code == 200:
-            articles = data.get("news", [])[:count]
-            result = [{"title": a["title"], "description": a.get("description", ""), "url": a.get("url", ""), "published": a.get("published", "")} for a in articles]
+        cached["source"] = "CACHE"
+        return cached
+    if source == "currents" and CURRENTS_API_KEY:
+        try:
+            resp = await HTTP_CLIENT.get(f"https://api.currentsapi.services/v1/latest-news?apiKey={CURRENTS_API_KEY}")
+            data = resp.json()
+            result = {"source": "CURRENTS_LIVE", "news": data.get("news", [])[:10]}
             await _cache_set(cache_key, result, CACHE_TTL["news"])
-            return {"data": result, "cached": False}
-        return JSONResponse(status_code=r.status_code, content={"error": "News API error"})
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
+            return result
+        except Exception as e:
+            return {"error": str(e)}
+    if source == "newsdata" and NEWSDATA_API_KEY:
+        try:
+            resp = await HTTP_CLIENT.get(f"https://newsdata.io/api/1/latest?apikey={NEWSDATA_API_KEY}&q=india")
+            data = resp.json()
+            result = {"source": "NEWSDATA_LIVE", "news": data.get("results", [])[:10]}
+            await _cache_set(cache_key, result, CACHE_TTL["news"])
+            return result
+        except Exception as e:
+            return {"error": str(e)}
+    return {"error": "No news API key available"}
 
-# ═══════════════════════════════════════════════════════════════
-# MANDI
-# ═══════════════════════════════════════════════════════════════
+MANDI_RESOURCE_ID = "9ef84268-d588-465a-a308-a864a43d0070"
+MANDI_BASE_URL = f"https://api.data.gov.in/resource/{MANDI_RESOURCE_ID}"
 
-@app.get("/api/mandi")
-async def api_mandi(commodity: str = "", state: str = "", limit: int = 10):
-    cache_key = _cache_key("mandi", commodity, state, limit)
+@app.get("/api/mandi/{state}")
+async def mandi_state(state: str, commodity: str = None, limit: int = 50):
+    cache_key = _cache_key("mandi", state, commodity or "all", limit)
     cached = await _cache_get(cache_key)
     if cached:
-        return {"data": cached, "cached": True}
+        cached["source"] = "CACHE"
+        return cached
     if not MANDI_API_KEY:
-        return JSONResponse(status_code=503, content={"error": "MANDI_API_KEY missing"})
+        return {"error": "MANDI_API_KEY missing"}
     try:
-        url = f"https://api.data.gov.in/resource/9ef84268-d588-465a-a308-a864a43d0070?api-key={MANDI_API_KEY}&format=json&limit={limit}"
+        params = {"api-key": MANDI_API_KEY, "format": "json", "limit": limit, "filters[state.keyword]": state}
         if commodity:
-            url += f"&filters[commodity]={commodity}"
-        if state:
-            url += f"&filters[state]={state}"
-        r = await HTTP_CLIENT.get(url, timeout=15)
-        data = r.json()
-        if r.status_code == 200:
-            await _cache_set(cache_key, data, CACHE_TTL["mandi"])
-            return {"data": data, "cached": False}
-        return JSONResponse(status_code=r.status_code, content={"error": "Mandi API error"})
+            params["filters[commodity.keyword]"] = commodity
+        resp = await HTTP_CLIENT.get(MANDI_BASE_URL, params=params, timeout=45)
+        data = resp.json()
+        result = {"state": state, "commodity_filter": commodity, "count": len(data.get("records", [])), "records": data.get("records", []), "source": "AGMARKNET_LIVE"}
+        await _cache_set(cache_key, result, CACHE_TTL["mandi"])
+        return result
     except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        return {"error": str(e)}
 
-# ═══════════════════════════════════════════════════════════════
-# GOLD
-# ═══════════════════════════════════════════════════════════════
+def _b64_too_big(b64_str: str) -> bool:
+    return (len(b64_str) * 3 / 4) > MAX_B64_BYTES
 
-@app.get("/api/gold")
-async def api_gold(city: str = "Delhi"):
-    try:
-        result = await run_in_threadpool(gold_rate_city, city)
-        return {"data": result, "city": city, "timestamp": datetime.now().isoformat()}
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
-
-# ═══════════════════════════════════════════════════════════════
-# FUEL
-# ═══════════════════════════════════════════════════════════════
-
-@app.get("/api/fuel")
-async def api_fuel(city: str = "Delhi"):
-    try:
-        result = await run_in_threadpool(fuel_price, city)
-        return {"data": result, "city": city, "timestamp": datetime.now().isoformat()}
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
-
-# ═══════════════════════════════════════════════════════════════
-# HOROSCOPE
-# ═══════════════════════════════════════════════════════════════
-
-@app.get("/api/horoscope")
-async def api_horoscope(sign: str = "aries", period: str = "today"):
-    try:
-        result = await run_in_threadpool(get_horoscope, sign, period)
-        return {"data": result, "sign": sign, "period": period}
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
-
-# ═══════════════════════════════════════════════════════════════
-# CURRENCY
-# ═══════════════════════════════════════════════════════════════
-
-@app.get("/api/currency")
-async def api_currency(base: str = "INR", target: str = "USD"):
-    try:
-        result = await run_in_threadpool(singhji_currency, base, target)
-        return {"data": result, "base": base, "target": target}
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
-
-# ═══════════════════════════════════════════════════════════════
-# PLANT ID
-# ═══════════════════════════════════════════════════════════════
-
-@app.post("/api/plant")
-async def api_plant(request: Request):
+@app.post("/api/plant/identify")
+async def plant_identify(request: Request):
     if not PLANT_ID_API:
-        return JSONResponse(status_code=503, content={"error": "PLANT_ID_API key missing"})
+        return {"error": "PLANT_ID_API missing"}
+    data = await request.json()
+    image_b64 = data.get("image_base64", "")
+    if not image_b64:
+        return {"error": "image_base64 required"}
+    if _b64_too_big(image_b64):
+        return JSONResponse(status_code=413, content={"error": "image too large (max 10MB)"})
     try:
-        data = await request.json()
-        image_b64 = data.get("image", "")
-        if not image_b64:
-            return JSONResponse(status_code=400, content={"error": "image (base64) required"})
-        # Decode and send to Plant.id API
-        import base64
-        image_bytes = base64.b64decode(image_b64)
-        files = {"images": ("plant.jpg", io.BytesIO(image_bytes), "image/jpeg")}
-        payload = {"organs": ["leaf"]}
-        r = await HTTP_CLIENT.post(
-            "https://api.plant.id/v2/identify",
-            headers={"Api-Key": PLANT_ID_API},
-            data=payload,
-            files=files,
+        resp = await HTTP_CLIENT.post(
+            "https://api.plant.id/v3/identification",
+            params={"details": "url,common_names,description"},
+            headers={"Api-Key": PLANT_ID_API, "Content-Type": "application/json"},
+            json={"images": [image_b64]},
             timeout=30
         )
-        return {"data": r.json()}
+        result = resp.json()
+        suggestions = result.get("result", {}).get("classification", {}).get("suggestions", [])
+        top = suggestions[0] if suggestions else None
+        return {
+            "status": "success",
+            "is_plant": result.get("result", {}).get("is_plant", {}).get("binary"),
+            "top_match": {"name": top.get("name"), "probability": top.get("probability"), "common_names": top.get("details", {}).get("common_names")} if top else None,
+            "all_suggestions": suggestions[:5],
+            "source": "PLANT.ID_LIVE"
+        }
     except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        return {"error": str(e)}
 
-# ═══════════════════════════════════════════════════════════════
-# TAX CALCULATOR
-# ═══════════════════════════════════════════════════════════════
+async def _call_groq(prompt: str, timeout=30):
+    resp = await HTTP_CLIENT.post(
+        "https://api.groq.com/openai/v1/chat/completions",
+        headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"},
+        json={"model": "openai/gpt-oss-20b", "messages": [{"role": "user", "content": prompt}]},
+        timeout=timeout
+    )
+    result = resp.json()
+    return result["choices"][0]["message"]["content"]
 
-@app.post("/api/tax")
-async def api_tax(request: Request):
-    try:
-        data = await request.json()
-        income = float(data.get("income", 0))
-        regime = data.get("regime", "new")
-        deductions = float(data.get("deductions", 0))
-        result = _calculate_tax(income, regime, deductions)
-        return {"data": result}
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
+@app.post("/api/chat")
+async def ai_chat(request: Request):
+    data = await request.json()
+    prompt = data.get("prompt", "")
+    model = data.get("model", "groq")
+    user_id = data.get("user_id", "anonymous")
 
-@app.get("/api/tax")
-async def api_tax_get(income: float = 0, regime: str = "new", deductions: float = 0):
-    try:
-        result = _calculate_tax(income, regime, deductions)
-        return {"data": result}
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
+    personal_kw = ["password", "otp", "secret", "aadhar", "pan", "bank", "cvv", "pin"]
+    is_personal = any(kw in prompt.lower() for kw in personal_kw)
 
-# ═══════════════════════════════════════════════════════════════
-# GOVERNMENT SERVICES
-# ═══════════════════════════════════════════════════════════════
+    cache_key = None
+    if not is_personal:
+        cache_key = _cache_key("ai_chat", model, prompt[:100])
+        cached = await _cache_get(cache_key)
+        if cached:
+            cached["source"] = "CACHE"
+            return cached
 
-@app.get("/api/govt")
-async def api_govt():
-    return {"data": GOVT_DATA, "timestamp": datetime.now().isoformat()}
+    if model in ["groq", "auto"] and GROQ_API_KEY:
+        try:
+            response_text = await _call_groq(prompt)
+            result_data = {"status": "success", "model": "groq", "response": response_text, "source": "GROQ_LIVE"}
+            if not is_personal:
+                await _cache_set(cache_key, result_data, CACHE_TTL["ai_chat"])
+            await _memory_save(f"chat:{user_id}:{int(time.time())}", {"prompt": prompt, "response": response_text, "model": "groq"})
+            return result_data
+        except Exception as e:
+            logger.warning(f"Groq failed: {e}")
 
-@app.get("/api/govt/{service_id}")
-async def api_govt_service(service_id: str):
-    service = next((s for s in GOVT_DATA if s.get("id") == service_id), None)
-    if not service:
-        return JSONResponse(status_code=404, content={"error": "Service not found"})
-    return {"data": service}
+    if model in ["gemini", "auto"] and GEMINI_API_KEY:
+        try:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+            resp = await HTTP_CLIENT.post(url, json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=30)
+            result = resp.json()
+            text = result["candidates"][0]["content"]["parts"][0]["text"]
+            result_data = {"status": "success", "model": "gemini", "response": text, "source": "GEMINI_LIVE"}
+            if not is_personal:
+                await _cache_set(cache_key, result_data, CACHE_TTL["ai_chat"])
+            await _memory_save(f"chat:{user_id}:{int(time.time())}", {"prompt": prompt, "response": text, "model": "gemini"})
+            return result_data
+        except Exception as e:
+            logger.warning(f"Gemini failed: {e}")
 
-# ═══════════════════════════════════════════════════════════════
-# SARKARI YOJANA
-# ═══════════════════════════════════════════════════════════════
+    if model in ["cerebras", "auto"] and CEREBRAS_API_KEY:
+        try:
+            resp = await HTTP_CLIENT.post(
+                "https://api.cerebras.ai/v1/chat/completions",
+                headers={"Authorization": f"Bearer {CEREBRAS_API_KEY}", "Content-Type": "application/json"},
+                json={"model": "llama-3.1-8b", "messages": [{"role": "user", "content": prompt}]},
+                timeout=30
+            )
+            result = resp.json()
+            text = result["choices"][0]["message"]["content"]
+            return {"status": "success", "model": "cerebras", "response": text, "source": "CEREBRAS_LIVE"}
+        except Exception as e:
+            logger.warning(f"Cerebras failed: {e}")
 
-@app.get("/api/yojana")
-async def api_yojana():
-    return {"data": "Sarkari Yojana module active", "timestamp": datetime.now().isoformat()}
+    return {"error": "All AI models failed or no API keys"}
 
-# ═══════════════════════════════════════════════════════════════
-# KISAAN DOCTOR
-# ═══════════════════════════════════════════════════════════════
+@app.get("/api/memory/{key}")
+async def memory_get(key: str):
+    return await _memory_get(key)
 
-@app.get("/api/kisaan")
-async def api_kisaan():
-    return {"data": "Kisaan Doctor module active", "timestamp": datetime.now().isoformat()}
+@app.post("/api/memory/")
+async def memory_save(request: Request):
+    data = await request.json()
+    key = data.get("key", str(int(time.time())))
+    value = data.get("value", data)
+    return await _memory_save(key, value)
 
-# ═══════════════════════════════════════════════════════════════
-# AAVISHKAR
-# ═══════════════════════════════════════════════════════════════
+BHASHINI_PIPELINE_URL = "https://meity-auth.ulcacontrib.org/ulca/apis/v0/model/getModelsPipeline"
 
-@app.get("/api/aavishkar")
-async def api_aavishkar():
-    return {"data": "Aavishkar module active", "timestamp": datetime.now().isoformat()}
-
-# ═══════════════════════════════════════════════════════════════
-# PANI
-# ═══════════════════════════════════════════════════════════════
-
-@app.get("/api/pani")
-async def api_pani():
-    return {"data": "Pani module active", "timestamp": datetime.now().isoformat()}
-
-# ═══════════════════════════════════════════════════════════════
-# SEWER
-# ═══════════════════════════════════════════════════════════════
-
-@app.get("/api/sewer")
-async def api_sewer():
-    return {"data": "Sewer module active", "timestamp": datetime.now().isoformat()}
-
-# ═══════════════════════════════════════════════════════════════
-# UPI
-# ═══════════════════════════════════════════════════════════════
-
-@app.get("/api/upi")
-async def api_upi():
-    return {
-        "data": {
-            "upi_id": "jp200883@sbi",
-            "status": "active",
-            "note": "0% transaction fee for UPI"
-        },
-        "timestamp": datetime.now().isoformat()
-    }
-
-# ═══════════════════════════════════════════════════════════════
-# BANKING
-# ═══════════════════════════════════════════════════════════════
-
-@app.get("/api/banking")
-async def api_banking():
-    return {"data": "Banking module active", "timestamp": datetime.now().isoformat()}
-
-# ═══════════════════════════════════════════════════════════════
-# ROZGAR
-# ═══════════════════════════════════════════════════════════════
-
-@app.get("/api/rozgar")
-async def api_rozgar():
-    return {"data": "Rozgar module active", "timestamp": datetime.now().isoformat()}
-
-# ═══════════════════════════════════════════════════════════════
-# SOCIAL MEDIA
-# ═══════════════════════════════════════════════════════════════
-
-@app.get("/api/social")
-async def api_social():
-    return {
-        "data": {
-            "facebook": bool(FACEBOOK_ACCESS_TOKEN),
-            "instagram": bool(INSTAGRAM_ACCESS_TOKEN),
-            "youtube": bool(YOUTUBE_API_KEY)
-        },
-        "timestamp": datetime.now().isoformat()
-    }
-
-# ═══════════════════════════════════════════════════════════════
-# EMERGENCY
-# ═══════════════════════════════════════════════════════════════
-
-@app.get("/api/emergency")
-async def api_emergency():
-    return {"data": EMERGENCY_DATA, "timestamp": datetime.now().isoformat()}
-
-# ═══════════════════════════════════════════════════════════════
-# BHASHINI
-# ═══════════════════════════════════════════════════════════════
+@app.get("/api/bhashini/")
+async def bhashini_root():
+    return {"module": "Bhashini", "status": "active" if AVAILABLE_KEYS["BHASHINI"] else "missing_credentials"}
 
 @app.post("/api/bhashini/translate")
-async def api_bhashini_translate(request: Request):
-    if not BHASHINI_USER_ID:
-        return JSONResponse(status_code=503, content={"error": "BHASHINI credentials missing"})
+async def bhashini_translate(request: Request):
+    if not AVAILABLE_KEYS["BHASHINI"]:
+        return {"error": "Bhashini credentials missing"}
+    data = await request.json()
+    text = data.get("text", "")
+    source = data.get("source", "hi")
+    target = data.get("target", "en")
     try:
-        data = await request.json()
-        text = data.get("text", "")
-        source = data.get("source_language", "en")
-        target = data.get("target_language", "hi")
-        # Bhashini API call
-        url = "https://meity-auth.ulcacontrib.org/ulca/apis/v0/model/compute"
+        headers = {"userID": BHASHINI_USER_ID, "ulcaApiKey": BHASHINI_ULCA_API_KEY, "Content-Type": "application/json"}
         payload = {
-            "modelId": "",
-            "task": "translation",
-            "input": [{"source": text}],
-            "userId": BHASHINI_USER_ID,
-            "ulcaApiKey": BHASHINI_ULCA_API_KEY
+            "pipelineTasks": [{"taskType": "translation", "config": {"language": {"sourceLanguage": source, "targetLanguage": target}}}],
+            "pipelineRequestConfig": {"pipelineId": "64392f96daac500b55c543cd"}
         }
-        r = await HTTP_CLIENT.post(url, json=payload, timeout=30)
-        return {"data": r.json()}
+        resp = await HTTP_CLIENT.post(BHASHINI_PIPELINE_URL, headers=headers, json=payload, timeout=15)
+        pipeline = resp.json()
+        service_id = pipeline["pipelineResponseConfig"][0]["config"][0]["serviceId"]
+        compute_url = pipeline["pipelineInferenceAPIEndPoint"]["callbackUrl"]
+        key_name = pipeline["pipelineInferenceAPIEndPoint"]["inferenceApiKey"]["name"]
+        key_value = pipeline["pipelineInferenceAPIEndPoint"]["inferenceApiKey"]["value"]
+        compute_payload = {
+            "pipelineTasks": [{"taskType": "translation", "config": {"language": {"sourceLanguage": source, "targetLanguage": target}, "serviceId": service_id}}],
+            "inputData": {"input": [{"source": text}]}
+        }
+        compute_resp = await HTTP_CLIENT.post(compute_url, headers={key_name: key_value, "Content-Type": "application/json"}, json=compute_payload, timeout=20)
+        result = compute_resp.json()
+        translated = result["pipelineResponse"][0]["output"][0]["target"]
+        return {"status": "success", "original": text, "translated": translated, "source": source, "target": target, "source_api": "BHASHINI_LIVE"}
     except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        return {"error": str(e)}
 
-# ═══════════════════════════════════════════════════════════════
-# WHISPER STT
-# ═══════════════════════════════════════════════════════════════
+_whisper_model = None
+WHISPER_MODEL_SIZE = os.getenv("WHISPER_MODEL_SIZE", "base")
 
-@app.post("/api/whisper")
-async def api_whisper(request: Request):
+def _get_whisper_model():
+    global _whisper_model
+    if _whisper_model is None:
+        try:
+            from faster_whisper import WhisperModel
+            logger.info(f"Loading Whisper ({WHISPER_MODEL_SIZE})...")
+            _whisper_model = WhisperModel(WHISPER_MODEL_SIZE, device="cpu", compute_type="int8")
+        except Exception as e:
+            logger.error(f"Whisper load failed: {e}")
+            return None
+    return _whisper_model
+
+def _transcribe_sync(audio_bytes: bytes, suffix: str, language=None):
+    model = _get_whisper_model()
+    if model is None:
+        return None
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=True) as tmp:
+        tmp.write(audio_bytes)
+        tmp.flush()
+        segments, info = model.transcribe(tmp.name, language=language)
+        transcript = " ".join(seg.text.strip() for seg in segments)
+    return transcript, info.language, info.language_probability
+
+@app.post("/api/whisper/transcribe")
+async def whisper_transcribe(request: Request):
+    data = await request.json()
+    audio_b64 = data.get("audio_base64", "")
+    language = data.get("language")
+    if not audio_b64:
+        return {"error": "audio_base64 required"}
+    if _b64_too_big(audio_b64):
+        return JSONResponse(status_code=413, content={"error": "audio too large (max 10MB)"})
     try:
-        data = await request.json()
-        audio_b64 = data.get("audio", "")
-        if not audio_b64:
-            return JSONResponse(status_code=400, content={"error": "audio (base64) required"})
-        # Use OpenAI Whisper API or local fallback
-        if OPENAI_API_KEY:
-            audio_bytes = base64.b64decode(audio_b64)
-            files = {"file": ("audio.mp3", io.BytesIO(audio_bytes), "audio/mpeg")}
-            data_form = {"model": "whisper-1", "language": "hi"}
-            r = await HTTP_CLIENT.post(
-                "https://api.openai.com/v1/audio/transcriptions",
-                headers={"Authorization": f"Bearer {OPENAI_API_KEY}"},
-                data=data_form,
-                files=files,
-                timeout=60
-            )
-            return {"data": r.json()}
-        return JSONResponse(status_code=503, content={"error": "Whisper API not configured"})
+        audio_bytes = base64.b64decode(audio_b64)
+        out = await run_in_threadpool(_transcribe_sync, audio_bytes, ".wav", language)
+        if out is None:
+            return {"error": "Whisper model not available"}
+        transcript, detected_lang, lang_prob = out
+        return {"status": "success", "transcript": transcript, "detected_language": detected_lang, "language_probability": round(lang_prob, 3), "source": "WHISPER_LOCAL"}
     except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        return {"error": str(e)}
 
-# ═══════════════════════════════════════════════════════════════
-# TTS
-# ═══════════════════════════════════════════════════════════════
+def _tts_sync(text: str, lang: str) -> bytes:
+    from gtts import gTTS
+    tts = gTTS(text=text, lang=lang, slow=False)
+    mp3_fp = io.BytesIO()
+    tts.write_to_fp(mp3_fp)
+    mp3_fp.seek(0)
+    return mp3_fp.read()
 
 @app.post("/api/tts")
-async def api_tts(request: Request):
-    try:
-        data = await request.json()
-        text = data.get("text", "")
-        lang = data.get("language", "hi")
-        if not text:
-            return JSONResponse(status_code=400, content={"error": "text required"})
-        # gTTS fallback
-        from gtts import gTTS
-        tts = gTTS(text=text, lang=lang, slow=False)
-        mp3_fp = io.BytesIO()
-        tts.write_to_fp(mp3_fp)
-        mp3_fp.seek(0)
-        audio_b64 = base64.b64encode(mp3_fp.read()).decode()
-        return {"audio_base64": audio_b64, "format": "mp3", "language": lang}
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
-
-# ═══════════════════════════════════════════════════════════════
-# IMAGE GENERATION
-# ═══════════════════════════════════════════════════════════════
-
-@app.post("/api/image/generate")
-async def api_image_generate(request: Request):
-    try:
-        data = await request.json()
-        prompt = data.get("prompt", "")
-        if not prompt:
-            return JSONResponse(status_code=400, content={"error": "prompt required"})
-        # Use Cloudflare Workers AI or HuggingFace
-        if CF_API_TOKEN:
-            account_id = os.getenv("CF_ACCOUNT_ID", "")
-            url = f"https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/run/@cf/stabilityai/stable-diffusion-xl-base-1.0"
-            r = await HTTP_CLIENT.post(
-                url,
-                headers={"Authorization": f"Bearer {CF_API_TOKEN}"},
-                json={"prompt": prompt},
-                timeout=60
-            )
-            if r.status_code == 200:
-                return {"image": base64.b64encode(r.content).decode(), "format": "png"}
-        return JSONResponse(status_code=503, content={"error": "Image generation not configured"})
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
-
-# ═══════════════════════════════════════════════════════════════
-# ADMIN
-# ═══════════════════════════════════════════════════════════════
-
-@app.get("/api/admin")
-async def api_admin(request: Request):
-    if not _check_admin_auth(request):
-        return JSONResponse(status_code=403, content={"error": "Unauthorized"})
-    return {
-        "version": "8.3",
-        "modules": MODULES,
-        "api_keys": {k: "configured" if v else "missing" for k, v in AVAILABLE_KEYS.items()},
-        "memory_stats": {"keys": len(MEMORY_STORE), "max": MAX_MEMORY_SIZE},
-        "scheduler": MASTER_SCHEDULER.get_status() if MASTER_SCHEDULER else {"running": False},
-        "smart_swarm": SMART_SWARM.get_status(),
-        "timestamp": datetime.now().isoformat()
-    }
-
-@app.get("/api/admin/users")
-async def api_admin_users(request: Request):
-    if not _check_admin_auth(request):
-        return JSONResponse(status_code=403, content={"error": "Unauthorized"})
-    return {"users": USER_PREFERENCES, "count": len(USER_PREFERENCES)}
-
-@app.post("/api/admin/broadcast")
-async def api_admin_broadcast(request: Request):
-    if not _check_admin_auth(request):
-        return JSONResponse(status_code=403, content={"error": "Unauthorized"})
+async def text_to_speech(request: Request):
     data = await request.json()
-    message = data.get("message", "")
-    if not message:
-        return JSONResponse(status_code=400, content={"error": "message required"})
-    if MASTER_SCHEDULER:
-        await MASTER_SCHEDULER._broadcast(message)
-    return {"status": "broadcast sent", "recipients": len(USER_PREFERENCES)}
-
-# ═══════════════════════════════════════════════════════════════
-# PAYMENT (Razorpay)
-# ═══════════════════════════════════════════════════════════════
-
-@app.post("/api/payment")
-async def api_payment(request: Request):
-    if not RAZORPAY_KEY_ID or not RAZORPAY_KEY_SECRET:
-        return JSONResponse(status_code=503, content={"error": "Payment gateway on hold. Will activate at 1000+ daily users.", "status": "on_hold"})
+    text = data.get("text", "")
+    lang = data.get("lang", "hi")
+    if not text:
+        return {"error": "text required"}
     try:
-        data = await request.json()
-        amount = int(data.get("amount", 0)) * 100  # paise
-        currency = data.get("currency", "INR")
-        receipt = data.get("receipt", f"receipt_{int(time.time())}")
-        import razorpay
-        client = razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET))
-        order = client.order.create({"amount": amount, "currency": currency, "receipt": receipt})
-        return {"data": order}
+        audio_bytes = await run_in_threadpool(_tts_sync, text, lang)
+        audio_b64 = base64.b64encode(audio_bytes).decode("utf-8")
+        return {"status": "success", "audio_base64": audio_b64, "lang": lang, "source": "GTTS_LIVE"}
     except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        return {"error": str(e)}
 
-@app.get("/api/payment")
-async def api_payment_status():
-    return {
-        "status": "on_hold" if not (RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET) else "active",
-        "message": "Payment gateway will activate at 1000+ daily users",
-        "upi_id": "jp200883@sbi",
-        "fees": {"upi": "0%", "card": "2%"}
-    }
-
-# ═══════════════════════════════════════════════════════════════
-# GMAIL
-# ═══════════════════════════════════════════════════════════════
-
-@app.post("/api/gmail/send")
-async def api_gmail_send(request: Request):
-    if not GMAIL_CLIENT_ID or not GMAIL_CLIENT_SECRET:
-        return JSONResponse(status_code=503, content={"error": "Gmail credentials missing"})
-    try:
-        data = await request.json()
-        to = data.get("to", "")
-        subject = data.get("subject", "")
-        body = data.get("body", "")
-        # Simple SMTP fallback
-        import smtplib
-        from email.mime.text import MIMEText
-        msg = MIMEText(body)
-        msg["Subject"] = subject
-        msg["From"] = GMAIL_USER
-        msg["To"] = to
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-            server.login(GMAIL_USER, GMAIL_PASS)
-            server.sendmail(GMAIL_USER, [to], msg.as_string())
-        return {"status": "sent", "to": to, "subject": subject}
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
-
-# ═══════════════════════════════════════════════════════════════
-# SWARM
-# ═══════════════════════════════════════════════════════════════
-
-@app.get("/api/swarm")
-async def api_swarm():
-    return {"data": SMART_SWARM.get_status()}
-
-# ═══════════════════════════════════════════════════════════════
-# SEARCH
-# ═══════════════════════════════════════════════════════════════
-
-@app.get("/api/search")
-async def api_search(q: str = ""):
-    if not TAVILY_API_KEY:
-        return JSONResponse(status_code=503, content={"error": "TAVILY_API_KEY missing"})
-    try:
-        r = await HTTP_CLIENT.post(
-            "https://api.tavily.com/search",
-            json={"api_key": TAVILY_API_KEY, "query": q, "search_depth": "basic", "max_results": 5},
-            timeout=15
-        )
-        return {"data": r.json()}
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
-
-# ═══════════════════════════════════════════════════════════════
-# FACEBOOK
-# ═══════════════════════════════════════════════════════════════
-
-@app.get("/api/facebook")
-async def api_facebook():
+@app.get("/api/facebook/status")
+async def facebook_status():
     if not FACEBOOK_ACCESS_TOKEN:
-        return JSONResponse(status_code=503, content={"error": "FACEBOOK_ACCESS_TOKEN missing"})
+        return {"error": "FACEBOOK_ACCESS_TOKEN missing"}
     try:
-        r = await HTTP_CLIENT.get(f"https://graph.facebook.com/v18.0/{FACEBOOK_PAGE_ID}?access_token={FACEBOOK_ACCESS_TOKEN}&fields=name,followers_count", timeout=15)
-        return {"data": r.json()}
+        url = f"https://graph.facebook.com/v25.0/{FACEBOOK_PAGE_ID}?access_token={FACEBOOK_ACCESS_TOKEN}&fields=id,name,followers_count"
+        resp = await HTTP_CLIENT.get(url)
+        data = resp.json()
+        if resp.status_code == 200:
+            return {"status": "connected", "page": {"id": data.get("id"), "name": data.get("name"), "followers": data.get("followers_count", 0)}}
+        return {"error": data.get("error", {}).get("message", "Unknown")}
     except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        return {"error": str(e)}
 
-# ═══════════════════════════════════════════════════════════════
-# INSTAGRAM
-# ═══════════════════════════════════════════════════════════════
+@app.post("/api/facebook/post")
+async def facebook_post(request: Request):
+    if not FACEBOOK_ACCESS_TOKEN:
+        return {"error": "FACEBOOK_ACCESS_TOKEN missing"}
+    data = await request.json()
+    try:
+        url = f"https://graph.facebook.com/v25.0/{FACEBOOK_PAGE_ID}/feed"
+        payload = {"access_token": FACEBOOK_ACCESS_TOKEN, "message": data.get("message", "")}
+        if data.get("link"):
+            payload["link"] = data["link"]
+        resp = await HTTP_CLIENT.post(url, data=payload)
+        return resp.json()
+    except Exception as e:
+        return {"error": str(e)}
 
-@app.get("/api/instagram")
-async def api_instagram():
+@app.get("/api/instagram/status")
+async def instagram_status():
     if not INSTAGRAM_ACCESS_TOKEN:
-        return JSONResponse(status_code=503, content={"error": "INSTAGRAM_ACCESS_TOKEN missing"})
+        return {"error": "INSTAGRAM_ACCESS_TOKEN missing"}
     try:
-        r = await HTTP_CLIENT.get(f"https://graph.instagram.com/me?access_token={INSTAGRAM_ACCESS_TOKEN}&fields=username,followers_count,media_count", timeout=15)
-        return {"data": r.json()}
+        url = f"https://graph.facebook.com/v25.0/{INSTAGRAM_BUSINESS_ID}?access_token={INSTAGRAM_ACCESS_TOKEN}&fields=id,username,followers_count"
+        resp = await HTTP_CLIENT.get(url)
+        data = resp.json()
+        if resp.status_code == 200:
+            return {"status": "connected", "account": {"id": data.get("id"), "username": data.get("username"), "followers": data.get("followers_count", 0)}}
+        return {"error": data.get("error", {}).get("message", "Unknown")}
     except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        return {"error": str(e)}
 
-# ═══════════════════════════════════════════════════════════════
-# YOUTUBE
-# ═══════════════════════════════════════════════════════════════
-
-@app.get("/api/youtube")
-async def api_youtube(q: str = "India news", max_results: int = 5):
+@app.get("/api/youtube/search")
+async def youtube_search(q: str = "", max_results: int = 10):
     if not YOUTUBE_API_KEY:
-        return JSONResponse(status_code=503, content={"error": "YOUTUBE_API_KEY missing"})
+        return {"error": "YOUTUBE_API_KEY missing"}
     try:
         url = f"https://www.googleapis.com/youtube/v3/search?part=snippet&q={q}&maxResults={max_results}&key={YOUTUBE_API_KEY}"
-        r = await HTTP_CLIENT.get(url, timeout=15)
-        return {"data": r.json()}
+        resp = await HTTP_CLIENT.get(url)
+        return resp.json()
     except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        return {"error": str(e)}
 
-# ═══════════════════════════════════════════════════════════════
-# VOICE TTS
-# ═══════════════════════════════════════════════════════════════
-
-@app.post("/api/voice/tts")
-async def api_voice_tts(request: Request):
+@app.get("/api/search")
+async def web_search(q: str = "", max_results: int = 5):
+    if not TAVILY_API_KEY:
+        return {"error": "TAVILY_API_KEY missing"}
     try:
-        data = await request.json()
-        text = data.get("text", "")
-        lang = data.get("language", "hi")
-        if not text:
-            return JSONResponse(status_code=400, content={"error": "text required"})
-        from gtts import gTTS
-        tts = gTTS(text=text, lang=lang, slow=False)
-        mp3_fp = io.BytesIO()
-        tts.write_to_fp(mp3_fp)
-        mp3_fp.seek(0)
-        audio_b64 = base64.b64encode(mp3_fp.read()).decode()
-        return {"audio_base64": audio_b64, "format": "mp3", "language": lang}
+        url = "https://api.tavily.com/search"
+        payload = {"api_key": TAVILY_API_KEY, "query": q, "max_results": max_results, "search_depth": "basic"}
+        resp = await HTTP_CLIENT.post(url, json=payload, timeout=15)
+        return resp.json()
     except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        return {"error": str(e)}
 
-# ═══════════════════════════════════════════════════════════════
-# VOICE CMD
-# ═══════════════════════════════════════════════════════════════
+@app.post("/api/retirement/tax-calculate")
+async def tax_calculate(request: Request):
+    data = await request.json()
+    income = data.get("income", 0)
+    regime = data.get("regime", "new")
+    deductions = data.get("deductions", 0)
+    return _calculate_tax(income, regime, deductions)
 
-@app.post("/api/voice/cmd")
-async def api_voice_cmd(request: Request):
-    try:
-        data = await request.json()
-        command = data.get("command", "")
-        return {"data": {"command": command, "status": "processed", "action": "voice_command_executed"}}
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
+@app.get("/api/swarm/status")
+async def swarm_status():
+    return SMART_SWARM.get_status()
 
-# ═══════════════════════════════════════════════════════════════
-# OTHER MODULES
-# ═══════════════════════════════════════════════════════════════
-
-@app.get("/api/analytics")
-async def api_analytics():
-    return {"data": "Analytics module active", "timestamp": datetime.now().isoformat()}
-
-@app.get("/api/daily-report")
-async def api_daily_report():
-    return {"data": "Daily report module active", "timestamp": datetime.now().isoformat()}
-
-@app.get("/api/guard")
-async def api_guard():
-    return {"data": "Guard Agent active", "timestamp": datetime.now().isoformat()}
-
-@app.get("/api/meta")
-async def api_meta():
-    return {"data": "Meta Agent active", "timestamp": datetime.now().isoformat()}
-
-@app.get("/api/lang-hub")
-async def api_lang_hub():
-    return {"data": "Language Hub active", "timestamp": datetime.now().isoformat()}
-
-@app.get("/api/bachpan")
-async def api_bachpan():
-    return {"data": "Bachpan module active", "timestamp": datetime.now().isoformat()}
-
-@app.get("/api/trolley")
-async def api_trolley():
-    return {"data": "Trolley module active", "timestamp": datetime.now().isoformat()}
-
-@app.get("/api/singhji-tv")
-async def api_singhji_tv():
-    return {"data": "SinghJi TV module active", "timestamp": datetime.now().isoformat()}
-
-@app.get("/api/whatsapp")
-async def api_whatsapp():
-    return {"data": "WhatsApp module active", "timestamp": datetime.now().isoformat()}
-
-@app.get("/api/newsdata")
-async def api_newsdata(q: str = "india", count: int = 5):
-    if not NEWSDATA_API_KEY:
-        return JSONResponse(status_code=503, content={"error": "NEWSDATA_API_KEY missing"})
-    try:
-        url = f"https://newsdata.io/api/1/latest?apikey={NEWSDATA_API_KEY}&q={q}&size={count}"
-        r = await HTTP_CLIENT.get(url, timeout=15)
-        return {"data": r.json()}
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
-
-# ═══════════════════════════════════════════════════════════════
-# TELEGRAM WEBHOOK — ALL 40+ CALLBACK HANDLERS
-# ═══════════════════════════════════════════════════════════════
+@app.post("/api/swarm/sync")
+async def swarm_sync():
+    result = SMART_SWARM.sync(MODULES, AVAILABLE_KEYS)
+    return {"synced": True, **result}
 
 @app.post("/telegram/webhook")
 async def telegram_webhook(request: Request):
-    if not TELEGRAM_TOKEN:
-        return JSONResponse(status_code=503, content={"error": "TELEGRAM_TOKEN missing"})
     try:
         data = await request.json()
-        message = data.get("message", {})
-        callback = data.get("callback_query", {})
 
-        if callback:
+        if "callback_query" in data:
+            callback = data["callback_query"]
             chat_id = callback["message"]["chat"]["id"]
-            callback_data = callback.get("data", "")
-            await _handle_callback(chat_id, callback_data)
-            # Answer callback
-            await HTTP_CLIENT.post(f"{TELEGRAM_API_BASE}/answerCallbackQuery", json={"callback_query_id": callback["id"]})
-            return {"ok": True}
+            user_id = callback["from"]["id"]
+            query_data = callback["data"]
 
-        if not message:
-            return {"ok": True}
+            if query_data == "status":
+                status = SMART_SWARM.get_status()
+                text = "Status\n\n"
+                text += f"Agents: {status['currently_loaded']}/330\n"
+                text += f"Active: {status['active_running']}\n"
+                text += f"Idle: {status['idle']}\n"
+                text += f"APIs: {sum(1 for v in AVAILABLE_KEYS.values() if v)}/{len(AVAILABLE_KEYS)}"
+                await _telegram_send_message(chat_id, text)
+            elif query_data == "weather":
+                USER_PREFERENCES.setdefault(user_id, {})["waiting_for"] = "weather"
+                await _telegram_send_message(chat_id, "Weather\n\nCity batao!")
+            elif query_data == "news":
+                if NEWSDATA_API_KEY:
+                    try:
+                        url = f"https://newsdata.io/api/1/latest?apikey={NEWSDATA_API_KEY}&q=india&size=5"
+                        resp = await HTTP_CLIENT.get(url)
+                        news_data = resp.json()
+                        articles = news_data.get("results", [])[:5]
+                        text = "News\n\n"
+                        for i, article in enumerate(articles, 1):
+                            text += f"{i}. {article.get('title', 'No title')}\n"
+                            desc = article.get('description', 'No description')[:100]
+                            text += f"   {desc}...\n\n"
+                        await _telegram_send_message(chat_id, text)
+                    except Exception as e:
+                        await _telegram_send_message(chat_id, f"News error: {str(e)[:100]}")
+                else:
+                    await _telegram_send_message(chat_id, "News API key missing")
+            elif query_data == "mandi":
+                USER_PREFERENCES.setdefault(user_id, {})["waiting_for"] = "mandi"
+                await _telegram_send_message(chat_id, "Mandi Bhav\n\nState batao!")
+            elif query_data == "ai_chat":
+                await _telegram_send_message(chat_id, "AI Chat\n\nKuch bhi poochho!")
+            elif query_data == "voice":
+                await _telegram_send_message(chat_id, "Voice\n\nVoice message bhejo!")
+            elif query_data == "tax":
+                USER_PREFERENCES.setdefault(user_id, {})["waiting_for"] = "tax"
+                await _telegram_send_message(chat_id, "Tax Calculator\n\nIncome batao!")
+            elif query_data == "plant":
+                await _telegram_send_message(chat_id, "Plant ID\n\nPlant ki photo bhejo!")
+            elif query_data == "gold":
+                USER_PREFERENCES.setdefault(user_id, {})["waiting_for"] = "gold"
+                await _telegram_send_message(chat_id, "Gold Rate\n\nCity batao! (ya sirf Enter dabao Delhi ke liye)")
+            elif query_data == "fuel":
+                USER_PREFERENCES.setdefault(user_id, {})["waiting_for"] = "fuel"
+                await _telegram_send_message(chat_id, "Fuel Price\n\nCity batao!")
+            elif query_data == "horoscope":
+                USER_PREFERENCES.setdefault(user_id, {})["waiting_for"] = "horoscope"
+                await _telegram_send_message(chat_id, "Horoscope\n\nRashi batao! (jaise: Mesh, Simha, Tula)")
+            elif query_data == "currency":
+                USER_PREFERENCES.setdefault(user_id, {})["waiting_for"] = "currency"
+                await _telegram_send_message(chat_id, "Currency Convert\n\nFormat: USD INR 100")
+            elif query_data == "emergency":
+                emg_text = "Emergency Numbers\n\n"
+                for k, v in EMERGENCY_DATA.items():
+                    emg_text += f"{k.title()}: {v['number']}" + (f" / {v['alt']}" if v.get("alt") else "") + "\n"
+                await _telegram_send_message(chat_id, emg_text)
+            elif query_data == "upi":
+                upi_id = os.getenv("UPI_ID", "jp200883@sbi")
+                upi_text = f"UPI Info\n\nUPI ID: {upi_id}\nApps: PhonePe, Google Pay, Paytm, BHIM\nDaily Limit: Rs 1,00,000"
+                await _telegram_send_message(chat_id, upi_text)
 
+            return {"status": "ok"}
+
+        if "message" not in data:
+            return {"status": "ok"}
+
+        message = data["message"]
         chat_id = message["chat"]["id"]
         text = message.get("text", "")
         user_id = message["from"]["id"]
 
-        # Store user
         if user_id not in USER_PREFERENCES:
             USER_PREFERENCES[user_id] = {"language": "hi", "location": None}
+            await _memory_save(f"user_pref:{user_id}", USER_PREFERENCES[user_id], table="user_memory")
 
-        # Rate limit check
+        # ─── बटन-प्रेस के बाद आई प्लेन टेक्स्ट को सही मॉड्यूल कमांड में बदलो ───
+        pending = USER_PREFERENCES.get(user_id, {}).pop("waiting_for", None)
+        if pending and text and not text.startswith("/"):
+            if pending == "weather":
+                text = "/weather " + text.strip()
+            elif pending == "mandi":
+                text = "/mandi " + text.strip()
+            elif pending == "tax":
+                text = "/tax " + text.strip()
+            elif pending == "gold":
+                text = "/gold " + text.strip()
+            elif pending == "fuel":
+                text = "/fuel " + text.strip()
+            elif pending == "horoscope":
+                text = "/horoscope " + text.strip()
+            elif pending == "currency":
+                text = "/currency " + text.strip()
+        # ────────────────────────────────────────────────────────────
+
         if _rate_check(f"tg_user:{user_id}", *RATE_LIMIT_TELEGRAM_USER):
-            await _telegram_send_message(chat_id, "Rate limit exceeded. Please wait a minute.")
-            return {"ok": True}
+            await _telegram_send_message(chat_id, "Thoda slow karo! 1 minute mein try karo.")
+            return {"status": "ok"}
 
-        # Commands
+        if "voice" in message:
+            voice = message["voice"]
+            file_id = voice["file_id"]
+            try:
+                file_resp = await HTTP_CLIENT.get(f"{TELEGRAM_API_BASE}/getFile?file_id={file_id}")
+                file_data = file_resp.json()
+                if file_data.get("ok"):
+                    file_path = file_data["result"]["file_path"]
+                    file_url = f"https://api.telegram.org/file/bot{TELEGRAM_TOKEN}/{file_path}"
+                    audio_resp = await HTTP_CLIENT.get(file_url, timeout=15)
+                    audio_bytes = audio_resp.content
+                    out = await run_in_threadpool(_transcribe_sync, audio_bytes, ".ogg", None)
+                    if out:
+                        transcript, _, _ = out
+                        transcript_msg = "Transcript:" + chr(10) + transcript + chr(10) + chr(10) + "AI soch raha hai..."
+                        await _telegram_send_message(chat_id, transcript_msg)
+                        ai_text = None
+                        if GROQ_API_KEY:
+                            ai_text = await _call_groq(transcript)
+                            try:
+                                tts_text = ai_text[:500] if len(ai_text) > 500 else ai_text
+                                tts_bytes = await run_in_threadpool(_tts_sync, tts_text, "hi")
+                                tts_b64 = base64.b64encode(tts_bytes).decode("utf-8")
+                                await _telegram_send_voice(chat_id, tts_b64, "AI Response (Hindi)")
+                            except Exception:
+                                ai_msg = "AI Response:" + chr(10) + chr(10) + ai_text
+                                await _telegram_send_message(chat_id, ai_msg)
+                        await _memory_save(f"telegram_voice:{user_id}:{int(time.time())}", {"transcript": transcript, "response": ai_text})
+                    else:
+                        await _telegram_send_message(chat_id, "Whisper model not available")
+                else:
+                    await _telegram_send_message(chat_id, "Could not download voice file")
+            except Exception as e:
+                logger.error(f"Voice processing error: {e}")
+                err_msg = "Voice processing error: " + str(e)[:100]
+                await _telegram_send_message(chat_id, err_msg)
+            return {"status": "ok"}
+
         if text == "/start":
-            welcome = (
-                "Jai Singh Ji! Welcome to Singh Ji AI Ultra v8.3
-
-"
-                "I am your AI assistant with 40+ modules:
-"
-                "News, Weather, Mandi, AI Chat, Voice, Tax, Gold, Fuel,
-"
-                "Govt Schemes, Banking, UPI, Pani, Sewer, Rozgar,
-"
-                "Scheme Swarm, Trishul, and more!
-
-"
-                "Use the buttons below or type /help"
-            )
-            await _telegram_send_message(chat_id, welcome, reply_markup=MAIN_KEYBOARD)
-            return {"ok": True}
+            welcome = "Welcome to Singh Ji AI Ultra v8.0!\n\nMain aapka AI assistant hoon.\n"
+            await _telegram_send_message(chat_id, welcome, MAIN_KEYBOARD)
+            return {"status": "ok"}
 
         elif text == "/help":
             help_text = (
-                "Available commands:
-"
-                "/start - Welcome message
-"
-                "/help - This help
-"
-                "/status - System status
-"
-                "/weather <city> - Weather info
-"
-                "/news - Latest news
-"
-                "/gold - Gold rates
-"
-                "/fuel <city> - Fuel prices
-"
-                "/tax <income> - Tax calculator
-"
-                "/yojana - Govt schemes
-"
-                "/mandi - Mandi rates
-"
-                "/voice <text> - Text to speech
-"
-                "/ai <question> - AI chat
-"
-                "/swarm - Smart Swarm status
-"
-                "/memory - Memory info
-"
+                "Commands\n\n"
+                "/start\n/weather city\n/news\n/mandi state\n/tax income\n/status\n/ai question\n"
+                "/gold city\n/fuel city\n/horoscope rashi\n/currency USD INR 100\n"
+                "/translate en text\n/emergency type\n/upi\n/pani\n/sewer\n/yojana age income category\n"
+                "/govt aadhaar\n/search query\n/tv educational"
             )
             await _telegram_send_message(chat_id, help_text)
-            return {"ok": True}
+            return {"status": "ok"}
 
         elif text == "/status":
-            status_text = (
-                f"Singh Ji AI Ultra v8.3
-"
-                f"Active Modules: {len(ACTIVE_MODULES)}/{len(MODULES)}
-"
-                f"Smart Swarm: {SMART_SWARM.get_status()['currently_loaded']} agents
-"
-                f"Scheduler: {'Running' if MASTER_SCHEDULER and MASTER_SCHEDULER.scheduler.running else 'Stopped'}
-"
-                f"Memory: {len(MEMORY_STORE)} entries
-"
-                f"Users: {len(USER_PREFERENCES)}"
-            )
+            status = SMART_SWARM.get_status()
+            status_text = "Status\n\n"
+            status_text += "Total Agents: 330\n"
+            status_text += f"Loaded: {status['currently_loaded']}\n"
+            status_text += f"Active: {status['active_running']}\n"
+            status_text += f"Idle: {status['idle']}\n"
+            api_count = sum(1 for v in AVAILABLE_KEYS.values() if v)
+            status_text += f"Active APIs: {api_count}/{len(AVAILABLE_KEYS)}\n"
+            status_text += f"Time: {datetime.now().strftime('%H:%M:%S')}"
             await _telegram_send_message(chat_id, status_text)
-            return {"ok": True}
+            return {"status": "ok"}
 
         elif text.startswith("/weather "):
-            city = text[9:].strip()
-            result = await api_weather(city)
-            if "data" in result:
-                d = result["data"]
-                msg = f"Weather in {d['city']}, {d['country']}:
-Temp: {d['temperature']}C (feels {d['feels_like']}C)
-Humidity: {d['humidity']}%
-Wind: {d['wind_speed']} m/s
-{d['description']}"
+            city = text.replace("/weather ", "").strip()
+            if OPENWEATHER_API_KEY:
+                try:
+                    url = f"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={OPENWEATHER_API_KEY}&units=metric"
+                    resp = await HTTP_CLIENT.get(url)
+                    data = resp.json()
+                    if resp.status_code == 200:
+                        weather_text = f"Weather in {city}\n\n"
+                        weather_text += f"Temperature: {data['main']['temp']}C\n"
+                        weather_text += f"Feels like: {data['main']['feels_like']}C\n"
+                        weather_text += f"Humidity: {data['main']['humidity']}%\n"
+                        weather_text += f"Wind: {data['wind']['speed']} m/s\n"
+                        weather_text += f"{data['weather'][0]['description'].title()}"
+                        await _telegram_send_message(chat_id, weather_text)
+                    else:
+                        await _telegram_send_message(chat_id, f"City not found: {city}")
+                except Exception as e:
+                    await _telegram_send_message(chat_id, f"Error: {str(e)[:100]}")
             else:
-                msg = result.get("error", "Weather fetch failed")
-            await _telegram_send_message(chat_id, msg)
-            return {"ok": True}
+                await _telegram_send_message(chat_id, "Weather API key missing")
+            return {"status": "ok"}
 
-        elif text.startswith("/ai "):
-            prompt = text[4:].strip()
-            response = await _call_groq(prompt)
-            await _telegram_send_message(chat_id, response[:4000])
-            return {"ok": True}
+        elif text == "/news":
+            if NEWSDATA_API_KEY:
+                try:
+                    url = f"https://newsdata.io/api/1/latest?apikey={NEWSDATA_API_KEY}&q=india&size=5"
+                    resp = await HTTP_CLIENT.get(url)
+                    news_data = resp.json()
+                    articles = news_data.get("results", [])[:5]
+                    news_text = "Latest News\n\n"
+                    for i, article in enumerate(articles, 1):
+                        news_text += f"{i}. {article.get('title', 'No title')}\n"
+                        desc = article.get('description', 'No description')[:80]
+                        news_text += f"   {desc}...\n\n"
+                    await _telegram_send_message(chat_id, news_text)
+                except Exception as e:
+                    await _telegram_send_message(chat_id, f"News error: {str(e)[:100]}")
+            else:
+                await _telegram_send_message(chat_id, "News API key missing")
+            return {"status": "ok"}
 
-        elif text.startswith("/voice "):
-            voice_text = text[7:].strip()
-            try:
-                from gtts import gTTS
-                tts = gTTS(text=voice_text, lang="hi", slow=False)
-                mp3_fp = io.BytesIO()
-                tts.write_to_fp(mp3_fp)
-                mp3_fp.seek(0)
-                audio_b64 = base64.b64encode(mp3_fp.read()).decode()
-                await _telegram_send_voice(chat_id, audio_b64, caption=voice_text[:100])
-            except Exception as e:
-                await _telegram_send_message(chat_id, f"Voice error: {str(e)}")
-            return {"ok": True}
+        elif text.startswith("/mandi "):
+            state = text.replace("/mandi ", "").strip()
+            if MANDI_API_KEY:
+                try:
+                    params = {"api-key": MANDI_API_KEY, "format": "json", "limit": 10, "filters[state.keyword]": state}
+                    resp = await HTTP_CLIENT.get(MANDI_BASE_URL, params=params, timeout=45)
+                    data = resp.json()
+                    records = data.get("records", [])
+                    mandi_text = f"Mandi Bhav - {state}\n\n"
+                    for i, record in enumerate(records[:5], 1):
+                        mandi_text += f"{i}. {record.get('commodity', 'Unknown')}\n"
+                        mandi_text += f"   Rs {record.get('modal_price', 'N/A')}/quintal\n"
+                        mandi_text += f"   {record.get('district', 'N/A')}, {record.get('market', 'N/A')}\n\n"
+                    await _telegram_send_message(chat_id, mandi_text)
+                except Exception as e:
+                    await _telegram_send_message(chat_id, f"Error: {str(e)[:100]}")
+            else:
+                await _telegram_send_message(chat_id, "Mandi API key missing")
+            return {"status": "ok"}
 
         elif text.startswith("/tax "):
             try:
-                income = float(text[5:].strip())
-                result = _calculate_tax(income)
-                msg = (
-                    f"Tax Calculation (New Regime):
-"
-                    f"Income: Rs {income:,.0f}
-"
-                    f"Tax: Rs {result['tax']:,.2f}
-"
-                    f"Cess: Rs {result['cess']:,.2f}
-"
-                    f"Total: Rs {result['total']:,.2f}
-"
-                    f"Take Home: Rs {result['take_home']:,.2f}"
-                )
-            except:
-                msg = "Usage: /tax <income_amount>"
-            await _telegram_send_message(chat_id, msg)
-            return {"ok": True}
+                income = float(text.replace("/tax ", "").strip())
+                r = _calculate_tax(income, "new")
+                tax_text = "Tax Calculation\n\n"
+                tax_text += f"Income: Rs {r['income']:,.0f}\n"
+                tax_text += f"Tax: Rs {r['tax']:,.2f}\n"
+                tax_text += f"Health Cess (4%): Rs {r['cess']:,.2f}\n"
+                tax_text += f"Total Tax: Rs {r['total']:,.2f}\n"
+                tax_text += f"Take Home: Rs {r['take_home']:,.2f}"
+                await _telegram_send_message(chat_id, tax_text)
+            except Exception:
+                await _telegram_send_message(chat_id, "Invalid income. Example: /tax 500000")
+            return {"status": "ok"}
 
-        elif text == "/yojana":
-            yojana_text = (
-                "Government Schemes:
+        elif text.startswith("/gold"):
+            city = text.replace("/gold", "").strip() or "delhi"
+            try:
+                resp = await gold_rate_city(city)
+                body = json.loads(bytes(resp.body))
+                d = body["data"]
+                cr = d.get("city_rates", {})
+                gold_text = f"Gold Rate - {cr.get('city', city.title())}\n\n"
+                gold_text += f"Source: {d.get('source', 'N/A')}\n"
+                gold_text += f"24K (1g): Rs {cr.get('price_gram_24k', 'N/A')}\n"
+                gold_text += f"22K (1g): Rs {cr.get('price_gram_22k', 'N/A')}\n"
+                gold_text += f"24K (10g): Rs {cr.get('price_10g_24k', 'N/A')}\n"
+                gold_text += f"Updated: {d.get('last_updated', 'N/A')}"
+                await _telegram_send_message(chat_id, gold_text)
+            except Exception as e:
+                await _telegram_send_message(chat_id, f"Gold rate error: {str(e)[:100]}")
+            return {"status": "ok"}
 
-"
-                "1. PM-KISAN - Rs 6,000/year for farmers
-"
-                "2. Ayushman Bharat - Rs 5 lakh health cover
-"
-                "3. PM Awas Yojana - Affordable housing
-"
-                "4. MUDRA Loan - Up to Rs 10 lakh
-"
-                "5. Jan Dhan Yojana - Zero balance account
+        elif text.startswith("/fuel"):
+            city = text.replace("/fuel", "").strip() or "delhi"
+            try:
+                resp = await fuel_price(city)
+                body = json.loads(bytes(resp.body))
+                d = body["data"]
+                fuel_text = f"Fuel Price - {d.get('city', city.title())}\n\n"
+                fuel_text += f"Petrol: Rs {d.get('petrol', 'N/A')}/L\n"
+                fuel_text += f"Diesel: Rs {d.get('diesel', 'N/A')}/L\n"
+                fuel_text += f"Source: {d.get('source', 'N/A')}\n"
+                fuel_text += f"Updated: {d.get('last_updated', 'N/A')}"
+                await _telegram_send_message(chat_id, fuel_text)
+            except Exception as e:
+                await _telegram_send_message(chat_id, f"Fuel price error: {str(e)[:100]}")
+            return {"status": "ok"}
 
-"
-                "Type /yojana <scheme_name> for details"
+        elif text.startswith("/horoscope"):
+            rashi = text.replace("/horoscope", "").strip() or "मेष"
+            try:
+                h = get_horoscope(rashi, "daily", "hi")
+                horo_text = _format_horoscope_telegram(h)
+                await _telegram_send_message(chat_id, horo_text)
+            except Exception as e:
+                await _telegram_send_message(chat_id, f"Horoscope error: {str(e)[:100]}")
+            return {"status": "ok"}
+
+        elif text.startswith("/currency"):
+            parts = text.replace("/currency", "").strip().split()
+            try:
+                base = parts[0].upper() if len(parts) > 0 else "USD"
+                target = parts[1].upper() if len(parts) > 1 else "INR"
+                amount = float(parts[2]) if len(parts) > 2 else 1.0
+                result = await singhji_currency.convert(base, target, amount)
+                cur_text = f"Currency Convert\n\n{amount} {base} = {result.converted} {target}\n"
+                cur_text += f"Rate: 1 {base} = {result.rate} {target}\n"
+                cur_text += f"Source: {result.source}"
+                await _telegram_send_message(chat_id, cur_text)
+            except Exception as e:
+                await _telegram_send_message(chat_id, f"Currency error: {str(e)[:100]}\n\nFormat: /currency USD INR 100")
+            return {"status": "ok"}
+
+        elif text.startswith("/translate "):
+            parts = text.replace("/translate ", "").strip().split(" ", 1)
+            try:
+                target_lang = parts[0].lower()
+                to_translate = parts[1] if len(parts) > 1 else ""
+                if not to_translate:
+                    await _telegram_send_message(chat_id, "Format: /translate en Namaste kaise ho")
+                    return {"status": "ok"}
+                result = await run_in_threadpool(LANG_MODULE.translate, to_translate, target_lang, "auto")
+                if result.get("success"):
+                    await _telegram_send_message(chat_id, f"Translation ({result.get('target_name', target_lang)})\n\n{result['translated']}")
+                else:
+                    await _telegram_send_message(chat_id, f"Translate error: {result.get('error', 'unknown')[:100]}")
+            except Exception as e:
+                await _telegram_send_message(chat_id, f"Translate error: {str(e)[:100]}\n\nFormat: /translate en Namaste kaise ho")
+            return {"status": "ok"}
+
+        elif text.startswith("/emergency"):
+            type_ = text.replace("/emergency", "").strip().lower()
+            if type_ and type_ in EMERGENCY_DATA:
+                v = EMERGENCY_DATA[type_]
+                emg_text = f"{type_.title()}\n\nNumber: {v['number']}"
+                if v.get("alt"):
+                    emg_text += f"\nAlt: {v['alt']}"
+                emg_text += f"\n{v.get('info', '')}"
+            else:
+                emg_text = "Emergency Numbers\n\n"
+                for k, v in EMERGENCY_DATA.items():
+                    emg_text += f"{k.title()}: {v['number']}" + (f" / {v['alt']}" if v.get("alt") else "") + "\n"
+            await _telegram_send_message(chat_id, emg_text)
+            return {"status": "ok"}
+
+        elif text == "/upi":
+            upi_id = os.getenv("UPI_ID", "jp200883@sbi")
+            upi_text = f"UPI Info\n\nUPI ID: {upi_id}\nApps: PhonePe, Google Pay, Paytm, BHIM\nDaily Limit: Rs 1,00,000"
+            await _telegram_send_message(chat_id, upi_text)
+            return {"status": "ok"}
+
+        elif text == "/pani":
+            pani_text = (
+                "Pani (Water) Helplines\n\n"
+                "National: 1800-180-1818\n"
+                "Jal Jeevan Mission: 1800-111-555\n\n"
+                "Schemes: Jal Jeevan Mission, AMRUT 2.0, Swajal Scheme\n"
+                "Complaint: jaljeevanmission.gov.in"
             )
-            await _telegram_send_message(chat_id, yojana_text)
-            return {"ok": True}
+            await _telegram_send_message(chat_id, pani_text)
+            return {"status": "ok"}
 
-        elif text.startswith("/yojana "):
-            scheme_name = text[8:].strip().lower()
-            schemes = {
-                "pmkisan": "PM-KISAN: Rs 6,000/year in 3 installments for small farmers. Documents: Aadhar, Land records, Bank account. Apply: pmkisan.gov.in",
-                "ayushman": "Ayushman Bharat: Health cover up to Rs 5 lakh per family. Eligibility: BPL families. Apply: pmjay.gov.in",
-                "awas": "PM Awas Yojana: Affordable housing for EWS/LIG. Apply: pmaymis.gov.in",
-                "mudra": "MUDRA Loan: Loan up to Rs 10 lakh for small entrepreneurs. Apply: mudra.org.in",
-                "jan dhan": "Jan Dhan Yojana: Zero balance bank account with insurance. Apply at any bank branch"
+        elif text == "/sewer":
+            sewer_text = (
+                "Sewer/Sanitation Helplines\n\n"
+                "Swachh Bharat: 1800-180-1818\n"
+                "Urban Sewer: 1800-111-555\n"
+                "Complaint: 1969\n\n"
+                "Portal: swachhbharaturban.gov.in"
+            )
+            await _telegram_send_message(chat_id, sewer_text)
+            return {"status": "ok"}
+
+        elif text.startswith("/govt"):
+            service = text.replace("/govt", "").strip().lower()
+            if service and service in GOVT_DATA:
+                d = GOVT_DATA[service]
+                govt_text = f"{d['title']}\n\nHelpline: {d['helpline']}\nWebsite: {d['website']}\nServices: {', '.join(d['services'])}"
+            else:
+                govt_text = "Govt Services\n\n" + ", ".join(GOVT_DATA.keys())
+                govt_text += "\n\nFormat: /govt aadhaar (ya pan, passport, voter, ration, driving, ayushman, pmkisan)"
+            await _telegram_send_message(chat_id, govt_text)
+            return {"status": "ok"}
+
+        elif text.startswith("/search "):
+            query = text.replace("/search ", "").strip()
+            if TAVILY_API_KEY:
+                try:
+                    url = "https://api.tavily.com/search"
+                    payload = {"api_key": TAVILY_API_KEY, "query": query, "max_results": 5, "search_depth": "basic"}
+                    resp = await HTTP_CLIENT.post(url, json=payload, timeout=15)
+                    data = resp.json()
+                    results = data.get("results", [])[:5]
+                    search_text = f"Search: {query}\n\n"
+                    for i, r in enumerate(results, 1):
+                        search_text += f"{i}. {r.get('title', 'No title')}\n   {r.get('url', '')}\n\n"
+                    if not results:
+                        search_text += "Koi result nahi mila"
+                    await _telegram_send_message(chat_id, search_text)
+                except Exception as e:
+                    await _telegram_send_message(chat_id, f"Search error: {str(e)[:100]}")
+            else:
+                await _telegram_send_message(chat_id, "Search API key missing")
+            return {"status": "ok"}
+
+        elif text.startswith("/tv"):
+            category = text.replace("/tv", "").strip().lower()
+            tv_content = {
+                "educational": ["Digital India Explained (10 min)", "PM Kisan Process (5 min)", "UPI Safety Tips (3 min)", "Aadhaar Update Guide (7 min)"],
+                "news": ["Daily Headlines (15 min)", "Mandi Rates Update (5 min)", "Weather Forecast (3 min)"],
+                "entertainment": ["Folk Music Collection (30 min)", "Regional Movies (120 min)"],
+                "health": ["Yoga for Beginners (20 min)", "Healthy Cooking (15 min)", "First Aid Basics (10 min)"],
             }
-            msg = schemes.get(scheme_name, f"Scheme '{scheme_name}' not found. Try: pmkisan, ayushman, awas, mudra, jan dhan")
-            await _telegram_send_message(chat_id, msg)
-            return {"ok": True}
-
-        elif text == "/news":
-            result = await api_news(5)
-            if "data" in result:
-                articles = result["data"]
-                msg = "Latest News:
-
-"
-                for i, a in enumerate(articles, 1):
-                    msg += f"{i}. {a['title']}
-{a.get('description', '')[:100]}...
-
-"
+            if category and category in tv_content:
+                tv_text = f"Singh Ji TV - {category.title()}\n\n" + "\n".join(tv_content[category])
             else:
-                msg = result.get("error", "News fetch failed")
-            await _telegram_send_message(chat_id, msg[:4000])
-            return {"ok": True}
+                tv_text = "Singh Ji TV Categories\n\n" + ", ".join(tv_content.keys())
+                tv_text += "\n\nFormat: /tv educational"
+            await _telegram_send_message(chat_id, tv_text)
+            return {"status": "ok"}
+            parts = text.replace("/yojana", "").strip().split()
+            try:
+                age = int(parts[0]) if len(parts) > 0 else 30
+                income = float(parts[1]) if len(parts) > 1 else 0
+                category = parts[2].lower() if len(parts) > 2 else ""
+                profile = UserProfile(
+                    age=age,
+                    gender="other",
+                    caste_category="general",
+                    annual_income=income,
+                    state="UP",
+                    occupation=category or "other",
+                    is_farmer=(category == "farmer"),
+                    is_student=(category == "student"),
+                    is_widow=(category == "widow"),
+                    is_senior_citizen=(age >= 60),
+                )
+                matches = await run_in_threadpool(scheme_engine.get_top_matches, profile, 5)
+                if matches:
+                    yojana_text = f"Sarkari Yojana Matches (Age {age}, Income {income:.0f}, {category or 'general'})\n\n"
+                    for i, m in enumerate(matches, 1):
+                        yojana_text += f"{i}. {m.scheme_name} (match {m.match_score}%)\n   {m.benefits_summary}\n\n"
+                else:
+                    yojana_text = "Koi matching scheme nahi mili. Details sahi bharo: /yojana age income category"
+                await _telegram_send_message(chat_id, yojana_text)
+            except Exception as e:
+                await _telegram_send_message(chat_id, f"Yojana error: {str(e)[:100]}\n\nFormat: /yojana 45 150000 farmer")
+            return {"status": "ok"}
 
-        elif text == "/gold":
-            result = await api_gold("Delhi")
-            if "data" in result:
-                d = result["data"]
-                msg = f"Gold Rates (Delhi):
-{d}"
+        elif text.startswith("/ai "):
+            prompt = text.replace("/ai ", "").strip()
+            if GROQ_API_KEY:
+                try:
+                    ai_response = await _call_groq(prompt)
+                    if len(ai_response) > 4000:
+                        ai_response = ai_response[:4000] + "...\n\n(Truncated)"
+                    await _telegram_send_message(chat_id, f"AI Response:\n\n{ai_response}")
+                    await _memory_save(f"telegram_chat:{user_id}:{int(time.time())}", {"prompt": prompt, "response": ai_response})
+                except Exception as e:
+                    await _telegram_send_message(chat_id, f"AI Error: {str(e)[:100]}")
             else:
-                msg = "Gold rates fetch failed"
-            await _telegram_send_message(chat_id, msg)
-            return {"ok": True}
+                await _telegram_send_message(chat_id, "Groq API key missing")
+            return {"status": "ok"}
 
-        elif text.startswith("/fuel "):
-            city = text[6:].strip()
-            result = await api_fuel(city)
-            if "data" in result:
-                d = result["data"]
-                msg = f"Fuel Prices ({city}):
-{d}"
-            else:
-                msg = result.get("error", "Fuel fetch failed")
-            await _telegram_send_message(chat_id, msg)
-            return {"ok": True}
+        elif text.startswith("/broadcast "):
+            if user_id != ADMIN_USER_ID:
+                await _telegram_send_message(chat_id, "Admin only command")
+                return {"status": "ok"}
+            broadcast_text = text.replace("/broadcast ", "").strip()
+            sem = asyncio.Semaphore(20)
+            async def _send(uid):
+                async with sem:
+                    await _telegram_send_message(uid, f"Broadcast\n\n{broadcast_text}")
+            await asyncio.gather(*(_send(uid) for uid in list(USER_PREFERENCES.keys())))
+            await _telegram_send_message(chat_id, f"Broadcast sent to {len(USER_PREFERENCES)} users")
+            return {"status": "ok"}
 
-        elif text == "/swarm":
-            status = SMART_SWARM.get_status()
-            msg = (
-                f"Smart Swarm Status:
-"
-                f"Total Agents: {status['total_registered']}
-"
-                f"Loaded: {status['currently_loaded']}
-"
-                f"Active: {status['active_running']}
-"
-                f"Idle: {status['idle']}
-"
-                f"Busy: {status['busy']}"
-            )
-            await _telegram_send_message(chat_id, msg)
-            return {"ok": True}
-
-        elif text == "/memory":
-            msg = (
-                f"Memory Status:
-"
-                f"Short-term keys: {len(MEMORY_STORE)}
-"
-                f"Max size: {MAX_MEMORY_SIZE}
-"
-                f"Users: {len(USER_PREFERENCES)}
-"
-                f"Supabase: {'Connected' if SUPABASE_CLIENT else 'Not connected'}"
-            )
-            await _telegram_send_message(chat_id, msg)
-            return {"ok": True}
-
-        elif text.startswith("/mandi "):
-            commodity = text[7:].strip()
-            result = await api_mandi(commodity=commodity)
-            if "data" in result:
-                msg = f"Mandi Rates for {commodity}:
-{json.dumps(result['data'], indent=2)[:3000]}"
-            else:
-                msg = result.get("error", "Mandi fetch failed")
-            await _telegram_send_message(chat_id, msg)
-            return {"ok": True}
-
-        # Default: AI chat
         else:
-            response = await _call_groq(text)
-            await _telegram_send_message(chat_id, response[:4000], reply_markup=MAIN_KEYBOARD)
-            return {"ok": True}
+            if GROQ_API_KEY and text:
+                try:
+                    ai_response = await _call_groq(text)
+                    if len(ai_response) > 4000:
+                        ai_response = ai_response[:4000] + "...\n\n(Truncated)"
+                    await _telegram_send_message(chat_id, ai_response)
+                    await _memory_save(f"telegram_chat:{user_id}:{int(time.time())}", {"prompt": text, "response": ai_response})
+                except Exception as e:
+                    await _telegram_send_message(chat_id, f"AI Error: {str(e)[:100]}")
+            return {"status": "ok"}
 
     except Exception as e:
-        logger.error(f"[WEBHOOK] Error: {e}")
-        return JSONResponse(status_code=500, content={"error": str(e)})
-        # ═══════════════════════════════════════════════════════════════
-# MODULE ROUTER INCLUDES
-# ═══════════════════════════════════════════════════════════════
+        logger.error(f"Telegram webhook error: {e}")
+        return {"status": "error", "message": str(e)}
 
-app.include_router(scheme_swarm_router, prefix="/api/scheme_swarm", tags=["scheme_swarm"])
-app.include_router(trishul_router, prefix="/api/trishul", tags=["trishul"])
-app.include_router(kisaan_router, prefix="/api/kisaan", tags=["kisaan"])
-app.include_router(yojana_router, prefix="/api/yojana", tags=["yojana"])
-app.include_router(currency_router, prefix="/api/currency", tags=["currency"])
-app.include_router(goldrate_router, prefix="/api/gold", tags=["gold"])
-app.include_router(fuel_router, prefix="/api/fuel", tags=["fuel"])
-app.include_router(aavishkar_router, prefix="/api/aavishkar", tags=["aavishkar"])
-app.include_router(miniprogram_router, prefix="/api/miniprogram", tags=["miniprogram"])
+# ==========================================
+# ADMIN ROUTES
+# ==========================================
 
-# ═══════════════════════════════════════════════════════════════
-# TELEGRAM CALLBACK HANDLERS
-# ═══════════════════════════════════════════════════════════════
-
-async def _handle_callback(chat_id: int, callback_data: str):
-    handlers = {
-        "weather": "Send: /weather <city_name>",
-        "news": "Latest news: /news",
-        "mandi": "Mandi rates: /mandi <commodity>",
-        "ai_chat": "AI Chat: Just type your question!",
-        "voice": "Voice: /voice <text>",
-        "status": "System status: /status",
-        "tax": "Tax calc: /tax <income>",
-        "plant": "Plant ID: Upload photo with /plant",
-        "gold": "Gold rates: /gold",
-        "fuel": "Fuel prices: /fuel <city>",
-        "horoscope": "Horoscope: /horoscope <sign>",
-        "currency": "Currency: /currency",
-        "emergency": "Emergency: /emergency",
-        "upi": "UPI ID: jp200883@sbi",
-        "pani": "Pani service active!",
-        "sewer": "Sewer service active!",
-        "govt": "Govt services: /govt",
-        "yojana": "Yojana: /yojana <scheme_name>",
-        "search": "Search: /search <query>",
-        "tv": "SinghJi TV: /singhji-tv",
-        "banking": "Banking: /banking",
-        "social": "Social media: /social",
-        "swarm": "Smart Swarm: /swarm",
-        "admin": "Admin panel: /admin (auth required)",
-        "payment": "Payment gateway: ON HOLD (1000+ users needed)",
-        "gmail": "Gmail: /gmail",
-        "translate": "Translate: /bhashini",
-        "whisper": "Speech-to-text: /whisper",
-        "tts": "Text-to-speech: /tts <text>",
-        "stt": "Speech-to-text: /stt",
-        "rozgar": "Jobs: /rozgar",
-        "supreme": "Supreme AI active!",
-        "scheme_swarm": "Scheme Swarm: 15 schemes available! /yojana",
-        "trishul": "Trishul Security: Active!",
-        "kisaan": "Kisaan Doctor: Active!",
-        "aavishkar": "Aavishkar: Active!",
-        "bachpan": "Bachpan: Active!",
-        "trolley": "Trolley: Active!",
-        "analytics": "Analytics: /analytics",
-        "daily_report": "Daily Report: /daily-report",
-        "guard": "Guard Agent: /guard",
-        "meta": "Meta Agent: /meta",
-        "lang_hub": "Language Hub: /lang-hub",
-        "whatsapp": "WhatsApp: /whatsapp",
-        "voice_tts": "Voice TTS: /voice-tts",
-        "voice_cmd": "Voice CMD: /voice-cmd",
-        "singhji_tv": "SinghJi TV: /singhji-tv",
-        "music": "Music: Coming soon!",
+@app.get("/api/admin/")
+async def admin_root(request: Request):
+    if not _check_admin_auth(request):
+        return JSONResponse({"error": "Unauthorized"}, status_code=401)
+    return {
+        "module": "Admin Panel",
+        "total_modules": len(MODULES),
+        "active_modules": [n for n, i in MODULES.items() if i["active"]],
+        "agents": SMART_SWARM.get_status(),
+        "apis": AVAILABLE_KEYS,
+        "users": len(USER_PREFERENCES),
+        "memory_ram": len(MEMORY_STORE),
+        "scheduler": MASTER_SCHEDULER.get_status() if MASTER_SCHEDULER else {"running": False},
+        "timestamp": datetime.now().isoformat()
     }
-    msg = handlers.get(callback_data, f"Module '{callback_data}' selected!")
-    await _telegram_send_message(chat_id, msg, reply_markup=MAIN_KEYBOARD)
 
-# ═══════════════════════════════════════════════════════════════
-# MAIN BLOCK
-# ═══════════════════════════════════════════════════════════════
+@app.get("/api/admin/users")
+async def admin_users(request: Request):
+    if not _check_admin_auth(request):
+        return JSONResponse({"error": "Unauthorized"}, status_code=401)
+    return {"users": USER_PREFERENCES, "count": len(USER_PREFERENCES)}
+
+@app.post("/api/admin/broadcast")
+async def admin_broadcast(request: Request):
+    if not _check_admin_auth(request):
+        return JSONResponse({"error": "Unauthorized"}, status_code=401)
+    data = await request.json()
+    message = data.get("message", "")
+    sem = asyncio.Semaphore(20)
+    async def _send(uid):
+        async with sem:
+            await _telegram_send_message(uid, f"Admin Broadcast\n\n{message}")
+    await asyncio.gather(*(_send(uid) for uid in list(USER_PREFERENCES.keys())))
+    return {"broadcast": True, "sent_to": len(USER_PREFERENCES)}
+
+# ==========================================
+# PAYMENT ROUTES
+# ==========================================
+
+@app.get("/api/payment/")
+async def payment_root():
+    return {"module": "Payment Gateway", "status": "ON_HOLD" if not AVAILABLE_KEYS["RAZORPAY"] else "ACTIVE", "upi_id": "jp200883@sbi", "note": "Activate at 1000+ daily users"}
+
+@app.post("/api/payment/create-order")
+async def payment_create_order(request: Request):
+    if not RAZORPAY_KEY_ID or not RAZORPAY_KEY_SECRET:
+        return {"error": "Razorpay keys missing"}
+    data = await request.json()
+    amount = data.get("amount", 0)
+    currency = data.get("currency", "INR")
+    receipt = data.get("receipt", f"order_{int(time.time())}")
+
+    def _create_order_sync():
+        import razorpay
+        client = razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET))
+        return client.order.create({"amount": amount, "currency": currency, "receipt": receipt, "payment_capture": 1})
+
+    try:
+        order = await run_in_threadpool(_create_order_sync)
+        return {"status": "success", "order": order, "source": "RAZORPAY_LIVE"}
+    except Exception as e:
+        return {"error": str(e)}
+
+# ==========================================
+# GMAIL ROUTES
+# ==========================================
+
+@app.get("/api/gmail/")
+async def gmail_root():
+    return {"module": "Gmail", "status": "active" if AVAILABLE_KEYS["GMAIL"] else "missing_credentials"}
+
+@app.get("/api/gmail/auth-url")
+async def gmail_auth_url():
+    if not GMAIL_CLIENT_ID:
+        return {"error": "GMAIL_CLIENT_ID missing"}
+    redirect_uri = os.getenv("GMAIL_REDIRECT_URI", "https://singhji-ai.github.io/oauth/callback")
+    scope = "https://www.googleapis.com/auth/gmail.send"
+    url = f"https://accounts.google.com/o/oauth2/v2/auth?client_id={GMAIL_CLIENT_ID}&redirect_uri={redirect_uri}&scope={scope}&response_type=code&access_type=offline"
+    return {"auth_url": url}
+
+# ==========================================
+# MAIN
+# ==========================================
 
 if __name__ == "__main__":
     import uvicorn
-    port = int(os.getenv("PORT", 8000))
+    port = int(os.environ.get("PORT", "8000"))
     uvicorn.run(app, host="0.0.0.0", port=port)
