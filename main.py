@@ -63,6 +63,10 @@ from modules.fuel.handler import router as fuel_router, fuel_price
 from modules.horoscope.handler import get_horoscope, format_telegram as _format_horoscope_telegram
 from modules.language.handler import LanguageModule
 from modules.emergency.handler import EMERGENCY_DATA
+from modules.govt.handler import GOVT_DATA
+from modules.trishul.handler import router as trishul_router
+from modules.scheme_swarm.api_routes import router as scheme_swarm_router, engine as scheme_engine
+from modules.scheme_swarm.eligibility import UserProfile
 from modules.pani.handler import handler as pani_handler
 from modules.sewer.handler import handler as sewer_handler
 from modules.upi.handler import handler as upi_handler
@@ -933,6 +937,8 @@ app.include_router(currency_router, prefix="/api")
 app.include_router(aavishkar_router, prefix="/modules/aavishkar")
 app.include_router(goldrate_router, prefix="/api/goldrate")
 app.include_router(fuel_router, prefix="/api/fuel")
+app.include_router(scheme_swarm_router)
+app.include_router(trishul_router, prefix="/api/trishul")
 app.add_api_route("/api/banking", banking_handler, methods=["GET"])
 app.add_api_route("/api/pani", pani_handler, methods=["GET", "POST"])
 app.add_api_route("/api/sewer", sewer_handler, methods=["GET", "POST"])
@@ -1579,7 +1585,8 @@ async def telegram_webhook(request: Request):
                 "Commands\n\n"
                 "/start\n/weather city\n/news\n/mandi state\n/tax income\n/status\n/ai question\n"
                 "/gold city\n/fuel city\n/horoscope rashi\n/currency USD INR 100\n"
-                "/translate en text\n/emergency type\n/upi\n/pani\n/sewer"
+                "/translate en text\n/emergency type\n/upi\n/pani\n/sewer\n/yojana age income category\n"
+                "/govt aadhaar\n/search query\n/tv educational"
             )
             await _telegram_send_message(chat_id, help_text)
             return {"status": "ok"}
@@ -1791,6 +1798,82 @@ async def telegram_webhook(request: Request):
                 "Portal: swachhbharaturban.gov.in"
             )
             await _telegram_send_message(chat_id, sewer_text)
+            return {"status": "ok"}
+
+        elif text.startswith("/govt"):
+            service = text.replace("/govt", "").strip().lower()
+            if service and service in GOVT_DATA:
+                d = GOVT_DATA[service]
+                govt_text = f"{d['title']}\n\nHelpline: {d['helpline']}\nWebsite: {d['website']}\nServices: {', '.join(d['services'])}"
+            else:
+                govt_text = "Govt Services\n\n" + ", ".join(GOVT_DATA.keys())
+                govt_text += "\n\nFormat: /govt aadhaar (ya pan, passport, voter, ration, driving, ayushman, pmkisan)"
+            await _telegram_send_message(chat_id, govt_text)
+            return {"status": "ok"}
+
+        elif text.startswith("/search "):
+            query = text.replace("/search ", "").strip()
+            if TAVILY_API_KEY:
+                try:
+                    url = "https://api.tavily.com/search"
+                    payload = {"api_key": TAVILY_API_KEY, "query": query, "max_results": 5, "search_depth": "basic"}
+                    resp = await HTTP_CLIENT.post(url, json=payload, timeout=15)
+                    data = resp.json()
+                    results = data.get("results", [])[:5]
+                    search_text = f"Search: {query}\n\n"
+                    for i, r in enumerate(results, 1):
+                        search_text += f"{i}. {r.get('title', 'No title')}\n   {r.get('url', '')}\n\n"
+                    if not results:
+                        search_text += "Koi result nahi mila"
+                    await _telegram_send_message(chat_id, search_text)
+                except Exception as e:
+                    await _telegram_send_message(chat_id, f"Search error: {str(e)[:100]}")
+            else:
+                await _telegram_send_message(chat_id, "Search API key missing")
+            return {"status": "ok"}
+
+        elif text.startswith("/tv"):
+            category = text.replace("/tv", "").strip().lower()
+            tv_content = {
+                "educational": ["Digital India Explained (10 min)", "PM Kisan Process (5 min)", "UPI Safety Tips (3 min)", "Aadhaar Update Guide (7 min)"],
+                "news": ["Daily Headlines (15 min)", "Mandi Rates Update (5 min)", "Weather Forecast (3 min)"],
+                "entertainment": ["Folk Music Collection (30 min)", "Regional Movies (120 min)"],
+                "health": ["Yoga for Beginners (20 min)", "Healthy Cooking (15 min)", "First Aid Basics (10 min)"],
+            }
+            if category and category in tv_content:
+                tv_text = f"Singh Ji TV - {category.title()}\n\n" + "\n".join(tv_content[category])
+            else:
+                tv_text = "Singh Ji TV Categories\n\n" + ", ".join(tv_content.keys())
+                tv_text += "\n\nFormat: /tv educational"
+            await _telegram_send_message(chat_id, tv_text)
+            return {"status": "ok"}
+            parts = text.replace("/yojana", "").strip().split()
+            try:
+                age = int(parts[0]) if len(parts) > 0 else 30
+                income = float(parts[1]) if len(parts) > 1 else 0
+                category = parts[2].lower() if len(parts) > 2 else ""
+                profile = UserProfile(
+                    age=age,
+                    gender="other",
+                    caste_category="general",
+                    annual_income=income,
+                    state="UP",
+                    occupation=category or "other",
+                    is_farmer=(category == "farmer"),
+                    is_student=(category == "student"),
+                    is_widow=(category == "widow"),
+                    is_senior_citizen=(age >= 60),
+                )
+                matches = await run_in_threadpool(scheme_engine.get_top_matches, profile, 5)
+                if matches:
+                    yojana_text = f"Sarkari Yojana Matches (Age {age}, Income {income:.0f}, {category or 'general'})\n\n"
+                    for i, m in enumerate(matches, 1):
+                        yojana_text += f"{i}. {m.scheme_name} (match {m.match_score}%)\n   {m.benefits_summary}\n\n"
+                else:
+                    yojana_text = "Koi matching scheme nahi mili. Details sahi bharo: /yojana age income category"
+                await _telegram_send_message(chat_id, yojana_text)
+            except Exception as e:
+                await _telegram_send_message(chat_id, f"Yojana error: {str(e)[:100]}\n\nFormat: /yojana 45 150000 farmer")
             return {"status": "ok"}
 
         elif text.startswith("/ai "):
