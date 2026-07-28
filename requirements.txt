@@ -137,3 +137,4 @@ python-dotenv==1.0.1
 websockets==14.2
 APScheduler==3.10.4
 faster-whisper==1.2.1
+playwright==1.48.0 
