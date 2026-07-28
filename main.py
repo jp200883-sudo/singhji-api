@@ -1,11 +1,3 @@
-"""
-🦁 SINGH JI AI ULTRA v8.0 — HYBRID SYSTEM
-100% REAL | Railway Primary | All APIs Live
-Master Scheduler Integrated | Auto-Broadcast Enabled
-
-
-"""
-
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
