@@ -1,5 +1,3 @@
-
-
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -44,6 +42,8 @@ from modules.scheme_swarm.eligibility import UserProfile
 from modules.pani.handler import handler as pani_handler
 from modules.sewer.handler import handler as sewer_handler
 from modules.upi.handler import handler as upi_handler
+from modules.guard_agent.handler import router as guard_router
+from modules.oauth_connector.handler import router as oauth_router
 from miniprogram.portal import router as miniprogram_router
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
@@ -913,6 +913,8 @@ app.include_router(goldrate_router, prefix="/api/goldrate")
 app.include_router(fuel_router, prefix="/api/fuel")
 app.include_router(scheme_swarm_router)
 app.include_router(trishul_router, prefix="/api/trishul")
+app.include_router(guard_router, prefix="/api")
+app.include_router(oauth_router, prefix="/api")
 app.add_api_route("/api/banking", banking_handler, methods=["GET"])
 app.add_api_route("/api/pani", pani_handler, methods=["GET", "POST"])
 app.add_api_route("/api/sewer", sewer_handler, methods=["GET", "POST"])
