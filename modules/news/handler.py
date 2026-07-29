@@ -63,7 +63,12 @@ def async_retry(max_retries: int = MAX_RETRIES, delay: float = 1.0):
         return wrapper
     return decorator
 
-
+def _is_hindi_text(text: str, threshold: float = 0.3) -> bool:
+    if not text:
+        return False
+    devanagari = sum(1 for ch in text if '\u0900' <= ch <= '\u097F')
+    letters = sum(1 for ch in text if ch.isalpha())
+    return letters > 0 and (devanagari / letters) >= threshold
 # ─── SOURCE 1: NEWSDATA.IO ───
 @async_retry(max_retries=2, delay=1.0)
 async def _fetch_newsdata(query: str = "", category: str = "", country: str = "in") -> List[Dict[str, Any]]:
@@ -71,7 +76,7 @@ async def _fetch_newsdata(query: str = "", category: str = "", country: str = "i
         return []
 
     async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
-        url = f"https://newsdata.io/api/1/news?apikey={NEWSDATA_API_KEY}&country={country}&language=en,hi"
+       url = f"https://newsdata.io/api/1/news?apikey={NEWSDATA_API_KEY}&country={country}&language=hi"
         if query:
             url += f"&q={quote(query)}"
         if category:
@@ -82,6 +87,7 @@ async def _fetch_newsdata(query: str = "", category: str = "", country: str = "i
         data = resp.json()
 
         results = data.get("results", [])
+        results = [r for r in results if _is_hindi_text(r.get("title", ""))]
         return [
             {
                 "title": r.get("title", ""),
