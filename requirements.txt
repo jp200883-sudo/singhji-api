@@ -138,3 +138,4 @@ websockets==14.2
 APScheduler==3.10.4
 faster-whisper==1.2.1
 playwright==1.48.0 
+opencv-python-headless==4.10.0.84
