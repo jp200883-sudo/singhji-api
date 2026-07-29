@@ -1,17 +1,3 @@
-"""
-╔═══════════════════════════════════════════════════════════════╗
-║         SINGH JI AI ULTRA - MASTER SCHEDULER                  ║
-║         सारे शेड्यूल एक साथ                                  ║
-╚═══════════════════════════════════════════════════════════════╝
-
-बदलाव (इस पैच में):
-  1. सभी placeholder fetch फ़ंक्शन असली मॉड्यूल से जोड़े गए
-     (news.py → singhji_news, weather/rozgar → अपने असली इम्पोर्ट पाथ भरें)
-  2. send_telegram_broadcast असली python-telegram-bot Bot इंस्टेंस
-     से भेजता है, अब सिर्फ़ लॉग नहीं करता
-  3. Supabase से active chat_id लिस्ट खींचता है (टेबल नाम अपने हिसाब
-     से बदलें — नीचे CHAT_ID_TABLE / CHAT_ID_COLUMN में मार्क किया है)
-"""
 
 import os
 import sys
