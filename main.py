@@ -44,6 +44,8 @@ from modules.sewer.handler import handler as sewer_handler
 from modules.upi.handler import handler as upi_handler
 from modules.guard_agent.handler import router as guard_router
 from modules.oauth_connector.handler import router as oauth_router
+from modules.social_agent.handler import router as social_router
+import modules.social_agent.core as social_core
 from miniprogram.portal import router as miniprogram_router
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
@@ -109,6 +111,7 @@ AVAILABLE_KEYS = {
     "BHASHINI": bool(BHASHINI_USER_ID and BHASHINI_ULCA_API_KEY),
     "GMAIL": bool(GMAIL_CLIENT_ID and GMAIL_CLIENT_SECRET),
     "INSTAGRAM": bool(INSTAGRAM_ACCESS_TOKEN),
+    "BLUESKY": bool(os.getenv("BLUESKY_HANDLE") and os.getenv("BLUESKY_APP_PASSWORD")),
 }
 
 SUPABASE_CLIENT = None
@@ -711,16 +714,45 @@ class SinghJiMasterScheduler:
         self._update_state("banking_weekly", "success")
         logger.info("[JOB] Banking DONE")
 
+    async def _job_fb_token_check(self):
+        logger.info("[JOB] Facebook Token Check starting...")
+        try:
+            import modules.social_agent.core as social_core
+            if social_core.SOCIAL_AGENT:
+                result = await social_core.SOCIAL_AGENT.check_and_refresh_facebook_token()
+                logger.info(f"[JOB] Facebook Token Check result: {result}")
+                if result.get("refreshed") and self.admin_uid:
+                    await self.send_tg(
+                        self.admin_uid,
+                        f"🔑 <b>Facebook Token Auto-Refresh</b>\n\n✅ नया token मिल गया, अब {result.get('new_expires_in_days', '?')} दिन और चलेगा"
+                    )
+                elif result.get("error") == "no_app_credentials" and self.admin_uid:
+                    await self.send_tg(
+                        self.admin_uid,
+                        "⚠️ <b>Facebook Token जल्द Expire होगा</b>\n\nFACEBOOK_APP_ID/FACEBOOK_APP_SECRET सेट नहीं हैं इसलिए auto-refresh नहीं हो सका — Railway env vars में डालो"
+                    )
+        except Exception as e:
+            logger.error(f"[JOB] Facebook Token Check fail: {e}")
+        self._update_state("fb_token_check", "success")
+        logger.info("[JOB] Facebook Token Check DONE")
+
     async def _job_social_promo(self):
         logger.info("[JOB] Social Promo starting...")
+        try:
+            import modules.social_agent.core as social_core
+            if social_core.SOCIAL_AGENT:
+                result = await social_core.SOCIAL_AGENT.create_and_publish()
+                summary = f"✅ {result['success_count']}/{result['total']} platforms पर पोस्ट हो गया"
+            else:
+                summary = "⚠️ Social agent initialized नहीं है"
+        except Exception as e:
+            summary = f"💥 Social post fail: {e}"
+            logger.error(f"[SOCIAL] auto-publish fail: {e}")
         if self.admin_uid:
             try:
                 await self.send_tg(
                     self.admin_uid,
-                    "📱 <b>Social Media Content Ready</b>\n\n"
-                    "• 3 Carousel slides generated\n"
-                    "• Captions + Hashtags ready\n"
-                    "• Review & post karo!"
+                    f"📱 <b>Social Media Auto-Post</b>\n\n{summary}"
                 )
             except Exception as e:
                 logger.warning(f"[SOCIAL] Admin notify fail: {e}")
@@ -803,6 +835,13 @@ class SinghJiMasterScheduler:
             replace_existing=True,
         )
         self.scheduler.add_job(
+            self._job_fb_token_check,
+            CronTrigger(day_of_week="sun", hour=3, minute=0),
+            id="fb_token_check",
+            name="Facebook Token Auto-Refresh Check",
+            replace_existing=True,
+        )
+        self.scheduler.add_job(
             self._self_ping,
             "interval",
             minutes=10,
@@ -850,6 +889,10 @@ async def lifespan(app):
     global HTTP_CLIENT, MASTER_SCHEDULER
     HTTP_CLIENT = httpx.AsyncClient(timeout=20)
     logger.info("Singh Ji AI Ultra v8.0 HYBRID Starting...")
+
+    social_core.init_social_agent(HTTP_CLIENT)
+    await social_core.SOCIAL_AGENT.load_saved_facebook_token()
+    logger.info("[STARTUP] Social Agent initialized")
 
     sync = SMART_SWARM.sync(MODULES, AVAILABLE_KEYS)
     logger.info(f"Swarm: {sync['active']}/{sync['total']} agents loaded")
@@ -915,6 +958,7 @@ app.include_router(scheme_swarm_router)
 app.include_router(trishul_router, prefix="/api/trishul")
 app.include_router(guard_router, prefix="/api")
 app.include_router(oauth_router, prefix="/api")
+app.include_router(social_router)
 app.add_api_route("/api/banking", banking_handler, methods=["GET"])
 app.add_api_route("/api/pani", pani_handler, methods=["GET", "POST"])
 app.add_api_route("/api/sewer", sewer_handler, methods=["GET", "POST"])
@@ -1576,6 +1620,26 @@ async def telegram_webhook(request: Request):
             status_text += f"Idle: {status['idle']}\n"
             api_count = sum(1 for v in AVAILABLE_KEYS.values() if v)
             status_text += f"Active APIs: {api_count}/{len(AVAILABLE_KEYS)}\n"
+
+            try:
+                import modules.guard_agent.handler as guard_module
+                g = guard_module.singhji_guard
+                status_text += f"\nGuard Agent: {len(g.alerts_db)} alerts, {len(g.cameras_db)} cameras\n"
+            except Exception:
+                status_text += "\nGuard Agent: not loaded\n"
+
+            try:
+                import modules.social_agent.core as social_core
+                s = social_core.SOCIAL_AGENT
+                if s:
+                    cfg = s.get_stats()["platforms_configured"]
+                    on = ", ".join(p for p, v in cfg.items() if v) or "none"
+                    status_text += f"Social Agent: {len(s.posted_history)} posts | live: {on}\n"
+                else:
+                    status_text += "Social Agent: not loaded\n"
+            except Exception:
+                status_text += "Social Agent: not loaded\n"
+
             status_text += f"Time: {datetime.now().strftime('%H:%M:%S')}"
             await _telegram_send_message(chat_id, status_text)
             return {"status": "ok"}
