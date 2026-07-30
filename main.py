@@ -26,7 +26,6 @@ from apscheduler.triggers.cron import CronTrigger
 from apscheduler.events import EVENT_JOB_ERROR, EVENT_JOB_EXECUTED
 
 from modules.kisaan_doctor.handler import router as kisaan_router
-from modules.sarkari_yojana.handler import router as yojana_router
 from modules.banking.handler import handler as banking_handler
 from modules.currency.handler import router as currency_router, singhji_currency
 from modules.aavishkar.handler import router as aavishkar_router
@@ -46,6 +45,8 @@ from modules.guard_agent.handler import router as guard_router
 from modules.oauth_connector.handler import router as oauth_router
 from modules.social_agent.handler import router as social_router
 import modules.social_agent.core as social_core
+from modules.oauth_connector.router import SmartVideoRouter
+from modules.oauth_connector.base import PlatformCredentials, VideoGenerationRequest
 from modules.news.handler import router as news_router
 from miniprogram.portal import router as miniprogram_router
 
@@ -85,6 +86,12 @@ GMAIL_CLIENT_SECRET = os.getenv("GMAIL_CLIENT_SECRET")
 INSTAGRAM_ACCESS_TOKEN = os.getenv("INSTAGRAM_ACCESS_TOKEN")
 INSTAGRAM_BUSINESS_ID = os.getenv("INSTAGRAM_BUSINESS_ID")
 ADMIN_USER_ID = int(os.getenv("ADMIN_USER_ID", "0"))
+SEEDANCE_API_KEY = os.getenv("SEEDANCE_API_KEY")
+KLING_API_KEY = os.getenv("KLING_API_KEY")
+HAILUO_API_KEY = os.getenv("HAILUO_API_KEY")
+LUMA_API_KEY = os.getenv("LUMA_API_KEY")
+PIKA_API_KEY = os.getenv("PIKA_API_KEY")
+VEO_API_KEY = os.getenv("VEO_API_KEY")
 
 MAX_B64_BYTES = 10 * 1024 * 1024
 
@@ -359,7 +366,6 @@ MODULES = {
     "miniprogram": {"needs_key": None, "active": True},
     "currency": {"needs_key": None, "active": True},
     "kisaan_doctor": {"needs_key": None, "active": True},
-    "sarkari_yojana": {"needs_key": None, "active": True},
     "banking": {"needs_key": None, "active": True},
 }
 
@@ -504,6 +510,22 @@ async def _ensure_correct_webhook():
             logger.error(f"[WEBHOOK FIX] setWebhook फेल: {result}")
     except Exception as e:
         logger.error(f"[WEBHOOK FIX] Webhook auto-fix में त्रुटि: {e}")
+
+def _build_video_credentials() -> Dict[str, "PlatformCredentials"]:
+    creds = {}
+    key_map = {
+        "seedance": SEEDANCE_API_KEY,
+        "kling": KLING_API_KEY,
+        "hailuo": HAILUO_API_KEY,
+        "luma": LUMA_API_KEY,
+        "pika": PIKA_API_KEY,
+        "veo": VEO_API_KEY,
+    }
+    for platform, api_key in key_map.items():
+        if api_key:
+            creds[platform] = PlatformCredentials(platform=platform, api_key=api_key)
+    return creds
+
 
 MAIN_KEYBOARD = {
     "inline_keyboard": [
@@ -927,7 +949,6 @@ app.add_middleware(
 # ROUTERS REGISTER
 # ==========================================
 app.include_router(kisaan_router, prefix="/modules/kisaan_doctor")
-app.include_router(yojana_router, prefix="/modules/sarkari_yojana")
 app.include_router(currency_router, prefix="/api")
 app.include_router(aavishkar_router, prefix="/modules/aavishkar")
 app.include_router(goldrate_router, prefix="/api/goldrate")
@@ -943,6 +964,28 @@ app.add_api_route("/api/pani", pani_handler, methods=["GET", "POST"])
 app.add_api_route("/api/sewer", sewer_handler, methods=["GET", "POST"])
 app.add_api_route("/api/upi", upi_handler, methods=["GET", "POST"])
 app.include_router(miniprogram_router, prefix="/api/v1/miniprogram")
+
+
+@app.post("/api/video/generate")
+async def video_generate(prompt: str, duration: int = 5, aspect_ratio: str = "16:9"):
+    creds = _build_video_credentials()
+    if not creds:
+        return {"success": False, "error": "Koi bhi video platform API key set nahi hai (SEEDANCE_API_KEY / KLING_API_KEY / HAILUO_API_KEY / LUMA_API_KEY / PIKA_API_KEY / VEO_API_KEY)"}
+    router_ = SmartVideoRouter(creds)
+    await router_.initialize()
+    result = await router_.generate_video(VideoGenerationRequest(prompt=prompt, duration=duration, aspect_ratio=aspect_ratio))
+    return result.__dict__
+
+
+@app.get("/api/video/status")
+async def video_status():
+    creds = _build_video_credentials()
+    if not creds:
+        return {"configured_platforms": 0, "platforms": {}}
+    router_ = SmartVideoRouter(creds)
+    await router_.initialize()
+    return router_.get_status_summary()
+
 
 LANG_MODULE = LanguageModule()
 
@@ -1557,6 +1600,36 @@ async def telegram_webhook(request: Request):
                 await _telegram_send_message(chat_id, err_msg)
             return {"status": "ok"}
 
+        if "photo" in message:
+            try:
+                photos = message["photo"]
+                file_id = photos[-1]["file_id"]  # सबसे बड़ी साइज़ वाली फोटो
+                file_resp = await HTTP_CLIENT.get(f"{TELEGRAM_API_BASE}/getFile?file_id={file_id}")
+                file_data = file_resp.json()
+                if file_data.get("ok"):
+                    file_path = file_data["result"]["file_path"]
+                    file_url = f"https://api.telegram.org/file/bot{TELEGRAM_TOKEN}/{file_path}"
+                    img_resp = await HTTP_CLIENT.get(file_url, timeout=15)
+                    img_b64 = base64.b64encode(img_resp.content).decode("utf-8")
+                    await _telegram_send_message(chat_id, "Photo mil gayi, jaanch ho rahi hai...")
+                    from modules.kisaan_doctor.handler import _detect_disease
+                    result = await _detect_disease(img_b64)
+                    if result is None:
+                        await _telegram_send_message(chat_id, "Plant ID API key set nahi hai.")
+                    elif result["is_healthy"]:
+                        await _telegram_send_message(chat_id, f"Plant healthy lag rahi hai! (probability: {result['health_probability']:.0%})")
+                    else:
+                        plant_text = "Disease Detection Result\n\n"
+                        for d in result["diseases"]:
+                            plant_text += f"{d['name']} ({d['probability']:.0%})\n{d['description'][:200]}\n\n"
+                        await _telegram_send_message(chat_id, plant_text[:4000])
+                else:
+                    await _telegram_send_message(chat_id, "Photo download nahi ho payi")
+            except Exception as e:
+                logger.error(f"Plant detect error: {e}")
+                await _telegram_send_message(chat_id, f"Plant detection error: {str(e)[:100]}")
+            return {"status": "ok"}
+
         if text == "/start":
             welcome = "Welcome to Singh Ji AI Ultra v8.0!\n\nMain aapka AI assistant hoon.\n"
             await _telegram_send_message(chat_id, welcome, MAIN_KEYBOARD)
@@ -1568,7 +1641,7 @@ async def telegram_webhook(request: Request):
                 "/start\n/weather city\n/news\n/mandi state\n/tax income\n/status\n/ai question\n"
                 "/gold city\n/fuel city\n/horoscope rashi\n/currency USD INR 100\n"
                 "/translate en text\n/emergency type\n/upi\n/pani\n/sewer\n/yojana age income category\n"
-                "/govt aadhaar\n/search query\n/tv educational"
+                "/govt aadhaar\n/search query\n/tv educational\n/video prompt"
             )
             await _telegram_send_message(chat_id, help_text)
             return {"status": "ok"}
@@ -1840,7 +1913,24 @@ async def telegram_webhook(request: Request):
             await _telegram_send_message(chat_id, tv_text)
             return {"status": "ok"}
 
-        elif text.startswith("/yojana"):
+        elif text.startswith("/video "):
+            prompt = text.replace("/video ", "").strip()
+            creds = _build_video_credentials()
+            if not creds:
+                await _telegram_send_message(chat_id, "Video Aggregator: koi platform API key set nahi hai (SEEDANCE/KLING/HAILUO/LUMA/PIKA/VEO)")
+            else:
+                await _telegram_send_message(chat_id, f"Video ban raha hai ({', '.join(creds.keys())} try honge)...")
+                try:
+                    router_ = SmartVideoRouter(creds)
+                    await router_.initialize()
+                    result = await router_.generate_video(VideoGenerationRequest(prompt=prompt))
+                    if result.success:
+                        await _telegram_send_message(chat_id, f"Video ready!\n{result.video_url}")
+                    else:
+                        await _telegram_send_message(chat_id, f"Video generation fail: {result.error_message}")
+                except Exception as e:
+                    await _telegram_send_message(chat_id, f"Video error: {str(e)[:150]}")
+            return {"status": "ok"}
             parts = text.replace("/yojana", "").strip().split()
             try:
                 age = int(parts[0]) if len(parts) > 0 else 30
