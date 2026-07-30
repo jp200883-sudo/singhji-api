@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Singh Ji AI Ultra v8.0</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+    body {
+      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+      background:var(--tg-theme-bg-color,#ffffff);
+      color:var(--tg-theme-text-color,#000000);
+      overflow-x:hidden;
+      padding-bottom:20px;
+    }
+    .header {
+      background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);
+      padding:14px 16px;
+      display:flex;
+      align-items:center;
+      gap:12px;
+      position:sticky;
+      top:0;
+      z-index:100;
+    }
+    .header-avatar {
+      width:42px;height:42px;border-radius:50%;
+      background:linear-gradient(135deg,#f59e0b,#d97706);
+      display:flex;align-items:center;justify-content:center;
+      font-size:22px;flex-shrink:0;
+    }
+    .header-info { flex:1; }
+    .header-title { color:#fff;font-size:16px;font-weight:600; }
+    .header-sub { color:#94a3b8;font-size:11px;margin-top:2px; }
+    .chat-area {
+      min-height:280px;max-height:45vh;
+      overflow-y:auto;padding:12px;
+      background:#f8fafc;
+    }
+    .msg-user { display:flex;gap:8px;margin-bottom:12px;justify-content:flex-end; }
+    .msg-user-bubble {
+      background:var(--tg-theme-button-color,#1a1a2e);
+      color:var(--tg-theme-button-text-color,#ffffff);
+      padding:10px 14px;border-radius:16px;border-bottom-right-radius:4px;
+      box-shadow:0 1px 3px rgba(0,0,0,0.08);max-width:80%;font-size:13px;line-height:1.5;
+    }
+    .msg-bot { display:flex;gap:8px;margin-bottom:12px; }
+    .msg-bot-avatar {
+      width:28px;height:28px;border-radius:50%;
+      background:linear-gradient(135deg,#f59e0b,#d97706);
+      display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;
+    }
+    .msg-bot-bubble {
+      background:#fff;padding:10px 14px;border-radius:16px;border-bottom-left-radius:4px;
+      box-shadow:0 1px 3px rgba(0,0,0,0.08);max-width:80%;font-size:13px;color:#334155;line-height:1.5;
+    }
+    .msg-time { font-size:10px;color:#94a3b8;margin-top:4px; }
+    .typing { display:flex;gap:4px;padding:8px 0; }
+    .typing-dot { width:6px;height:6px;background:#94a3b8;border-radius:50%;animation:blink 1.4s infinite; }
+    .typing-dot:nth-child(2){animation-delay:0.2s;}
+    .typing-dot:nth-child(3){animation-delay:0.4s;}
+    @keyframes blink{0%,80%,100%{opacity:0.3;}40%{opacity:1;}}
+    
+    .section-title {
+      font-size:11px;color:#64748b;font-weight:600;
+      padding:10px 12px 6px;background:#fff;
+    }
+    .grid-4 {
+      display:grid;grid-template-columns:repeat(4,1fr);gap:8px;
+      padding:0 12px 8px;background:#fff;
+    }
+    .grid-3 {
+      display:grid;grid-template-columns:repeat(3,1fr);gap:8px;
+      padding:0 12px 8px;background:#fff;
+    }
+    .btn-action {
+      border:none;border-radius:14px;padding:10px 4px;
+      cursor:pointer;display:flex;flex-direction:column;
+      align-items:center;gap:4px;transition:transform 0.15s,opacity 0.15s;
+      font-family:inherit;
+    }
+    .btn-action:active { transform:scale(0.95);opacity:0.8; }
+    .btn-action span.emoji { font-size:22px; }
+    .btn-action span.label { font-size:11px;font-weight:600; }
+    
+    .btn-w{background:#fef3c7;border:1px solid #fde68a;color:#92400e;}
+    .btn-n{background:#e0f2fe;border:1px solid #bae6fd;color:#0369a1;}
+    .btn-m{background:#dcfce7;border:1px solid #bbf7d0;color:#166534;}
+    .btn-g{background:#fef9c3;border:1px solid #fde047;color:#a16207;}
+    .btn-y{background:#f3e8ff;border:1px solid #d8b4fe;color:#7c3aed;}
+    .btn-t{background:#fee2e2;border:1px solid #fecaca;color:#dc2626;}
+    .btn-r{background:#ffedd5;border:1px solid #fed7aa;color:#c2410c;}
+    .btn-gov{background:#e0e7ff;border:1px solid #c7d2fe;color:#4338ca;}
+    .btn-p{background:#cffafe;border:1px solid #a5f3fc;color:#0e7490;}
+    .btn-s{background:#f1f5f9;border:1px solid #cbd5e1;color:#475569;}
+    .btn-k{background:#ecfccb;border:1px solid #d9f99d;color:#4d7c0f;}
+    .btn-f{background:#fce7f3;border:1px solid #fbcfe8;color:#be185d;}
+    .btn-h{background:#faf5ff;border:1px solid #e9d5ff;color:#7e22ce;}
+    .btn-c{background:#f0fdf4;border:1px solid #bbf7d0;color:#15803d;}
+    .btn-st{background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;}
+    
+    .more-row {
+      display:flex;gap:6px;overflow-x:auto;padding:0 12px 10px;background:#fff;
+      scrollbar-width:none;
+    }
+    .more-row::-webkit-scrollbar { display:none; }
+    .btn-pill {
+      white-space:nowrap;border:none;border-radius:20px;
+      padding:7px 14px;font-size:11px;font-weight:600;
+      cursor:pointer;color:#fff;flex-shrink:0;
+      font-family:inherit;transition:transform 0.15s;
+    }
+    .btn-pill:active { transform:scale(0.95); }
+    
+    .input-area {
+      padding:10px 12px;background:#fff;
+      border-top:1px solid #e2e8f0;
+      display:flex;align-items:center;gap:8px;
+      position:sticky;bottom:0;
+    }
+    .voice-btn {
+      width:40px;height:40px;border-radius:50%;
+      border:1px solid #cbd5e1;background:#fff;
+      display:flex;align-items:center;justify-content:center;
+      cursor:pointer;font-size:18px;transition:all 0.2s;flex-shrink:0;
+    }
+    .voice-btn.active { background:#dc2626;color:#fff;border-color:#dc2626; }
+    .msg-input {
+      flex:1;border:1px solid #e2e8f0;border-radius:20px;
+      padding:9px 14px;font-size:14px;outline:none;
+      background:var(--tg-theme-secondary-bg-color,#f8fafc);
+      color:var(--tg-theme-text-color,#000);
+    }
+    .send-btn {
+      background:var(--tg-theme-button-color,#1a1a2e);
+      color:var(--tg-theme-button-text-color,#fff);
+      border:none;border-radius:12px;padding:9px 18px;
+      font-size:13px;font-weight:700;cursor:pointer;flex-shrink:0;
+    }
+    .footer {
+      padding:6px 12px;background:#f1f5f9;
+      border-top:1px solid #e2e8f0;
+      display:flex;justify-content:space-between;
+      font-size:10px;color:#64748b;
+    }
+    .status-panel {
+      display:none;position:fixed;bottom:70px;left:12px;right:12px;
+      background:#fff;border-radius:16px;
+      box-shadow:0 8px 32px rgba(0,0,0,0.15);
+      border:1px solid #e2e8f0;padding:12px;z-index:200;
+      max-height:280px;overflow-y:auto;
+    }
+    .status-grid { display:grid;grid-template-columns:repeat(2,1fr);gap:6px; }
+    .status-item {
+      display:flex;align-items:center;gap:6px;
+      padding:5px 8px;background:#f8fafc;border-radius:8px;font-size:11px;
+    }
+    .overlay {
+      display:none;position:fixed;inset:0;background:rgba(0,0,0,0.3);z-index:150;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="header-avatar">🦁</div>
+    <div class="header-info">
+      <div class="header-title">Singh Ji AI Ultra <span style="color:#f59e0b;font-size:12px;">v8.0</span></div>
+      <div class="header-sub">🟢 95/300 Agents Active · Groq · Gemini</div>
+    </div>
+    <div style="color:#fff;font-size:20px;cursor:pointer;" onclick="toggleStatus()">⋮</div>
+  </div>
+
+  <div class="chat-area" id="chatArea">
+    <div class="msg-bot">
+      <div class="msg-bot-avatar">🦁</div>
+      <div class="msg-bot-bubble">
+        <div>नमस्ते! 🙏 Singh Ji AI Ultra v8.0 mein aapka swagat hai!<br><br>Kya madad chahiye aapko? Koi bhi button dabao ya kuch bhi poochho!</div>
+        <div class="msg-time">Just now</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-title">⚡ Quick Actions — Koi bhi dabao:</div>
+  <div class="grid-4">
+    <button class="btn-action btn-w" onclick="sendCmd('/weather')"><span class="emoji">🌤️</span><span class="label">Weather</span></button>
+    <button class="btn-action btn-n" onclick="sendCmd('/news')"><span class="emoji">📰</span><span class="label">News</span></button>
+    <button class="btn-action btn-m" onclick="sendCmd('/mandi')"><span class="emoji">🌾</span><span class="label">Mandi</span></button>
+    <button class="btn-action btn-g" onclick="sendCmd('/gold')"><span class="emoji">🥇</span><span class="label">Gold</span></button>
+    <button class="btn-action btn-y" onclick="sendCmd('/yojana')"><span class="emoji">📜</span><span class="label">Yojana</span></button>
+    <button class="btn-action btn-t" onclick="sendCmd('/tv')"><span class="emoji">📺</span><span class="label">TV</span></button>
+    <button class="btn-action btn-r" onclick="sendCmd('/rozgar')"><span class="emoji">💼</span><span class="label">Rozgar</span></button>
+    <button class="btn-action btn-gov" onclick="sendCmd('/govt')"><span class="emoji">🏛️</span><span class="label">Govt</span></button>
+  </div>
+  <div class="grid-4">
+    <button class="btn-action btn-p" onclick="sendCmd('/pani')"><span class="emoji">💧</span><span class="label">Pani</span></button>
+    <button class="btn-action btn-s" onclick="sendCmd('/sewer')"><span class="emoji">🚰</span><span class="label">Sewer</span></button>
+    <button class="btn-action btn-k" onclick="sendCmd('/kisaan')"><span class="emoji">🚜</span><span class="label">Kisaan</span></button>
+    <button class="btn-action btn-f" onclick="sendCmd('/fuel')"><span class="emoji">⛽</span><span class="label">Fuel</span></button>
+  </div>
+  <div class="grid-3">
+    <button class="btn-action btn-h" onclick="sendCmd('/horoscope')"><span class="emoji">🔮</span><span class="label">Horoscope</span></button>
+    <button class="btn-action btn-c" onclick="sendCmd('/currency')"><span class="emoji">💱</span><span class="label">Currency</span></button>
+    <button class="btn-action btn-st" onclick="sendCmd('/status')"><span class="emoji">📊</span><span class="label">Status</span></button>
+  </div>
+
+  <div class="section-title">🚀 More Modules:</div>
+  <div class="more-row">
+    <button class="btn-pill" style="background:#1e293b;" onclick="sendCmd('/voice')">🎙️ Voice</button>
+    <button class="btn-pill" style="background:#7c3aed;" onclick="sendCmd('/ai_chat')">🤖 AI Chat</button>
+    <button class="btn-pill" style="background:#059669;" onclick="sendCmd('/tax_calc')">🧮 Tax Calc</button>
+    <button class="btn-pill" style="background:#16a34a;" onclick="sendCmd('/plant_id')">🌿 Plant ID</button>
+    <button class="btn-pill" style="background:#dc2626;" onclick="sendCmd('/emergency')">🚨 Emergency</button>
+    <button class="btn-pill" style="background:#2563eb;" onclick="sendCmd('/upi')">💳 UPI Info</button>
+    <button class="btn-pill" style="background:#db2777;" onclick="sendCmd('/image_gen')">🎨 Image Gen</button>
+    <button class="btn-pill" style="background:#0891b2;" onclick="sendCmd('/translate')">🌐 Translate</button>
+    <button class="btn-pill" style="background:#ea580c;" onclick="sendCmd('/admin')">🔒 Admin</button>
+  </div>
+
+  <div class="input-area">
+    <button class="voice-btn" id="voiceBtn" onclick="toggleVoice()">🎙️</button>
+    <input class="msg-input" id="msgInput" type="text" placeholder="Kuch bhi poochho..." onkeypress="if(event.key==='Enter')sendMsg()">
+    <button class="send-btn" onclick="sendMsg()">Bhejo</button>
+  </div>
+
+  <div class="footer">
+    <div>🤖 AI + 🎙️ Voice + 🕊️ News</div>
+    <div>⚡ Groq · Gemini · 300 Agents</div>
+  </div>
+
+  <div class="overlay" id="overlay" onclick="closeStatus()"></div>
+  <div class="status-panel" id="statusPanel">
+    <div style="font-size:13px;font-weight:700;color:#1e293b;margin-bottom:10px;">📊 Module Status Dashboard</div>
+    <div class="status-grid" id="statusGrid"></div>
+    <button onclick="closeStatus()" style="margin-top:10px;width:100%;background:#f1f5f9;border:none;border-radius:8px;padding:7px;font-size:12px;color:#475569;cursor:pointer;font-weight:600;">Close</button>
+  </div>
+
+<script>
+const tg = window.Telegram.WebApp;
+tg.ready();
+tg.expand();
+tg.setHeaderColor('#1a1a2e');
+tg.setBackgroundColor('#ffffff');
+
+const modules = [
+  {n:'Weather',s:'✅',c:'#22c55e'},{n:'News',s:'✅',c:'#22c55e'},{n:'Mandi',s:'✅',c:'#22c55e'},
+  {n:'Gold',s:'✅',c:'#22c55e'},{n:'Yojana',s:'✅',c:'#22c55e'},{n:'TV',s:'✅',c:'#22c55e'},
+  {n:'Rozgar',s:'✅',c:'#22c55e'},{n:'Govt',s:'✅',c:'#22c55e'},{n:'Pani',s:'✅',c:'#22c55e'},
+  {n:'Sewer',s:'✅',c:'#22c55e'},{n:'Kisaan',s:'✅',c:'#22c55e'},{n:'Fuel',s:'✅',c:'#22c55e'},
+  {n:'Horoscope',s:'✅',c:'#22c55e'},{n:'Currency',s:'✅',c:'#22c55e'},{n:'Voice',s:'✅',c:'#22c55e'},
+  {n:'AI Chat',s:'✅',c:'#22c55e'},{n:'Tax Calc',s:'✅',c:'#22c55e'},{n:'Plant ID',s:'✅',c:'#22c55e'},
+  {n:'Emergency',s:'✅',c:'#22c55e'},{n:'UPI Info',s:'✅',c:'#22c55e'},{n:'Image Gen',s:'✅',c:'#22c55e'},
+  {n:'Translate',s:'✅',c:'#22c55e'},{n:'Status',s:'✅',c:'#22c55e'},{n:'Admin',s:'🔒',c:'#f59e0b'}
+];
+
+const responses = {
+  '/weather':'🌤️ <b>Weather (Delhi):</b><br>🌡️ तापमान: 30.15°C (Feel: 34.91°C)<br>💧 नमी: 68%<br>💨 हवा: 2.48 m/s<br>🌧️ Light Rain<br><br>— Singh Ji AI Ultra',
+  '/news':'📰 <b>Latest News:</b><br>• Rahul Gandhi demands Amit Shah resignation<br>• India GDP growth 7.2%<br>• ISRO launches new satellite<br><br>— Singh Ji AI Ultra',
+  '/mandi':'🌾 <b>Mandi Bhav (Delhi):</b><br>🌾 गेहूं: ₹2,450/quintal<br>🌾 चावल: ₹3,200/quintal<br>🧅 प्याज: ₹1,800/quintal<br>🥔 आलू: ₹1,200/quintal<br><br>— Singh Ji AI Ultra',
+  '/gold':'🥇 <b>Gold Rate:</b><br>💰 24K: ₹78,450/10g<br>💰 22K: ₹71,890/10g<br>💰 18K: ₹58,840/10g<br><br>— Singh Ji AI Ultra',
+  '/yojana':'📜 <b>Sarkari Yojana:</b><br>• PM Kisan Samman Nidhi<br>• Ayushman Bharat<br>• PM Awas Yojana<br>• Mudra Loan<br><br>— Singh Ji AI Ultra',
+  '/tv':'📺 <b>TV Channels:</b><br>• DD National<br>• Aaj Tak<br>• Zee News<br>• Sony TV<br>• Colors TV<br><br>— Singh Ji AI Ultra',
+  '/rozgar':'💼 <b>Rozgar:</b><br>• SSC CGL 2026 - Apply Now<br>• UPSC CDS - Last Date: 15 Aug<br>• Railway Group D - 5000 Posts<br>• Bank PO - IBPS<br><br>— Singh Ji AI Ultra',
+  '/govt':'🏛️ <b>Govt Services:</b><br>• Aadhaar Update<br>• PAN Card Apply<br>• Passport Status<br>• Voter ID<br>• Ration Card<br><br>— Singh Ji AI Ultra',
+  '/pani':'💧 <b>Jal Board:</b><br>• Delhi Jal Board Bill<br>• New Water Connection<br>• Complaint Register<br>• Tanker Booking<br><br>— Singh Ji AI Ultra',
+  '/sewer':'🚰 <b>Sewer:</b><br>• Sewer Connection<br>• Blockage Complaint<br>• Sewer Bill Payment<br>• Connection Status<br><br>— Singh Ji AI Ultra',
+  '/kisaan':'🚜 <b>Kisaan Portal:</b><br>• PM Kisan Registration<br>• Crop Insurance<br>• Soil Health Card<br>• KCC Loan<br><br>— Singh Ji AI Ultra',
+  '/fuel':'⛽ <b>Fuel Prices:</b><br>• Petrol: ₹96.72/L (Delhi)<br>• Diesel: ₹89.62/L<br>• CNG: ₹76.50/kg<br>• LPG: ₹903/cyl<br><br>— Singh Ji AI Ultra',
+  '/horoscope':'🔮 <b>Rashifal:</b><br>♈ मेष: आज का दिन अच्छा<br>♉ वृष: व्यापार में लाभ<br>♊ मिथुन: नई योजना<br><br>— Singh Ji AI Ultra',
+  '/currency':'💱 <b>Currency:</b><br>• USD: ₹83.42<br>• EUR: ₹90.15<br>• GBP: ₹105.30<br>• JPY: ₹0.56<br><br>— Singh Ji AI Ultra',
+  '/voice':'🎙️ <b>Voice AI ON!</b><br>Bhashini + Whisper STT<br>Kokoro TTS ready!<br>Ab bol ke poochho!<br><br>— Singh Ji AI Ultra',
+  '/ai_chat':'🤖 <b>AI Chat Mode ON!</b><br>Groq + Gemini active<br>Koi bhi sawaal poochho!<br><br>— Singh Ji AI Ultra',
+  '/tax_calc':'🧮 <b>Tax Calculator:</b><br>Salary batao — Old vs New regime compare karenge!<br><br>— Singh Ji AI Ultra',
+  '/plant_id':'🌿 <b>Plant Identifier:</b><br>Photo bhejo — AI pehchanega!<br>Care tips + medicinal uses bhi!<br><br>— Singh Ji AI Ultra',
+  '/emergency':'🚨 <b>Emergency:</b><br>🚑 Ambulance: 102<br>🚔 Police: 100<br>🔥 Fire: 101<br>🆘 Women: 1091<br>💊 Poison: 1066<br><br>— Singh Ji AI Ultra',
+  '/upi':'💳 <b>UPI Info:</b><br>UPI ID: jp200883@sbi<br>• 0% UPI Fee<br>• Instant Transfer<br>• QR Payment<br><br>— Singh Ji AI Ultra',
+  '/image_gen':'🎨 <b>Image Generator:</b><br>FLUX.1 + SD 3.5 ready!<br>Prompt batao:<br>\"Indian farmer in golden field\"<br><br>— Singh Ji AI Ultra',
+  '/translate':'🌐 <b>Translator:</b><br>IndicTrans2 + SeamlessM4T<br>Koi bhi language!<br><br>— Singh Ji AI Ultra',
+  '/status':'📊 <b>System Status:</b><br>✅ Backend: Railway (Online)<br>✅ AWS Backup: 15.134.36.7<br>✅ 95/300 Agents Active<br>✅ Groq: Connected<br>✅ Gemini: Connected<br><br>— Singh Ji AI Ultra',
+  '/admin':'🔒 <b>Admin Panel:</b><br>Login required.<br>Admin.html pe jaao ya secret key daalo.<br><br>— Singh Ji AI Ultra'
+};
+
+function addUserMsg(text) {
+  const chat = document.getElementById('chatArea');
+  const div = document.createElement('div');
+  div.className = 'msg-user';
+  div.innerHTML = `<div class="msg-user-bubble">${text}</div>`;
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+function addTyping() {
+  const chat = document.getElementById('chatArea');
+  const div = document.createElement('div');
+  div.className = 'msg-bot'; div.id = 'typing';
+  div.innerHTML = `<div class="msg-bot-avatar">🦁</div><div class="msg-bot-bubble"><div class="typing"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div></div>`;
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+function removeTyping() {
+  const t = document.getElementById('typing');
+  if(t) t.remove();
+}
+
+function addBotMsg(html) {
+  const chat = document.getElementById('chatArea');
+  const div = document.createElement('div');
+  div.className = 'msg-bot';
+  div.innerHTML = `<div class="msg-bot-avatar">🦁</div><div class="msg-bot-bubble"><div>${html}</div><div class="msg-time">Just now</div></div></div>`;
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+function sendCmd(cmd) {
+  addUserMsg(cmd);
+  addTyping();
+  setTimeout(() => {
+    removeTyping();
+    addBotMsg(responses[cmd] || `🤖 <b>Singh Ji AI:</b><br>"${cmd}" samajh liya! Main ispe kaam kar raha hoon...<br><br>— Singh Ji AI Ultra`);
+  }, 700);
+}
+
+function sendMsg() {
+  const inp = document.getElementById('msgInput');
+  const txt = inp.value.trim();
+  if(!txt) return;
+  sendCmd(txt);
+  inp.value = '';
+}
+
+function toggleVoice() {
+  const btn = document.getElementById('voiceBtn');
+  btn.classList.toggle('active');
+  sendCmd('/voice');
+}
+
+function toggleStatus() {
+  const panel = document.getElementById('statusPanel');
+  const overlay = document.getElementById('overlay');
+  const grid = document.getElementById('statusGrid');
+  grid.innerHTML = modules.map(m => `<div class="status-item"><span style="color:${m.c};font-weight:700;">${m.s}</span><span style="color:#334155;">${m.n}</span></div>`).join('');
+  panel.style.display = 'block';
+  overlay.style.display = 'block';
+}
+
+function closeStatus() {
+  document.getElementById('statusPanel').style.display = 'none';
+  document.getElementById('overlay').style.display = 'none';
+}
+</script>
+</body>
+</html>
