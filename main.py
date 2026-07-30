@@ -46,6 +46,7 @@ from modules.guard_agent.handler import router as guard_router
 from modules.oauth_connector.handler import router as oauth_router
 from modules.social_agent.handler import router as social_router
 import modules.social_agent.core as social_core
+from modules.news.handler import router as news_router
 from miniprogram.portal import router as miniprogram_router
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
@@ -593,36 +594,12 @@ class SinghJiMasterScheduler:
         logger.info(f"[BROADCAST] Sent to {len(user_ids)} users")
 
     async def _fetch_news(self, count=5):
-        lines = []
-        if self.keys.get("NEWSDATA"):
-            try:
-                url = f"https://newsdata.io/api/1/latest?apikey={os.getenv('NEWSDATA_API_KEY')}&q=india&size={count}"
-                r = await self.http.get(url, timeout=15)
-                data = r.json()
-                articles = data.get("results", [])[:count]
-                for i, a in enumerate(articles, 1):
-                    title = a.get("title", "No title")
-                    desc = (a.get("description") or "")[:90]
-                    lines.append(f"{i}. <b>{title}</b>\n   {desc}...")
-                if lines:
-                    return "\n\n".join(lines)
-            except Exception as e:
-                logger.warning(f"[NEWS] Newsdata fail: {e}")
-        if self.keys.get("CURRENTS"):
-            try:
-                url = f"https://api.currentsapi.services/v1/latest-news?apiKey={os.getenv('CURRENTS_API_KEY')}"
-                r = await self.http.get(url, timeout=15)
-                data = r.json()
-                articles = data.get("news", [])[:count]
-                for i, a in enumerate(articles, 1):
-                    title = a.get("title", "No title")
-                    desc = (a.get("description") or "")[:90]
-                    lines.append(f"{i}. <b>{title}</b>\n   {desc}...")
-                if lines:
-                    return "\n\n".join(lines)
-            except Exception as e:
-                logger.warning(f"[NEWS] Currents fail: {e}")
-        return "• कोई समाचार उपलब्ध नहीं (API limit हो सकती है)"
+        try:
+            import modules.news.handler as news_module
+            return await news_module.get_news_digest_text(count=count)
+        except Exception as e:
+            logger.warning(f"[NEWS] fail: {e}")
+            return "• कोई समाचार उपलब्ध नहीं (API limit हो सकती है)"
 
     async def _fetch_weather(self, city="Delhi"):
         if not self.keys.get("OPENWEATHER"):
@@ -959,6 +936,7 @@ app.include_router(trishul_router, prefix="/api/trishul")
 app.include_router(guard_router, prefix="/api")
 app.include_router(oauth_router, prefix="/api")
 app.include_router(social_router)
+app.include_router(news_router)
 app.add_api_route("/api/banking", banking_handler, methods=["GET"])
 app.add_api_route("/api/pani", pani_handler, methods=["GET", "POST"])
 app.add_api_route("/api/sewer", sewer_handler, methods=["GET", "POST"])
@@ -1094,33 +1072,6 @@ async def weather_city(city: str):
         return {"error": data.get("message", "Unknown error"), "code": resp.status_code}
     except Exception as e:
         return {"error": str(e)}
-
-@app.get("/api/news/latest")
-async def news_latest(source: str = "currents"):
-    cache_key = _cache_key("news", source)
-    cached = await _cache_get(cache_key)
-    if cached:
-        cached["source"] = "CACHE"
-        return cached
-    if source == "currents" and CURRENTS_API_KEY:
-        try:
-            resp = await HTTP_CLIENT.get(f"https://api.currentsapi.services/v1/latest-news?apiKey={CURRENTS_API_KEY}")
-            data = resp.json()
-            result = {"source": "CURRENTS_LIVE", "news": data.get("news", [])[:10]}
-            await _cache_set(cache_key, result, CACHE_TTL["news"])
-            return result
-        except Exception as e:
-            return {"error": str(e)}
-    if source == "newsdata" and NEWSDATA_API_KEY:
-        try:
-            resp = await HTTP_CLIENT.get(f"https://newsdata.io/api/1/latest?apikey={NEWSDATA_API_KEY}&q=india")
-            data = resp.json()
-            result = {"source": "NEWSDATA_LIVE", "news": data.get("results", [])[:10]}
-            await _cache_set(cache_key, result, CACHE_TTL["news"])
-            return result
-        except Exception as e:
-            return {"error": str(e)}
-    return {"error": "No news API key available"}
 
 MANDI_RESOURCE_ID = "9ef84268-d588-465a-a308-a864a43d0070"
 MANDI_BASE_URL = f"https://api.data.gov.in/resource/{MANDI_RESOURCE_ID}"
@@ -1470,22 +1421,12 @@ async def telegram_webhook(request: Request):
                 USER_PREFERENCES.setdefault(user_id, {})["waiting_for"] = "weather"
                 await _telegram_send_message(chat_id, "Weather\n\nCity batao!")
             elif query_data == "news":
-                if NEWSDATA_API_KEY:
-                    try:
-                        url = f"https://newsdata.io/api/1/latest?apikey={NEWSDATA_API_KEY}&q=india&size=5"
-                        resp = await HTTP_CLIENT.get(url)
-                        news_data = resp.json()
-                        articles = news_data.get("results", [])[:5]
-                        text = "News\n\n"
-                        for i, article in enumerate(articles, 1):
-                            text += f"{i}. {article.get('title', 'No title')}\n"
-                            desc = article.get('description', 'No description')[:100]
-                            text += f"   {desc}...\n\n"
-                        await _telegram_send_message(chat_id, text)
-                    except Exception as e:
-                        await _telegram_send_message(chat_id, f"News error: {str(e)[:100]}")
-                else:
-                    await _telegram_send_message(chat_id, "News API key missing")
+                try:
+                    import modules.news.handler as news_module
+                    text = "News\n\n" + await news_module.get_news_digest_text(count=5)
+                    await _telegram_send_message(chat_id, text)
+                except Exception as e:
+                    await _telegram_send_message(chat_id, f"News error: {str(e)[:100]}")
             elif query_data == "mandi":
                 USER_PREFERENCES.setdefault(user_id, {})["waiting_for"] = "mandi"
                 await _telegram_send_message(chat_id, "Mandi Bhav\n\nState batao!")
@@ -1668,22 +1609,12 @@ async def telegram_webhook(request: Request):
             return {"status": "ok"}
 
         elif text == "/news":
-            if NEWSDATA_API_KEY:
-                try:
-                    url = f"https://newsdata.io/api/1/latest?apikey={NEWSDATA_API_KEY}&q=india&size=5"
-                    resp = await HTTP_CLIENT.get(url)
-                    news_data = resp.json()
-                    articles = news_data.get("results", [])[:5]
-                    news_text = "Latest News\n\n"
-                    for i, article in enumerate(articles, 1):
-                        news_text += f"{i}. {article.get('title', 'No title')}\n"
-                        desc = article.get('description', 'No description')[:80]
-                        news_text += f"   {desc}...\n\n"
-                    await _telegram_send_message(chat_id, news_text)
-                except Exception as e:
-                    await _telegram_send_message(chat_id, f"News error: {str(e)[:100]}")
-            else:
-                await _telegram_send_message(chat_id, "News API key missing")
+            try:
+                import modules.news.handler as news_module
+                news_text = "Latest News\n\n" + await news_module.get_news_digest_text(count=5)
+                await _telegram_send_message(chat_id, news_text)
+            except Exception as e:
+                await _telegram_send_message(chat_id, f"News error: {str(e)[:100]}")
             return {"status": "ok"}
 
         elif text.startswith("/mandi "):
