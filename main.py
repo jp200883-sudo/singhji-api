@@ -1952,7 +1952,7 @@ async def telegram_webhook(request: Request):
                 )
                 matches = await run_in_threadpool(scheme_engine.get_top_matches, profile, 5)
                 if matches:
-                    yojana_text = f"Sarkari Yojana Matches (Age {age}, Income {income:.0f}, {category or 'general'})\n\n"
+                    yojana_text = f"Sarkari Yojana Matches (Umar {age}, Aamdani {income:.0f}, {category or 'general'})\n\n"
                     for i, m in enumerate(matches, 1):
                         yojana_text += f"{i}. {m.scheme_name} (match {m.match_score}%)\n   {m.benefits_summary}\n\n"
                 else:
