@@ -23,9 +23,52 @@ HF_TOKEN = os.getenv("HUGGINGFACE_TOKEN")
 
 FACEBOOK_TOKEN = os.getenv("FACEBOOK_ACCESS_TOKEN")
 FACEBOOK_PAGE_ID = os.getenv("FACEBOOK_PAGE_ID", "")
+FACEBOOK_APP_ID = os.getenv("FACEBOOK_APP_ID")
+FACEBOOK_APP_SECRET = os.getenv("FACEBOOK_APP_SECRET")
 INSTAGRAM_TOKEN = os.getenv("INSTAGRAM_ACCESS_TOKEN")
 INSTAGRAM_BUSINESS_ID = os.getenv("INSTAGRAM_BUSINESS_ID", "")
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
+
+BLUESKY_HANDLE = os.getenv("BLUESKY_HANDLE")
+BLUESKY_APP_PASSWORD = os.getenv("BLUESKY_APP_PASSWORD")
+
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY") or os.getenv("SUPABASE_SERVICE_KEY")
+
+
+async def _load_token_from_supabase(http: httpx.AsyncClient) -> Optional[str]:
+    """पिछली बार refresh हुआ token Supabase से लोड करो (अगर env वाले से नया है)"""
+    if not (SUPABASE_URL and SUPABASE_KEY):
+        return None
+    try:
+        r = await http.get(
+            f"{SUPABASE_URL}/rest/v1/api_tokens?key=eq.facebook_page_token&select=value",
+            headers={"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"},
+        )
+        rows = r.json()
+        if rows:
+            return rows[0]["value"]
+    except Exception as e:
+        logger.warning(f"[SOCIAL_AGENT] Supabase token load fail: {e}")
+    return None
+
+
+async def _save_token_to_supabase(http: httpx.AsyncClient, token: str, expires_at: str):
+    """नया refreshed token Supabase में upsert करो"""
+    if not (SUPABASE_URL and SUPABASE_KEY):
+        return
+    try:
+        await http.post(
+            f"{SUPABASE_URL}/rest/v1/api_tokens",
+            headers={
+                "apikey": SUPABASE_KEY,
+                "Authorization": f"Bearer {SUPABASE_KEY}",
+                "Prefer": "resolution=merge-duplicates",
+            },
+            json={"key": "facebook_page_token", "value": token, "expires_at": expires_at},
+        )
+    except Exception as e:
+        logger.warning(f"[SOCIAL_AGENT] Supabase token save fail: {e}")
 
 # Free image gen — no API key needed
 POLLINATIONS_IMAGE_URL = "https://image.pollinations.ai/prompt/{prompt}?width=1080&height=1080&seed={seed}&nologo=true"
@@ -48,6 +91,76 @@ class SinghJiSocialAgent:
         self.content_queue: List[Dict] = []
         self.posted_history: List[Dict] = []
         self.is_running = False
+        self.fb_token = FACEBOOK_TOKEN  # runtime override — refresh होने पर यह अपडेट होगा
+        self._bsky_session = None  # {accessJwt, did} — login होने पर cache होगा
+
+    async def load_saved_facebook_token(self):
+        """Startup पर पिछला refreshed token (अगर है) Supabase से लोड करो"""
+        saved = await _load_token_from_supabase(self.http)
+        if saved:
+            self.fb_token = saved
+            logger.info("[SOCIAL_AGENT] Facebook token Supabase से लोड हुआ")
+
+    async def check_and_refresh_facebook_token(self):
+        """
+        Facebook long-lived token की expiry खुद चेक करता है।
+        7 दिन से कम बचे हों तो खुद नया token ले लेता है और Supabase में सेव कर देता है।
+        """
+        if not self.fb_token:
+            logger.warning("[SOCIAL_AGENT] कोई Facebook token नहीं है, refresh skip")
+            return {"checked": False, "reason": "no_token"}
+
+        try:
+            # STEP 1: अभी वाले token की expiry पता करो
+            debug = await self.http.get(
+                "https://graph.facebook.com/debug_token",
+                params={"input_token": self.fb_token, "access_token": self.fb_token},
+            )
+            data = debug.json().get("data", {})
+            expires_at_ts = data.get("expires_at", 0)  # 0 का मतलब कभी expire नहीं होगा
+
+            if expires_at_ts == 0:
+                logger.info("[SOCIAL_AGENT] Facebook token कभी expire नहीं होगा (page token, non-expiring)")
+                return {"checked": True, "expires": "never"}
+
+            days_left = (expires_at_ts - time.time()) / 86400
+            logger.info(f"[SOCIAL_AGENT] Facebook token में {days_left:.1f} दिन बचे हैं")
+
+            if days_left > 7:
+                return {"checked": True, "days_left": round(days_left, 1), "refreshed": False}
+
+            # STEP 2: 7 दिन से कम बचे — नया long-lived token लो
+            if not (FACEBOOK_APP_ID and FACEBOOK_APP_SECRET):
+                logger.error("[SOCIAL_AGENT] ⚠️ Token expire होने वाला है पर FACEBOOK_APP_ID/SECRET सेट नहीं — auto-refresh नहीं हो सकता")
+                return {"checked": True, "days_left": round(days_left, 1), "refreshed": False, "error": "no_app_credentials"}
+
+            resp = await self.http.get(
+                "https://graph.facebook.com/v21.0/oauth/access_token",
+                params={
+                    "grant_type": "fb_exchange_token",
+                    "client_id": FACEBOOK_APP_ID,
+                    "client_secret": FACEBOOK_APP_SECRET,
+                    "fb_exchange_token": self.fb_token,
+                },
+            )
+            new_data = resp.json()
+            new_token = new_data.get("access_token")
+            if not new_token:
+                logger.error(f"[SOCIAL_AGENT] Token refresh fail: {new_data}")
+                return {"checked": True, "refreshed": False, "error": str(new_data)}
+
+            new_expires_days = new_data.get("expires_in", 5184000) / 86400  # default ~60 din
+            new_expires_at = (datetime.now() + timedelta(days=new_expires_days)).isoformat()
+
+            self.fb_token = new_token
+            await _save_token_to_supabase(self.http, new_token, new_expires_at)
+            logger.info(f"[SOCIAL_AGENT] ✅ Facebook token अपने-आप refresh हो गया, अब {new_expires_days:.0f} दिन और चलेगा")
+
+            return {"checked": True, "refreshed": True, "new_expires_in_days": round(new_expires_days, 1)}
+
+        except Exception as e:
+            logger.error(f"[SOCIAL_AGENT] Token check/refresh fail: {e}")
+            return {"checked": False, "error": str(e)}
         
     # ═══════════════════════════════════════
     # STEP 1: AI CONTENT GENERATION
@@ -206,7 +319,7 @@ class SinghJiSocialAgent:
     
     async def post_to_facebook(self, caption: str, hashtags: str, image_bytes: bytes = None) -> Dict:
         """Facebook Page pe auto-post"""
-        if not FACEBOOK_TOKEN or not FACEBOOK_PAGE_ID:
+        if not self.fb_token or not FACEBOOK_PAGE_ID:
             return {"error": "Facebook credentials missing"}
         
         full_text = f"{caption}\n\n{hashtags}"
@@ -216,7 +329,7 @@ class SinghJiSocialAgent:
                 # Photo post
                 files = {"file": ("image.png", io.BytesIO(image_bytes), "image/png")}
                 data = {
-                    "access_token": FACEBOOK_TOKEN,
+                    "access_token": self.fb_token,
                     "message": full_text,
                     "published": "true"
                 }
@@ -226,7 +339,7 @@ class SinghJiSocialAgent:
                 # Text-only post
                 url = f"https://graph.facebook.com/v25.0/{FACEBOOK_PAGE_ID}/feed"
                 resp = await self.http.post(url, data={
-                    "access_token": FACEBOOK_TOKEN,
+                    "access_token": self.fb_token,
                     "message": full_text
                 }, timeout=20)
             
@@ -242,9 +355,10 @@ class SinghJiSocialAgent:
             return {"error": str(e), "platform": "facebook"}
 
     async def post_to_instagram(self, caption: str, hashtags: str, image_bytes: bytes) -> Dict:
-        """Instagram Business Account pe auto-post"""
-        if not INSTAGRAM_TOKEN or not INSTAGRAM_BUSINESS_ID:
-            return {"error": "Instagram credentials missing"}
+        """Instagram Business Account pe auto-post (Facebook से linked होना ज़रूरी)"""
+        ig_token = INSTAGRAM_TOKEN or self.fb_token  # linked होने पर Page token ही चलता है
+        if not ig_token or not INSTAGRAM_BUSINESS_ID:
+            return {"error": "Instagram credentials missing — Facebook Page se link + INSTAGRAM_BUSINESS_ID chahiye"}
         
         if not image_bytes:
             return {"error": "Instagram needs image"}
@@ -272,7 +386,7 @@ class SinghJiSocialAgent:
             # Actually let's use a simpler approach - upload to FB first
             fb_upload = await self.http.post(
                 f"https://graph.facebook.com/v25.0/{FACEBOOK_PAGE_ID}/photos",
-                data={"access_token": FACEBOOK_TOKEN, "published": "false", "message": "temp"},
+                data={"access_token": self.fb_token, "published": "false", "message": "temp"},
                 files={"file": ("temp.jpg", io.BytesIO(image_bytes), "image/jpeg")},
                 timeout=30
             )
@@ -284,7 +398,7 @@ class SinghJiSocialAgent:
             
             # Get URL of uploaded image
             img_resp = await self.http.get(
-                f"https://graph.facebook.com/v25.0/{media_fbid}?access_token={FACEBOOK_TOKEN}&fields=images"
+                f"https://graph.facebook.com/v25.0/{media_fbid}?access_token={self.fb_token}&fields=images"
             )
             img_data = img_resp.json()
             image_url = img_data.get("images", [{}])[0].get("source", "")
@@ -296,7 +410,7 @@ class SinghJiSocialAgent:
             container_resp = await self.http.post(
                 container_url,
                 data={
-                    "access_token": INSTAGRAM_TOKEN,
+                    "access_token": ig_token,
                     "image_url": image_url,
                     "caption": full_caption
                 },
@@ -314,7 +428,7 @@ class SinghJiSocialAgent:
             publish_resp = await self.http.post(
                 f"https://graph.facebook.com/v25.0/{INSTAGRAM_BUSINESS_ID}/media_publish",
                 data={
-                    "access_token": INSTAGRAM_TOKEN,
+                    "access_token": ig_token,
                     "creation_id": creation_id
                 },
                 timeout=20
@@ -339,6 +453,78 @@ class SinghJiSocialAgent:
         # This is a placeholder - full implementation needs OAuth flow
         return {"status": "pending", "platform": "youtube", "note": "Requires OAuth2 setup"}
 
+    async def _bsky_login(self) -> Optional[Dict]:
+        """Bluesky App Password से session लो (cache करके रखो)"""
+        if self._bsky_session:
+            return self._bsky_session
+        if not (BLUESKY_HANDLE and BLUESKY_APP_PASSWORD):
+            return None
+        try:
+            resp = await self.http.post(
+                "https://bsky.social/xrpc/com.atproto.server.createSession",
+                json={"identifier": BLUESKY_HANDLE, "password": BLUESKY_APP_PASSWORD},
+                timeout=15,
+            )
+            data = resp.json()
+            if "accessJwt" not in data:
+                logger.error(f"[SOCIAL_AGENT] Bluesky login fail: {data}")
+                return None
+            self._bsky_session = data
+            return data
+        except Exception as e:
+            logger.error(f"[SOCIAL_AGENT] Bluesky login exception: {e}")
+            return None
+
+    async def post_to_bluesky(self, caption: str, hashtags: str, image_bytes: bytes = None) -> Dict:
+        """Bluesky (AT Protocol) pe auto-post"""
+        session = await self._bsky_login()
+        if not session:
+            return {"error": "Bluesky credentials missing/invalid", "platform": "bluesky"}
+
+        full_text = f"{caption}\n\n{hashtags}"[:300]  # Bluesky 300-char limit
+        headers = {"Authorization": f"Bearer {session['accessJwt']}"}
+        embed = None
+
+        try:
+            if image_bytes:
+                upload = await self.http.post(
+                    "https://bsky.social/xrpc/com.atproto.repo.uploadBlob",
+                    headers={**headers, "Content-Type": "image/png"},
+                    content=image_bytes,
+                    timeout=30,
+                )
+                blob_data = upload.json()
+                if "blob" in blob_data:
+                    embed = {
+                        "$type": "app.bsky.embed.images",
+                        "images": [{"alt": caption[:100], "image": blob_data["blob"]}],
+                    }
+
+            record = {
+                "$type": "app.bsky.feed.post",
+                "text": full_text,
+                "createdAt": datetime.utcnow().isoformat() + "Z",
+            }
+            if embed:
+                record["embed"] = embed
+
+            resp = await self.http.post(
+                "https://bsky.social/xrpc/com.atproto.repo.createRecord",
+                headers=headers,
+                json={"repo": session["did"], "collection": "app.bsky.feed.post", "record": record},
+                timeout=20,
+            )
+            result = resp.json()
+            if "uri" in result:
+                logger.info(f"[SOCIAL_AGENT] Bluesky post success: {result['uri']}")
+                return {"success": True, "platform": "bluesky", "post_id": result["uri"]}
+            else:
+                logger.error(f"[SOCIAL_AGENT] Bluesky post fail: {result}")
+                return {"error": str(result), "platform": "bluesky"}
+        except Exception as e:
+            logger.error(f"[SOCIAL_AGENT] Bluesky exception: {e}")
+            return {"error": str(e), "platform": "bluesky"}
+
     # ═══════════════════════════════════════
     # STEP 4: FULL AUTOPILOT PIPELINE
     # ═══════════════════════════════════════
@@ -346,7 +532,7 @@ class SinghJiSocialAgent:
     async def create_and_publish(self, platforms: List[str] = None, niche: str = None) -> Dict:
         """Full pipeline: Generate → Image → Post"""
         if platforms is None:
-            platforms = ["facebook", "instagram"]
+            platforms = ["facebook", "instagram", "bluesky"]
         
         logger.info(f"[SOCIAL_AGENT] Starting auto-post pipeline for {platforms}")
         
@@ -371,6 +557,8 @@ class SinghJiSocialAgent:
                     res = {"error": "No image for Instagram", "platform": "instagram"}
             elif platform == "youtube":
                 res = await self.post_to_youtube_community(content["caption"], content["hashtags"])
+            elif platform == "bluesky":
+                res = await self.post_to_bluesky(content["caption"], content["hashtags"], image)
             else:
                 res = {"error": f"Unknown platform: {platform}"}
             
@@ -429,7 +617,8 @@ class SinghJiSocialAgent:
             "platforms_configured": {
                 "facebook": bool(FACEBOOK_TOKEN and FACEBOOK_PAGE_ID),
                 "instagram": bool(INSTAGRAM_TOKEN and INSTAGRAM_BUSINESS_ID),
-                "youtube": bool(YOUTUBE_API_KEY)
+                "youtube": bool(YOUTUBE_API_KEY),
+                "bluesky": bool(BLUESKY_HANDLE and BLUESKY_APP_PASSWORD)
             }
         }
 
