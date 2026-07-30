@@ -55,6 +55,37 @@ def async_retry(max_retries: int = MAX_RETRIES, delay: float = 1.0):
     return decorator
 
 
+# ─── SOURCE 0: GOLD-API.COM (FREE, NO KEY) ───
+@async_retry(max_retries=2, delay=1.0)
+async def _fetch_gold_api_com() -> Optional[Dict[str, Any]]:
+    async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
+        price_resp = await client.get("https://api.gold-api.com/price/XAU")
+        if price_resp.status_code != 200:
+            return None
+        price_data = price_resp.json()
+        usd_per_oz = price_data.get("price") or price_data.get("rate") or price_data.get("value")
+        if not usd_per_oz:
+            return None
+
+        fx_resp = await client.get("https://api.exchangerate-api.com/v4/latest/USD")
+        if fx_resp.status_code != 200:
+            return None
+        usd_inr = fx_resp.json().get("rates", {}).get("INR")
+        if not usd_inr:
+            return None
+
+        inr_per_gram_24k = (usd_per_oz / 31.1035) * usd_inr
+        return {
+            "source": "GoldAPI.com",
+            "metal": "Gold",
+            "currency": "INR",
+            "price_gram_24k": round(inr_per_gram_24k, 2),
+            "price_gram_22k": round(inr_per_gram_24k * 0.9167, 2),
+            "price_gram_18k": round(inr_per_gram_24k * 0.75, 2),
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+
+
 # ─── SOURCE 1: GOLDAPI.IO ───
 @async_retry(max_retries=2, delay=1.0)
 async def _fetch_goldapi() -> Optional[Dict[str, Any]]:
@@ -144,7 +175,9 @@ async def gold_rate_city(city: str = "delhi"):
         return JSONResponse({"cached": True, "data": cached})
 
     # Fetch base rate
-    data = await _fetch_goldapi()
+    data = await _fetch_gold_api_com()
+    if not data:
+        data = await _fetch_goldapi()
     if not data:
         data = await _fetch_metalprice()
 
