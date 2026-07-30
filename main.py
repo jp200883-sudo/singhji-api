@@ -514,6 +514,7 @@ MAIN_KEYBOARD = {
         [{"text": "Gold Rate", "callback_data": "gold"}, {"text": "Fuel Price", "callback_data": "fuel"}],
         [{"text": "Horoscope", "callback_data": "horoscope"}, {"text": "Currency", "callback_data": "currency"}],
         [{"text": "Emergency", "callback_data": "emergency"}, {"text": "UPI Info", "callback_data": "upi"}],
+        [{"text": "🛡️ Guard Agent", "callback_data": "guard"}, {"text": "📱 Social Agent", "callback_data": "social"}],
     ]
 }
 
@@ -1460,6 +1461,26 @@ async def telegram_webhook(request: Request):
                 upi_id = os.getenv("UPI_ID", "jp200883@sbi")
                 upi_text = f"UPI Info\n\nUPI ID: {upi_id}\nApps: PhonePe, Google Pay, Paytm, BHIM\nDaily Limit: Rs 1,00,000"
                 await _telegram_send_message(chat_id, upi_text)
+            elif query_data == "guard":
+                try:
+                    import modules.guard_agent.handler as guard_module
+                    g = guard_module.singhji_guard
+                    guard_text = f"Guard Agent\n\nCameras: {len(g.cameras_db)}\nAlerts: {len(g.alerts_db)}\nDetection agents: vehicle, human, sound, face, anpr, fire, crowd, object, behavior"
+                except Exception as e:
+                    guard_text = f"Guard Agent not loaded: {str(e)[:100]}"
+                await _telegram_send_message(chat_id, guard_text)
+            elif query_data == "social":
+                try:
+                    import modules.social_agent.core as social_core
+                    s = social_core.SOCIAL_AGENT
+                    if s:
+                        on = getattr(s, "auto_post_enabled", True)
+                        social_text = f"Social Agent\n\nPosts published: {len(s.posted_history)}\nAuto-post: {'ON' if on else 'OFF'}\nPlatforms: Facebook, Instagram, Bluesky"
+                    else:
+                        social_text = "Social Agent not initialized"
+                except Exception as e:
+                    social_text = f"Social Agent not loaded: {str(e)[:100]}"
+                await _telegram_send_message(chat_id, social_text)
 
             return {"status": "ok"}
 
@@ -1818,6 +1839,8 @@ async def telegram_webhook(request: Request):
                 tv_text += "\n\nFormat: /tv educational"
             await _telegram_send_message(chat_id, tv_text)
             return {"status": "ok"}
+
+        elif text.startswith("/yojana"):
             parts = text.replace("/yojana", "").strip().split()
             try:
                 age = int(parts[0]) if len(parts) > 0 else 30
