@@ -1931,6 +1931,8 @@ async def telegram_webhook(request: Request):
                 except Exception as e:
                     await _telegram_send_message(chat_id, f"Video error: {str(e)[:150]}")
             return {"status": "ok"}
+
+        elif text.startswith("/yojana"):
             parts = text.replace("/yojana", "").strip().split()
             try:
                 age = int(parts[0]) if len(parts) > 0 else 30
