@@ -271,3 +271,10 @@ async def news_root():
         "features": ["multi-source", "cached", "hindi-filter", "ai-summary", "trending"],
         "cache_ttl_seconds": CACHE_TTL,
     })
+
+
+# ─── legacy compat: modules/news/__init__.py इसे import करता है ───
+async def handler(request):
+    query = request.query_params.get("q", "") if hasattr(request, "query_params") else ""
+    data = await get_latest_news(query=query)
+    return JSONResponse({"success": True, "data": data})
