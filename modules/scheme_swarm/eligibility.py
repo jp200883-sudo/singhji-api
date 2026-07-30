@@ -186,16 +186,29 @@ class EligibilityEngine:
             deadline=scheme.get("deadline")
         )
     
+    _FREQ_HI = {
+        "one_time": "ek-baar", "yearly": "saalana", "monthly": "har mahine",
+        "quarterly": "har 3 mahine", "weekly": "har hafte", "daily": "roz",
+    }
+    _TYPE_HI = {
+        "interest_subsidy": "byaj subsidy", "insurance": "beema", "incentive": "protsahan rashi",
+        "infrastructure": "infrastructure suvidha", "cash_transfer": "seedha paisa",
+        "loan": "loan/karza", "scholarship": "scholarship", "pension": "pension",
+        "subsidy": "subsidy", "grant": "grant/anudan",
+    }
+
     def _format_benefits(self, benefits: Dict) -> str:
-        """Format benefits into readable string"""
+        """Format benefits into readable string (Hinglish)"""
         parts = []
         if "amount" in benefits:
             parts.append(f"₹{benefits['amount']:,}")
         if "frequency" in benefits:
-            parts.append(f"{benefits['frequency']}")
+            freq = benefits["frequency"]
+            parts.append(self._FREQ_HI.get(freq, freq))
         if "type" in benefits:
-            parts.append(f"({benefits['type']})")
-        return " ".join(parts) if parts else "Benefits vary"
+            btype = benefits["type"]
+            parts.append(f"({self._TYPE_HI.get(btype, btype)})")
+        return " ".join(parts) if parts else "Benefit alag-alag ho sakta hai"
     
     def find_all_matches(self, profile: UserProfile, min_score: int = 50) -> List[SchemeMatch]:
         """Find all matching schemes for a user profile"""
