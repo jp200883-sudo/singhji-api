@@ -47,6 +47,7 @@ from modules.social_agent.handler import router as social_router
 import modules.social_agent.core as social_core
 from modules.oauth_connector.router import SmartVideoRouter
 from modules.oauth_connector.base import PlatformCredentials, VideoGenerationRequest
+from modules.search.handler import handler as search_handler
 from modules.news.handler import router as news_router
 from miniprogram.portal import router as miniprogram_router
 
@@ -1413,17 +1414,7 @@ async def youtube_search(q: str = "", max_results: int = 10):
     except Exception as e:
         return {"error": str(e)}
 
-@app.get("/api/search")
-async def web_search(q: str = "", max_results: int = 5):
-    if not TAVILY_API_KEY:
-        return {"error": "TAVILY_API_KEY missing"}
-    try:
-        url = "https://api.tavily.com/search"
-        payload = {"api_key": TAVILY_API_KEY, "query": q, "max_results": max_results, "search_depth": "basic"}
-        resp = await HTTP_CLIENT.post(url, json=payload, timeout=15)
-        return resp.json()
-    except Exception as e:
-        return {"error": str(e)}
+app.add_api_route("/api/search", search_handler, methods=["GET", "POST"])
 
 @app.post("/api/retirement/tax-calculate")
 async def tax_calculate(request: Request):
@@ -1793,9 +1784,16 @@ async def telegram_webhook(request: Request):
         elif text.startswith("/currency"):
             parts = text.replace("/currency", "").strip().split()
             try:
-                base = parts[0].upper() if len(parts) > 0 else "USD"
-                target = parts[1].upper() if len(parts) > 1 else "INR"
-                amount = float(parts[2]) if len(parts) > 2 else 1.0
+                if len(parts) == 1:
+                    try:
+                        amount = float(parts[0])
+                        base, target = "USD", "INR"
+                    except ValueError:
+                        base, target, amount = parts[0].upper(), "INR", 1.0
+                else:
+                    base = parts[0].upper() if len(parts) > 0 else "USD"
+                    target = parts[1].upper() if len(parts) > 1 else "INR"
+                    amount = float(parts[2]) if len(parts) > 2 else 1.0
                 result = await singhji_currency.convert(base, target, amount)
                 cur_text = f"Currency Convert\n\n{amount} {base} = {result.converted} {target}\n"
                 cur_text += f"Rate: 1 {base} = {result.rate} {target}\n"
