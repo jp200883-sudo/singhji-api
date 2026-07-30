@@ -131,7 +131,12 @@ class SinghJiGuardAgent:
         self.supabase_url = os.getenv("SUPABASE_URL")
         self.supabase_key = os.getenv("SUPABASE_KEY")
         self.whatsapp_token = os.getenv("WHATSAPP_TOKEN")
+        self.twilio_sid = os.getenv("TWILIO_SID")
+        self.twilio_token = os.getenv("TWILIO_TOKEN")
+        self.twilio_whatsapp_from = os.getenv("TWILIO_WHATSAPP_FROM", "whatsapp:+14155238886")
+        self.alert_numbers = [n.strip() for n in os.getenv("GUARD_ALERT_WHATSAPP_NUMBERS", "").split(",") if n.strip()]
         self.ai_model_url = os.getenv("AI_MODEL_URL", "http://localhost:8001")
+        self.http = httpx.AsyncClient(timeout=15)
 
         # AI मॉडल्स लोड करो (mock for now, real later)
         self.ai_models = {
@@ -177,10 +182,14 @@ class SinghJiGuardAgent:
 
         return AlertPriority.INFO.value
 
-    async def _send_whatsapp(self, alert: Alert, numbers: List[str]):
-        """व्हाट्सएप अलर्ट भेजो"""
-        if not self.whatsapp_token:
-            logger.warning("⚠️ WhatsApp token नहीं मिला")
+    async def _send_whatsapp(self, alert: Alert, numbers: List[str] = None):
+        """व्हाट्सएप अलर्ट भेजो (Twilio WhatsApp API)"""
+        numbers = numbers or self.alert_numbers
+        if not numbers:
+            logger.warning("⚠️ GUARD_ALERT_WHATSAPP_NUMBERS सेट नहीं है — अलर्ट किसे भेजें पता नहीं")
+            return
+        if not (self.twilio_sid and self.twilio_token):
+            logger.warning("⚠️ TWILIO_SID/TWILIO_TOKEN नहीं मिला")
             return
 
         emoji_map = {
@@ -205,9 +214,17 @@ class SinghJiGuardAgent:
 _जहाँ सिंह जी की नज़र, वहाँ चोर की फजीहत_ 🦁"""
 
         for num in numbers:
+            to = num if num.startswith("whatsapp:") else f"whatsapp:{num}"
             try:
-                # TODO: Real WhatsApp Business API call
-                logger.info(f"📱 WhatsApp भेजा: {num}")
+                resp = await self.http.post(
+                    f"https://api.twilio.com/2010-04-01/Accounts/{self.twilio_sid}/Messages.json",
+                    auth=(self.twilio_sid, self.twilio_token),
+                    data={"From": self.twilio_whatsapp_from, "To": to, "Body": message},
+                )
+                if resp.status_code < 300:
+                    logger.info(f"📱 WhatsApp भेजा: {num}")
+                else:
+                    logger.error(f"💥 WhatsApp fail {num}: {resp.status_code} {resp.text[:200]}")
             except Exception as e:
                 logger.error(f"💥 WhatsApp fail {num}: {e}")
 
@@ -320,7 +337,7 @@ _जहाँ सिंह जी की नज़र, वहाँ चोर �
         await self._save_to_supabase(alert)
 
         if alert.priority == "critical":
-            await self._send_whatsapp(alert, ["+919999999999"])
+            await self._send_whatsapp(alert)
 
         return alert
 
@@ -381,7 +398,7 @@ _जहाँ सिंह जी की नज़र, वहाँ चोर �
         await self._save_to_supabase(alert)
 
         if alert.priority == "critical":
-            await self._send_whatsapp(alert, ["+919999999999"])
+            await self._send_whatsapp(alert)
 
         return alert
 
@@ -469,7 +486,7 @@ _जहाँ सिंह जी की नज़र, वहाँ चोर �
 
         self.alerts_db.append(alert)
         await self._save_to_supabase(alert)
-        await self._send_whatsapp(alert, ["+919999999999", "+918888888888"])
+        await self._send_whatsapp(alert)
         return alert
 
     async def detect_crowd(self, location: str, camera_id: str,
@@ -528,7 +545,7 @@ _जहाँ सिंह जी की नज़र, वहाँ चोर �
         await self._save_to_supabase(alert)
 
         if alert.priority == "critical":
-            await self._send_whatsapp(alert, ["+919999999999"])
+            await self._send_whatsapp(alert)
 
         return alert
 
@@ -561,7 +578,7 @@ _जहाँ सिंह जी की नज़र, वहाँ चोर �
         await self._save_to_supabase(alert)
 
         if alert.priority in ["critical", "warning"]:
-            await self._send_whatsapp(alert, ["+919999999999"])
+            await self._send_whatsapp(alert)
 
         return alert
 
