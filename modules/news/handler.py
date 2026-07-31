@@ -24,6 +24,7 @@ NEWSDATA_API_KEY = os.getenv("NEWSDATA_API_KEY", "")
 CURRENTS_API_KEY = os.getenv("CURRENTS_API_KEY", "")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 GNEWS_API_KEY = os.getenv("GNEWS_API_KEY", "")
+TAVILY_API_KEY = os.getenv("TAVILY_API_KEY", "")
 
 CACHE_TTL = 180
 REQUEST_TIMEOUT = 12.0
@@ -143,6 +144,41 @@ async def _fetch_currents(query: str = "") -> List[Dict[str, Any]]:
         return []
 
 
+# ─── SOURCE 4: TAVILY (WEB SEARCH — sabse bharosemand, jab dedicated news APIs fail/limit ho jayein) ───
+async def _fetch_tavily(query: str = "") -> List[Dict[str, Any]]:
+    if not TAVILY_API_KEY:
+        return []
+    try:
+        search_query = query if query else "aaj ki mukhya khabrein India"
+        async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
+            resp = await client.post(
+                "https://api.tavily.com/search",
+                json={
+                    "api_key": TAVILY_API_KEY,
+                    "query": search_query,
+                    "search_depth": "basic",
+                    "topic": "news",
+                    "max_results": 10,
+                },
+            )
+            resp.raise_for_status()
+            data = resp.json()
+        return [
+            {
+                "title": r.get("title", ""),
+                "description": r.get("content", "")[:200],
+                "url": r.get("url", ""),
+                "source": "Tavily",
+                "published": r.get("published_date", ""),
+                "image": "",
+            }
+            for r in data.get("results", [])
+        ]
+    except Exception as e:
+        logger.warning(f"[NEWS] Tavily fail: {e}")
+        return []
+
+
 # ─── AI SUMMARY (GROQ) ───
 async def _summarize_with_groq(news_items: List[Dict[str, Any]]) -> str:
     if not GROQ_API_KEY or len(news_items) < 3:
@@ -181,13 +217,14 @@ async def get_latest_news(query: str = "", category: str = "", country: str = "i
         _fetch_newsdata(query, category, country),
         _fetch_gnews(query, "hi", country),
         _fetch_currents(query),
+        _fetch_tavily(query),
         return_exceptions=True,
     )
 
     all_news = []
     source_counts = {}
     for i, result in enumerate(results):
-        name = ["NewsData", "GNews", "Currents"][i]
+        name = ["NewsData", "GNews", "Currents", "Tavily"][i]
         if isinstance(result, list):
             all_news.extend(result)
             source_counts[name] = len(result)
@@ -226,9 +263,17 @@ async def get_news_digest_text(count: int = 5, hindi_only: bool = True) -> str:
     """Telegram/Voice के लिए plain text digest — scheduler jobs और bot commands यही इस्तेमाल करें"""
     data = await get_latest_news(num=count, hindi_only=hindi_only)
     articles = data.get("articles", [])
+    if not articles and hindi_only:
+        # Hindi mein kuch nahi mila, English/mixed results se fallback (khaali se behtar)
+        data = await get_latest_news(num=count, hindi_only=False)
+        articles = data.get("articles", [])
     if not articles:
         return "अभी कोई खबर उपलब्ध नहीं है।"
     lines = []
+    summary = data.get("summary", "")
+    if summary:
+        lines.append(summary.strip())
+        lines.append("")
     for i, a in enumerate(articles[:count], 1):
         title = a.get("title", "बिना शीर्षक")
         lines.append(f"{i}. {title}")
@@ -267,7 +312,7 @@ async def news_root():
     return JSONResponse({
         "module": "📰 News",
         "version": "3.0-unified",
-        "sources": ["NewsData.io", "GNews", "CurrentsAPI"],
+        "sources": ["NewsData.io", "GNews", "CurrentsAPI", "Tavily"],
         "features": ["multi-source", "cached", "hindi-filter", "ai-summary", "trending"],
         "cache_ttl_seconds": CACHE_TTL,
     })
