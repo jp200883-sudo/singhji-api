@@ -48,6 +48,8 @@ import modules.social_agent.core as social_core
 from modules.oauth_connector.router import SmartVideoRouter
 from modules.oauth_connector.base import PlatformCredentials, VideoGenerationRequest
 from modules.search.handler import handler as search_handler
+from modules.rozgar.handler import handler as rozgar_handler
+from modules.rozgar import handler as rozgar_module
 from modules.news.handler import router as news_router
 from miniprogram.portal import router as miniprogram_router
 
@@ -538,6 +540,7 @@ MAIN_KEYBOARD = {
         [{"text": "Horoscope", "callback_data": "horoscope"}, {"text": "Currency", "callback_data": "currency"}],
         [{"text": "Emergency", "callback_data": "emergency"}, {"text": "UPI Info", "callback_data": "upi"}],
         [{"text": "🛡️ Guard Agent", "callback_data": "guard"}, {"text": "📱 Social Agent", "callback_data": "social"}],
+        [{"text": "💼 Rozgar/Jobs", "callback_data": "rozgar"}],
     ]
 }
 
@@ -623,7 +626,7 @@ class SinghJiMasterScheduler:
             return await news_module.get_news_digest_text(count=count)
         except Exception as e:
             logger.warning(f"[NEWS] fail: {e}")
-            return "• कोई समाचार उपलब्ध नहीं (API limit हो सकती है)"
+            return f"• News error: {str(e)[:150]}"
 
     async def _fetch_weather(self, city="Delhi"):
         if not self.keys.get("OPENWEATHER"):
@@ -645,16 +648,66 @@ class SinghJiMasterScheduler:
             logger.warning(f"[WEATHER] Error: {e}")
             return "• Weather fetch failed"
 
+    async def _fetch_mandi(self, state="Uttar Pradesh", limit=5):
+        try:
+            data = await mandi_state(state, limit=limit)
+            if data.get("error"):
+                return f"• Mandi error: {data['error'][:100]}"
+            records = data.get("records", [])
+            if not records:
+                return "• Aaj mandi data available nahi hai"
+            lines = []
+            for r in records[:limit]:
+                commodity = r.get("commodity", "?")
+                market = r.get("market", "?")
+                price = r.get("modal_price", "?")
+                lines.append(f"{commodity} ({market}): ₹{price}/quintal")
+            return "\n".join(lines)
+        except Exception as e:
+            logger.warning(f"[MANDI] fail: {e}")
+            return f"• Mandi error: {str(e)[:100]}"
+
+    async def _fetch_gold_silver(self, city="Delhi"):
+        try:
+            data = await gold_rate_city(city)
+            gold_24k = data.get("price_gram_24k")
+            gold_22k = data.get("price_gram_22k")
+            silver = round(gold_24k / 75, 2) if gold_24k else "?"
+            return f"🥇 Gold 24K: ₹{gold_24k}/g | 22K: ₹{gold_22k}/g\n🥈 Silver (approx): ₹{silver}/g"
+        except Exception as e:
+            logger.warning(f"[GOLD] fail: {e}")
+            return f"• Gold/Silver error: {str(e)[:100]}"
+
+    def _fetch_horoscope_summary(self):
+        try:
+            from modules.horoscope.handler import get_all_horoscopes
+            data = get_all_horoscopes(period="daily", language="hi")
+            lines = []
+            for entry in data.get("rashis", [])[:12]:
+                rashi = entry.get("rashi", "?")
+                pred = entry.get("prediction", "")[:60]
+                lines.append(f"{rashi}: {pred}")
+            return "\n".join(lines) if lines else "• Aaj rashifal available nahi hai"
+        except Exception as e:
+            logger.warning(f"[HOROSCOPE] fail: {e}")
+            return f"• Horoscope error: {str(e)[:100]}"
+
     async def _job_morning_digest(self):
         logger.info("[JOB] Morning Digest starting...")
         news = await self._fetch_news(5)
         weather = await self._fetch_weather("Delhi")
+        mandi = await self._fetch_mandi("Uttar Pradesh", limit=5)
+        gold_silver = await self._fetch_gold_silver("Delhi")
+        horoscope = self._fetch_horoscope_summary()
         msg = (
             f"🌅 <b>Singh Ji Morning Digest</b>\n"
             f"📅 {datetime.now().strftime('%d %b %Y, %A')}\n"
             f"{'─' * 28}\n\n"
             f"📰 <b>मुख्य समाचार:</b>\n{news}\n\n"
             f"🌤️ <b>मौसम (Delhi):</b>\n{weather}\n\n"
+            f"🌾 <b>मंडी भाव (UP):</b>\n{mandi}\n\n"
+            f"💰 <b>Gold/Silver:</b>\n{gold_silver}\n\n"
+            f"🔮 <b>राशिफल (आज):</b>\n{horoscope}\n\n"
             f"— <i>Singh Ji AI Ultra</i>"
         )
         await self._broadcast(msg, parse_mode="HTML")
@@ -777,6 +830,51 @@ class SinghJiMasterScheduler:
         self._update_state("monthly_tenders", "success")
         logger.info("[JOB] Tenders DONE")
 
+    FLOOD_WATCH_CITIES = ["Kanpur", "Lucknow", "Gorakhpur", "Varanasi", "Patna", "Muzaffarpur", "Darbhanga"]
+    FLOOD_RAIN_THRESHOLD_MM = 100  # 24-40 ghante mein itni ya zyada baarish = heavy/flood risk (IMD orange-red alert ke kareeb)
+
+    async def _check_flood_risk(self, city: str) -> Optional[Dict[str, Any]]:
+        """OpenWeather 5-day/3-hour forecast se agle 24-40 ghante ki baarish check karta hai"""
+        if not self.keys.get("OPENWEATHER"):
+            return None
+        try:
+            key = os.getenv("OPENWEATHER_API_KEY")
+            url = f"https://api.openweathermap.org/data/2.5/forecast?q={city}&appid={key}&units=metric"
+            r = await self.http.get(url, timeout=15)
+            if r.status_code != 200:
+                return None
+            data = r.json()
+            periods = data.get("list", [])[:13]  # 13 x 3hr = ~39 ghante
+            total_rain = sum(p.get("rain", {}).get("3h", 0) for p in periods)
+            if total_rain >= self.FLOOD_RAIN_THRESHOLD_MM:
+                return {"city": city, "expected_rain_mm": round(total_rain, 1)}
+            return None
+        except Exception as e:
+            logger.warning(f"[FLOOD] {city} check fail: {e}")
+            return None
+
+    async def _job_flood_watch(self):
+        logger.info("[JOB] Flood Watch check starting...")
+        risky = []
+        for city in self.FLOOD_WATCH_CITIES:
+            result = await self._check_flood_risk(city)
+            if result:
+                risky.append(result)
+        if risky:
+            lines = "\n".join(f"⚠️ {r['city']}: agle 24-40 ghante mein ~{r['expected_rain_mm']}mm baarish ka anumaan" for r in risky)
+            msg = (
+                f"🌊 <b>Baadh Chetavani (Flood Watch)</b>\n"
+                f"{'─' * 28}\n\n"
+                f"{lines}\n\n"
+                f"Savdhaan rahein, nichle/nadi-kinare ke ilakon mein khaas dhyan dein.\n\n"
+                f"— <i>Singh Ji AI Ultra</i>"
+            )
+            await self._broadcast(msg, parse_mode="HTML")
+            logger.info(f"[JOB] Flood Watch: {len(risky)} cities flagged")
+        else:
+            logger.info("[JOB] Flood Watch: koi risk nahi mila")
+        self._update_state("flood_watch", "success")
+
     async def _self_ping(self):
         app_url = os.getenv("APP_URL", "")
         if not app_url:
@@ -804,6 +902,14 @@ class SinghJiMasterScheduler:
             CronTrigger(hour=18, minute=0),
             id="evening_digest",
             name="Evening News + Rozgar",
+            replace_existing=True,
+            misfire_grace_time=3600,
+        )
+        self.scheduler.add_job(
+            self._job_flood_watch,
+            CronTrigger(hour="*/6", minute=0),
+            id="flood_watch",
+            name="Flood Watch (24-40hr rain forecast)",
             replace_existing=True,
             misfire_grace_time=3600,
         )
@@ -1415,6 +1521,7 @@ async def youtube_search(q: str = "", max_results: int = 10):
         return {"error": str(e)}
 
 app.add_api_route("/api/search", search_handler, methods=["GET", "POST"])
+app.add_api_route("/api/rozgar", rozgar_handler, methods=["GET", "POST"])
 
 @app.post("/api/retirement/tax-calculate")
 async def tax_calculate(request: Request):
@@ -1515,6 +1622,9 @@ async def telegram_webhook(request: Request):
                 except Exception as e:
                     social_text = f"Social Agent not loaded: {str(e)[:100]}"
                 await _telegram_send_message(chat_id, social_text)
+            elif query_data == "rozgar":
+                USER_PREFERENCES.setdefault(user_id, {})["waiting_for"] = "rozgar"
+                await _telegram_send_message(chat_id, "Rozgar/Jobs\n\nKeyword aur/ya country batao\n(jaise: software IN, ya sirf software, ya sirf IN)")
 
             return {"status": "ok"}
 
@@ -1547,6 +1657,8 @@ async def telegram_webhook(request: Request):
                 text = "/horoscope " + text.strip()
             elif pending == "currency":
                 text = "/currency " + text.strip()
+            elif pending == "rozgar":
+                text = "/rozgar " + text.strip()
         # ────────────────────────────────────────────────────────────
 
         if _rate_check(f"tg_user:{user_id}", *RATE_LIMIT_TELEGRAM_USER):
@@ -1632,7 +1744,7 @@ async def telegram_webhook(request: Request):
                 "/start\n/weather city\n/news\n/mandi state\n/tax income\n/status\n/ai question\n"
                 "/gold city\n/fuel city\n/horoscope rashi\n/currency USD INR 100\n"
                 "/translate en text\n/emergency type\n/upi\n/pani\n/sewer\n/yojana age income category\n"
-                "/govt aadhaar\n/search query\n/tv educational\n/video prompt"
+                "/govt aadhaar\n/search query\n/tv educational\n/video prompt\n/rozgar software IN"
             )
             await _telegram_send_message(chat_id, help_text)
             return {"status": "ok"}
@@ -1801,6 +1913,43 @@ async def telegram_webhook(request: Request):
                 await _telegram_send_message(chat_id, cur_text)
             except Exception as e:
                 await _telegram_send_message(chat_id, f"Currency error: {str(e)[:100]}\n\nFormat: /currency USD INR 100")
+            return {"status": "ok"}
+
+        elif text.startswith("/rozgar"):
+            raw = text.replace("/rozgar", "").strip()
+            parts = raw.split()
+            known_countries = set(rozgar_module.PORTALS["regional"].keys())
+            country = ""
+            keyword_parts = []
+            for p in parts:
+                if p.upper() in known_countries and not country:
+                    country = p.upper()
+                else:
+                    keyword_parts.append(p)
+            keyword = " ".join(keyword_parts).strip().lower()
+            try:
+                search_term = rozgar_module.KEYWORD_MAP.get(keyword, keyword) if keyword else ""
+                if keyword and country:
+                    result = rozgar_module._search_keyword(keyword, search_term)
+                    result = rozgar_module._filter_by_country(result, country)
+                elif keyword:
+                    result = rozgar_module._search_keyword(keyword, search_term)
+                elif country:
+                    result = rozgar_module._country_only(country)
+                else:
+                    result = {"global": [], "regional": [], "govt": [], "categories": []}
+
+                rozgar_text = "Rozgar/Jobs Portals\n\n"
+                for section, label in [("govt", "Government"), ("regional", "Regional"), ("global", "Global")]:
+                    for entry in result.get(section, [])[:5]:
+                        name = entry.get("name", "")
+                        site = entry.get("site", "")
+                        rozgar_text += f"{name} — {site}\n"
+                if not any(result.get(s) for s in ("govt", "regional", "global")):
+                    rozgar_text += "Kuch nahi mila. Format: /rozgar software IN\n"
+                await _telegram_send_message(chat_id, rozgar_text[:4000])
+            except Exception as e:
+                await _telegram_send_message(chat_id, f"Rozgar error: {str(e)[:100]}\n\nFormat: /rozgar software IN")
             return {"status": "ok"}
 
         elif text.startswith("/translate "):
