@@ -3,6 +3,7 @@
 Polished: Async, Cached, Retry, Rate-Limited, Superior
 """
 
-from .handler import router, handler
+from .handler import router
+from .handler import handler as legacy_handler
 
-__all__ = ["router", "handler"]
+__all__ = ["router", "legacy_handler"]
