@@ -1,4 +1,7 @@
-
+"""
+miniprogram/utils.py — Singh Ji AI Ultra v8.0
+Common utilities for miniprogram portal module.
+"""
 
 import os
 import json
@@ -240,6 +243,92 @@ def format_bytes(size: int) -> str:
         size /= 1024
     return f"{size:.1f} TB"
 
+
+# ─── APP ID / SECRET GENERATORS ──────────────────────────
+def generate_app_id(prefix: str = "app") -> str:
+    """Generate unique app ID for miniprogram"""
+    timestamp = int(time.time())
+    random_part = secrets.token_hex(4)
+    return f"{prefix}_{timestamp}_{random_part}"
+
+def generate_secret(length: int = 32) -> str:
+    """Generate secure secret key"""
+    return secrets.token_urlsafe(length)
+
+def generate_nonce(length: int = 16) -> str:
+    """Generate random nonce for API requests"""
+    return secrets.token_hex(length // 2)
+
+def generate_short_id(length: int = 8) -> str:
+    """Generate short alphanumeric ID"""
+    chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+    return "".join(secrets.choice(chars) for _ in range(length))
+
+# ─── SIGNATURE UTILITIES ─────────────────────────────────
+def generate_signature(payload: Dict, secret: str) -> str:
+    """Generate HMAC-SHA256 signature for webhook/API verification"""
+    message = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    return hmac.new(secret.encode(), message.encode(), hashlib.sha256).hexdigest()
+
+def verify_signature(payload: Dict, secret: str, signature: str) -> bool:
+    """Verify HMAC-SHA256 signature"""
+    expected = generate_signature(payload, secret)
+    return hmac.compare_digest(expected, signature)
+
+# ─── RATE LIMIT HELPERS ──────────────────────────────────
+def check_rate_limit(key: str, max_requests: int, window_seconds: int, store: Dict) -> bool:
+    """Simple in-memory rate limit check"""
+    now = time.time()
+    if key not in store:
+        store[key] = []
+    # Clean old entries
+    store[key] = [t for t in store[key] if now - t < window_seconds]
+    if len(store[key]) >= max_requests:
+        return False  # Rate limited
+    store[key].append(now)
+    return True  # OK
+
+# ─── PHONE OTP HELPERS ───────────────────────────────────
+def mask_phone(phone: str) -> str:
+    """Mask phone number: 9876543210 → 98****3210"""
+    if len(phone) >= 10:
+        return phone[:2] + "****" + phone[-4:]
+    return "****"
+
+def format_phone(phone: str) -> str:
+    """Format phone to +91 standard"""
+    digits = "".join(c for c in phone if c.isdigit())
+    if len(digits) == 10:
+        return f"+91{digits}"
+    elif len(digits) == 12 and digits.startswith("91"):
+        return f"+{digits}"
+    return digits
+
+# ─── JSON HELPERS ────────────────────────────────────────
+def safe_json_loads(data: str, default: Any = None) -> Any:
+    """Safe JSON parse with fallback"""
+    try:
+        return json.loads(data)
+    except (json.JSONDecodeError, TypeError):
+        return default
+
+def pretty_json(data: Any) -> str:
+    """Pretty print JSON"""
+    return json.dumps(data, indent=2, ensure_ascii=False, default=str)
+
+# ─── ENVIRONMENT HELPERS ─────────────────────────────────
+def get_env_int(key: str, default: int = 0) -> int:
+    """Get integer from env var"""
+    try:
+        return int(os.getenv(key, str(default)))
+    except (ValueError, TypeError):
+        return default
+
+def get_env_bool(key: str, default: bool = False) -> bool:
+    """Get boolean from env var"""
+    val = os.getenv(key, "").lower()
+    return val in ("true", "1", "yes", "on") if val else default
+
 # ─── EXPORT ──────────────────────────────────────────────
 __all__ = [
     "success_response", "error_response",
@@ -247,6 +336,11 @@ __all__ = [
     "require_auth", "require_admin",
     "validate_phone", "validate_aadhaar", "validate_pan", "sanitize_input",
     "generate_api_key", "hash_password", "verify_password", "generate_otp",
+    "generate_app_id", "generate_secret", "generate_nonce", "generate_short_id",
+    "generate_signature", "verify_signature",
+    "check_rate_limit", "mask_phone", "format_phone",
+    "safe_json_loads", "pretty_json",
+    "get_env_int", "get_env_bool",
     "get_client_ip", "get_user_agent",
     "paginate", "generate_cache_key",
     "format_datetime", "time_ago",
