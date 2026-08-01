@@ -145,35 +145,53 @@ async def _fetch_currents(query: str = "") -> List[Dict[str, Any]]:
 
 
 # ─── SOURCE 4: TAVILY (WEB SEARCH — sabse bharosemand, jab dedicated news APIs fail/limit ho jayein) ───
+_GENERIC_TITLE_PATTERNS = [
+    "news in hindi", "breaking news", "live news", "superfast news",
+    "news live", "top news", "latest news", "news today", "समाचार",
+    "हिंदी न्यूज़", "हिन्दी समाचार", "ब्रेकिंग न्यूज़",
+]
+
+
+def _is_generic_title(title: str) -> bool:
+    """Channel/homepage jaisi generic titles ko chhaanta hai (jaise 'India News In Hindi - ABP News')"""
+    t = title.lower().strip()
+    return any(p in t for p in _GENERIC_TITLE_PATTERNS) or len(t) < 15
+
+
 async def _fetch_tavily(query: str = "") -> List[Dict[str, Any]]:
     if not TAVILY_API_KEY:
         return []
     try:
-        search_query = query if query else "aaj ki mukhya khabrein India"
+        today = datetime.utcnow().strftime("%d %B %Y")
+        search_query = query if query else f"India specific news headlines {today}"
         async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
             resp = await client.post(
                 "https://api.tavily.com/search",
                 json={
                     "api_key": TAVILY_API_KEY,
                     "query": search_query,
-                    "search_depth": "basic",
+                    "search_depth": "advanced",
                     "topic": "news",
-                    "max_results": 10,
+                    "time_range": "day",
+                    "max_results": 15,
                 },
             )
             resp.raise_for_status()
             data = resp.json()
-        return [
-            {
-                "title": r.get("title", ""),
+        results = []
+        for r in data.get("results", []):
+            title = r.get("title", "")
+            if not title or _is_generic_title(title):
+                continue
+            results.append({
+                "title": title,
                 "description": r.get("content", "")[:200],
                 "url": r.get("url", ""),
                 "source": "Tavily",
                 "published": r.get("published_date", ""),
                 "image": "",
-            }
-            for r in data.get("results", [])
-        ]
+            })
+        return results
     except Exception as e:
         logger.warning(f"[NEWS] Tavily fail: {e}")
         return []
