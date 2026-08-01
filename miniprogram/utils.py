@@ -329,14 +329,96 @@ def get_env_bool(key: str, default: bool = False) -> bool:
     val = os.getenv(key, "").lower()
     return val in ("true", "1", "yes", "on") if val else default
 
+
+# ─── APP CODE / INVITE CODE VALIDATORS ───────────────────
+def validate_app_code(code: str) -> bool:
+    """Validate miniprogram app registration code"""
+    if not code or len(code) < 6:
+        return False
+    # Format: 6+ alphanumeric chars, no special chars
+    return code.isalnum() and len(code) <= 20
+
+def validate_invite_code(code: str) -> bool:
+    """Validate invite/referral code"""
+    if not code or len(code) < 4:
+        return False
+    return code.isalnum() and len(code) <= 16
+
+def generate_invite_code(length: int = 8) -> str:
+    """Generate random invite code"""
+    chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # No confusing chars (0,O,I,1)
+    return "".join(secrets.choice(chars) for _ in range(length))
+
+# ─── UPI / PAYMENT VALIDATORS ────────────────────────────
+def validate_upi_id(upi: str) -> bool:
+    """Validate UPI ID format"""
+    if not upi or "@" not in upi:
+        return False
+    parts = upi.split("@")
+    return len(parts) == 2 and len(parts[0]) >= 3 and len(parts[1]) >= 3
+
+def validate_ifsc(ifsc: str) -> bool:
+    """Validate IFSC code (11 chars: 4 alpha + 0 + 6 alphanumeric)"""
+    if len(ifsc) != 11:
+        return False
+    return (ifsc[:4].isalpha() and ifsc[4] == "0" and ifsc[5:].isalnum())
+
+# ─── ID GENERATORS ─────────────────────────────────────
+def generate_order_id(prefix: str = "ORD") -> str:
+    """Generate unique order ID"""
+    ts = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+    rand = secrets.token_hex(3).upper()
+    return f"{prefix}{ts}{rand}"
+
+def generate_transaction_id() -> str:
+    """Generate unique transaction reference"""
+    ts = int(time.time())
+    rand = secrets.token_hex(4)
+    return f"TXN{ts}{rand}"
+
+# ─── STRING UTILITIES ──────────────────────────────────
+def slugify(text: str) -> str:
+    """Convert text to URL slug"""
+    text = text.lower().strip()
+    keep = "abcdefghijklmnopqrstuvwxyz0123456789-"
+    return "".join(c if c in keep else "-" for c in text)[:50]
+
+def truncate(text: str, length: int = 100, suffix: str = "...") -> str:
+    """Truncate text with ellipsis"""
+    if len(text) <= length:
+        return text
+    return text[:length - len(suffix)] + suffix
+
+# ─── NUMBER UTILITIES ────────────────────────────────────
+def format_inr(amount: float) -> str:
+    """Format amount in Indian Rupees: ₹1,23,456.00"""
+    return f"₹{amount:,.2f}"
+
+def format_number(num: int) -> str:
+    """Format large numbers: 1,23,456"""
+    s = str(num)
+    if len(s) <= 3:
+        return s
+    # Indian numbering: 1,23,456
+    last3 = s[-3:]
+    rest = s[:-3]
+    groups = []
+    while rest:
+        groups.append(rest[-2:] if len(rest) >= 2 else rest)
+        rest = rest[:-2]
+    return ",".join(reversed(groups)) + "," + last3
+
 # ─── EXPORT ──────────────────────────────────────────────
 __all__ = [
     "success_response", "error_response",
     "create_jwt_token", "decode_jwt_token", "verify_jwt_from_request",
     "require_auth", "require_admin",
     "validate_phone", "validate_aadhaar", "validate_pan", "sanitize_input",
+    "validate_app_code", "validate_invite_code", "generate_invite_code",
+    "validate_upi_id", "validate_ifsc",
     "generate_api_key", "hash_password", "verify_password", "generate_otp",
     "generate_app_id", "generate_secret", "generate_nonce", "generate_short_id",
+    "generate_order_id", "generate_transaction_id",
     "generate_signature", "verify_signature",
     "check_rate_limit", "mask_phone", "format_phone",
     "safe_json_loads", "pretty_json",
@@ -344,5 +426,6 @@ __all__ = [
     "get_client_ip", "get_user_agent",
     "paginate", "generate_cache_key",
     "format_datetime", "time_ago",
+    "slugify", "truncate", "format_inr", "format_number",
     "log_api_call", "safe_filename", "format_bytes"
 ]
