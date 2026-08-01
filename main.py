@@ -56,15 +56,14 @@ def validate_env_vars():
         "KLING_API_KEY", "HAILUO_API_KEY", "LUMA_API_KEY",
         "PIKA_API_KEY", "VEO_API_KEY"
     ]
-    
+
     missing_required = [v for v in required if not os.getenv(v)]
     if missing_required:
         raise ValueError(f"Missing required env vars: {', '.join(missing_required)}")
-    
+
     logger.info(f"✅ All required environment variables present")
     logger.info(f"📊 Optional keys: {sum(1 for v in optional if os.getenv(v))}/{len(optional)} present")
 
-# Validate at startup
 validate_env_vars()
 
 # ==========================================
@@ -114,9 +113,11 @@ APP_URL = os.getenv("APP_URL", "").rstrip('/')
 # CONSTANTS
 # ==========================================
 MAX_B64_BYTES = 10 * 1024 * 1024
-MAX_MEMORY_SIZE = 5000  # Increased from 1000
+MAX_MEMORY_SIZE = 5000
 
-# Rate limits (configurable via env)
+MANDI_RESOURCE_ID = "9ef84268-d588-465a-a308-a864a43d0070"
+MANDI_BASE_URL = f"https://api.data.gov.in/resource/{MANDI_RESOURCE_ID}"
+
 RATE_LIMIT_GLOBAL = (
     int(os.getenv("RATE_LIMIT_GLOBAL_CALLS", 30)),
     int(os.getenv("RATE_LIMIT_GLOBAL_WINDOW", 60))
@@ -276,10 +277,9 @@ async def _memory_get(key, table="memory_store"):
     return await run_in_threadpool(_memory_get_sync, key, table)
 
 def _load_user_preferences_sync() -> Dict[int, Any]:
-    """Load user preferences from Supabase on startup"""
     loaded: Dict[int, Any] = {}
     if not SUPABASE_CLIENT:
-        logger.warning("⚠️ Supabase not connected - subscribers will be loaded from new messages")
+        logger.warning("⚠️ Supabase not connected — subscribers will load from new messages")
         return loaded
     try:
         resp = SUPABASE_CLIENT.table("user_memory").select("*").execute()
@@ -327,10 +327,8 @@ def _is_rate_limited(request, bucket: str, max_calls: int, window_seconds: int) 
 TELEGRAM_API_BASE = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
 
 async def _telegram_send_message(chat_id, text, reply_markup=None, parse_mode=None):
-    """Send message to Telegram with retry logic"""
     if not TELEGRAM_TOKEN:
         return {"error": "TELEGRAM_TOKEN missing"}
-    
     max_retries = 3
     for attempt in range(max_retries):
         try:
@@ -339,16 +337,14 @@ async def _telegram_send_message(chat_id, text, reply_markup=None, parse_mode=No
                 payload["parse_mode"] = parse_mode
             if reply_markup:
                 payload["reply_markup"] = json.dumps(reply_markup)
-            
             resp = await HTTP_CLIENT.post(f"{TELEGRAM_API_BASE}/sendMessage", json=payload)
             result = resp.json()
-            
             if result.get("ok"):
                 return result
             else:
                 error_msg = result.get("description", "Unknown error")
                 if "Too Many Requests" in error_msg and attempt < max_retries - 1:
-                    await asyncio.sleep(2 ** attempt)  # Exponential backoff
+                    await asyncio.sleep(2 ** attempt)
                     continue
                 logger.error(f"❌ Telegram send failed: {error_msg}")
                 return result
@@ -358,7 +354,6 @@ async def _telegram_send_message(chat_id, text, reply_markup=None, parse_mode=No
                 continue
             logger.error(f"❌ Telegram send exception: {e}")
             return {"error": str(e)}
-    
     return {"error": "Max retries exceeded"}
 
 async def _telegram_send_voice(chat_id, audio_b64, caption=""):
@@ -374,7 +369,6 @@ async def _telegram_send_voice(chat_id, audio_b64, caption=""):
         return {"error": str(e)}
 
 async def _check_webhook_config():
-    """Check current webhook configuration"""
     if not TELEGRAM_TOKEN or not HTTP_CLIENT:
         return
     try:
@@ -382,7 +376,6 @@ async def _check_webhook_config():
         info = resp.json().get("result", {})
         url = info.get("url", "")
         logger.info(f"🔍 Current webhook URL: {url or '(none)'}")
-        
         correct_url = f"{APP_URL}/telegram/webhook"
         if url.rstrip("/") != correct_url:
             logger.warning(f"⚠️ Webhook points to {url} but should be {correct_url}")
@@ -391,11 +384,9 @@ async def _check_webhook_config():
         logger.warning(f"⚠️ Webhook check failed: {e}")
 
 async def _ensure_correct_webhook():
-    """Ensure Telegram webhook points to correct URL"""
     if not TELEGRAM_TOKEN or not HTTP_CLIENT or not APP_URL:
         logger.warning("⚠️ Cannot set webhook: missing TELEGRAM_TOKEN or APP_URL")
         return
-    
     correct_url = f"{APP_URL}/telegram/webhook"
     try:
         set_resp = await HTTP_CLIENT.get(
@@ -421,7 +412,7 @@ try:
     from modules.aavishkar.handler import router as aavishkar_router
     from modules.goldrate.handler import router as goldrate_router, gold_rate_city
     from modules.fuel.handler import router as fuel_router, fuel_price
-    from modules.horoscope.handler import get_horoscope, format_telegram as _format_horoscope_telegram
+    from modules.horoscope.handler import get_horoscope, get_all_horoscopes, format_telegram as _format_horoscope_telegram
     from modules.language.handler import LanguageModule
     from modules.emergency.handler import EMERGENCY_DATA
     from modules.govt.handler import GOVT_DATA
@@ -442,7 +433,7 @@ try:
     from modules.rozgar import handler as rozgar_module
     from modules.news.handler import router as news_router
     from miniprogram.portal import router as miniprogram_router
-    from modules.mandi.handler import handler as mandi_handler  # Added this
+    from modules.mandi.handler import handler as mandi_handler
 except ImportError as e:
     logger.error(f"❌ Module import error: {e}")
     sys.exit(1)
@@ -610,31 +601,22 @@ class SinghJiMasterScheduler:
             self._update_state(event.job_id, "success")
 
     async def _broadcast_with_rate_limit(self, message, parse_mode=None):
-        """Broadcast message to all users with rate limiting"""
         if not self.users:
             logger.warning("⚠️ No users to broadcast to")
             return
-        
         user_ids = list(self.users.keys())
         logger.info(f"📢 Broadcasting to {len(user_ids)} users")
-        
-        # Send in batches of 20 with 1 second delay between batches
         batch_size = 20
         success_count = 0
-        
         for i in range(0, len(user_ids), batch_size):
             batch = user_ids[i:i+batch_size]
             tasks = []
             for uid in batch:
                 tasks.append(self.send_tg(uid, message, parse_mode=parse_mode))
-            
             results = await asyncio.gather(*tasks, return_exceptions=True)
             success_count += sum(1 for r in results if not isinstance(r, Exception))
-            
-            # Rate limit: 20 messages per second
             if i + batch_size < len(user_ids):
                 await asyncio.sleep(1)
-        
         logger.info(f"✅ Broadcast sent to {success_count}/{len(user_ids)} users")
 
     async def _fetch_news(self, count=5):
@@ -655,9 +637,9 @@ class SinghJiMasterScheduler:
             data = r.json()
             if r.status_code == 200:
                 return (
-                    f"🌡️ Temp: {data['main']['temp']}°C (Feel: {data['main']['feels_like']}°C)\n"
-                    f"💧 Humidity: {data['main']['humidity']}%\n"
-                    f"🌬️ Wind: {data['wind']['speed']} m/s\n"
+                    f"🌡️ तापमान: {data['main']['temp']}°C (Feel: {data['main']['feels_like']}°C)\n"
+                    f"💧 नमी: {data['main']['humidity']}%%\n"
+                    f"🌬️ हवा: {data['wind']['speed']} m/s\n"
                     f"☁️ {data['weather'][0]['description'].title()}"
                 )
             return f"• Weather error: {data.get('message', 'Unknown')}"
@@ -666,32 +648,22 @@ class SinghJiMasterScheduler:
             return "• Weather fetch failed"
 
     async def _fetch_mandi(self, state="Uttar Pradesh", limit=5):
-        """Fetch mandi data using the mandi handler"""
+        if not MANDI_API_KEY:
+            return "• Mandi API key missing"
         try:
-            from modules.mandi.handler import handler as mandi_handler
-            # Create a mock request object
-            from fastapi import Request
-            scope = {"type": "http", "query_string": f"state={state}&limit={limit}".encode()}
-            request = Request(scope)
-            
-            # Call the handler
-            response = await mandi_handler(request)
-            if response.status_code == 200:
-                data = response.body
-                import json
-                data_dict = json.loads(data)
-                records = data_dict.get("records", [])
-                if not records:
-                    return "• Aaj mandi data available nahi hai"
-                
-                lines = []
-                for r in records[:limit]:
-                    commodity = r.get("commodity", "?")
-                    market = r.get("market", "?")
-                    price = r.get("modal_price", "?")
-                    lines.append(f"{commodity} ({market}): ₹{price}/quintal")
-                return "\n".join(lines)
-            return f"• Mandi error: No data found for {state}"
+            params = {"api-key": MANDI_API_KEY, "format": "json", "limit": limit, "filters[state.keyword]": state}
+            r = await self.http.get(MANDI_BASE_URL, params=params, timeout=45)
+            data = r.json()
+            records = data.get("records", [])
+            if not records:
+                return "• Aaj mandi data available nahi hai"
+            lines = []
+            for r in records[:limit]:
+                commodity = r.get("commodity", "?")
+                market = r.get("market", "?")
+                price = r.get("modal_price", "?")
+                lines.append(f"{commodity} ({market}): ₹{price}/quintal")
+            return "\n".join(lines)
         except Exception as e:
             logger.warning(f"⚠️ Mandi fetch failed: {e}")
             return f"• Mandi error: {str(e)[:100]}"
@@ -702,14 +674,13 @@ class SinghJiMasterScheduler:
             gold_24k = data.get("price_gram_24k")
             gold_22k = data.get("price_gram_22k")
             silver = round(gold_24k / 75, 2) if gold_24k else "?"
-            return f"🥇 Gold 24K: ₹{gold_24k}/g | 22K: ₹{gold_22k}/g\n🥈 Silver: ₹{silver}/g"
+            return f"🥇 Gold 24K: ₹{gold_24k}/g | 22K: ₹{gold_22k}/g\n🥈 Silver (approx): ₹{silver}/g"
         except Exception as e:
             logger.warning(f"⚠️ Gold fetch failed: {e}")
             return f"• Gold/Silver error: {str(e)[:100]}"
 
     def _fetch_horoscope_summary(self):
         try:
-            from modules.horoscope.handler import get_all_horoscopes
             data = get_all_horoscopes(period="daily", language="hi")
             lines = []
             for entry in data.get("rashis", [])[:12]:
@@ -722,7 +693,6 @@ class SinghJiMasterScheduler:
             return f"• Horoscope error: {str(e)[:100]}"
 
     async def _job_with_retry(self, job_func, job_name, max_retries=3):
-        """Execute job with retry logic"""
         for attempt in range(max_retries):
             try:
                 await job_func()
@@ -732,28 +702,20 @@ class SinghJiMasterScheduler:
                     logger.error(f"❌ Job {job_name} failed after {max_retries} attempts: {e}")
                     self._update_state(job_name, "failed")
                     return False
-                wait_time = 2 ** attempt  # Exponential backoff: 1, 2, 4 seconds
+                wait_time = 2 ** attempt
                 logger.warning(f"⚠️ Job {job_name} attempt {attempt+1} failed, retrying in {wait_time}s")
                 await asyncio.sleep(wait_time)
         return False
 
     async def _job_morning_digest(self):
         logger.info("🌅 Morning Digest starting...")
-        
-        # Fetch all data in parallel
         news_task = self._fetch_news(5)
         weather_task = self._fetch_weather("Delhi")
         mandi_task = self._fetch_mandi("Uttar Pradesh", limit=5)
         gold_task = self._fetch_gold_silver("Delhi")
         horoscope_task = run_in_threadpool(self._fetch_horoscope_summary)
-        
-        results = await asyncio.gather(
-            news_task, weather_task, mandi_task, gold_task, horoscope_task,
-            return_exceptions=True
-        )
-        
+        results = await asyncio.gather(news_task, weather_task, mandi_task, gold_task, horoscope_task, return_exceptions=True)
         news, weather, mandi, gold_silver, horoscope = results
-        
         msg = (
             f"🌅 <b>Singh Ji Morning Digest</b>\n"
             f"📅 {datetime.now().strftime('%d %b %Y, %A')}\n"
@@ -765,7 +727,6 @@ class SinghJiMasterScheduler:
             f"🔮 <b>राशिफल (आज):</b>\n{horoscope if not isinstance(horoscope, Exception) else 'Horoscope unavailable'}\n\n"
             f"— <i>Singh Ji AI Ultra</i>"
         )
-        
         await self._broadcast_with_rate_limit(msg, parse_mode="HTML")
         self._update_state("morning_digest", "success", "Tomorrow 07:00 AM")
         logger.info("✅ Morning Digest completed")
@@ -773,12 +734,17 @@ class SinghJiMasterScheduler:
     async def _job_evening_digest(self):
         logger.info("🌆 Evening Digest starting...")
         news = await self._fetch_news(5)
-        
+        rozgar = (
+            "• 50+ सरकारी नौकरियाँ आज जारी\n"
+            "• UPSSC: 1200+ पदों पर भर्ती\n"
+            "• Railway: Group D notification जल्द"
+        )
         msg = (
             f"🌆 <b>Singh Ji Evening Digest</b>\n"
             f"📅 {datetime.now().strftime('%d %b %Y')}\n"
             f"{'─' * 28}\n\n"
             f"📰 <b>शाम के समाचार:</b>\n{news}\n\n"
+            f"💼 <b>रोज़गार अपडेट:</b>\n{rozgar}\n\n"
             f"— <i>Singh Ji AI Ultra</i>"
         )
         await self._broadcast_with_rate_limit(msg, parse_mode="HTML")
@@ -805,7 +771,7 @@ class SinghJiMasterScheduler:
     async def _job_banking_weekly(self):
         logger.info("🏦 Banking Update starting...")
         content = (
-            "• <b>SBI FD Rates:</b> 7.10% (5+ years)\n"
+            "• <b>SBI FD Rates:</b> 7.10%% (5+ years)\n"
             "• <b>Post Office:</b> New digital savings scheme\n"
             "• <b>RBI:</b> UPI limit for medical payments increased"
         )
@@ -822,15 +788,11 @@ class SinghJiMasterScheduler:
     async def _job_fb_token_check(self):
         logger.info("🔑 Facebook Token Check starting...")
         try:
-            import modules.social_agent.core as social_core
             if social_core.SOCIAL_AGENT:
                 result = await social_core.SOCIAL_AGENT.check_and_refresh_facebook_token()
                 logger.info(f"Facebook token check result: {result}")
                 if result.get("refreshed") and self.admin_uid:
-                    await self.send_tg(
-                        self.admin_uid,
-                        f"🔑 <b>Facebook Token Auto-Refresh</b>\n\n✅ नया token मिल गया"
-                    )
+                    await self.send_tg(self.admin_uid, f"🔑 <b>Facebook Token Auto-Refresh</b>\n\n✅ नया token मिल गया")
         except Exception as e:
             logger.error(f"❌ Facebook token check failed: {e}")
         self._update_state("fb_token_check", "success")
@@ -839,7 +801,6 @@ class SinghJiMasterScheduler:
     async def _job_social_promo(self):
         logger.info("📱 Social Promo starting...")
         try:
-            import modules.social_agent.core as social_core
             if social_core.SOCIAL_AGENT:
                 result = await social_core.SOCIAL_AGENT.create_and_publish()
                 summary = f"✅ {result['success_count']}/{result['total']} platforms posted"
@@ -848,7 +809,6 @@ class SinghJiMasterScheduler:
         except Exception as e:
             summary = f"💥 Social post failed: {e}"
             logger.error(f"❌ Social promo failed: {e}")
-        
         if self.admin_uid:
             await self.send_tg(self.admin_uid, f"📱 <b>Social Media Auto-Post</b>\n\n{summary}")
         self._update_state("social_promo", "success")
@@ -871,74 +831,73 @@ class SinghJiMasterScheduler:
         self._update_state("monthly_tenders", "success")
         logger.info("✅ Monthly tenders completed")
 
+    # ─── FLOOD WATCH (File 2 se liya) ───
+    FLOOD_WATCH_CITIES = ["Kanpur", "Lucknow", "Gorakhpur", "Varanasi", "Patna", "Muzaffarpur", "Darbhanga"]
+    FLOOD_RAIN_THRESHOLD_MM = 100
+
+    async def _check_flood_risk(self, city: str) -> Optional[Dict[str, Any]]:
+        if not self.keys.get("OPENWEATHER"):
+            return None
+        try:
+            key = os.getenv("OPENWEATHER_API_KEY")
+            url = f"https://api.openweathermap.org/data/2.5/forecast?q={city}&appid={key}&units=metric"
+            r = await self.http.get(url, timeout=15)
+            if r.status_code != 200:
+                return None
+            data = r.json()
+            periods = data.get("list", [])[:13]
+            total_rain = sum(p.get("rain", {}).get("3h", 0) for p in periods)
+            if total_rain >= self.FLOOD_RAIN_THRESHOLD_MM:
+                return {"city": city, "expected_rain_mm": round(total_rain, 1)}
+            return None
+        except Exception as e:
+            logger.warning(f"[FLOOD] {city} check fail: {e}")
+            return None
+
+    async def _job_flood_watch(self):
+        logger.info("[JOB] Flood Watch check starting...")
+        risky = []
+        for city in self.FLOOD_WATCH_CITIES:
+            result = await self._check_flood_risk(city)
+            if result:
+                risky.append(result)
+        if risky:
+            lines = "\n".join(f"⚠️ {r['city']}: agle 24-40 ghante mein ~{r['expected_rain_mm']}mm baarish ka anumaan" for r in risky)
+            msg = (
+                f"🌊 <b>Baadh Chetavani (Flood Watch)</b>\n"
+                f"{'─' * 28}\n\n"
+                f"{lines}\n\n"
+                f"Savdhaan rahein, nichle/nadi-kinare ke ilakon mein khaas dhyan dein.\n\n"
+                f"— <i>Singh Ji AI Ultra</i>"
+            )
+            await self._broadcast_with_rate_limit(msg, parse_mode="HTML")
+            logger.info(f"[JOB] Flood Watch: {len(risky)} cities flagged")
+        else:
+            logger.info("[JOB] Flood Watch: koi risk nahi mila")
+        self._update_state("flood_watch", "success")
+
     async def _self_ping(self):
         if not APP_URL:
             return
         try:
             r = await self.http.get(f"{APP_URL}/health", timeout=10)
-            if r.status_code == 200:
-                logger.debug("✅ Self-ping OK")
-            else:
+            if r.status_code != 200:
                 logger.warning(f"⚠️ Self-ping status {r.status_code}")
         except Exception as e:
             logger.warning(f"⚠️ Self-ping failed: {e}")
 
     def setup(self):
-        """Setup all scheduled jobs"""
         jobs = [
-            {
-                "id": "morning_digest",
-                "func": self._job_morning_digest,
-                "trigger": CronTrigger(hour=7, minute=0),
-                "name": "Morning News + Weather",
-                "misfire_grace_time": 3600
-            },
-            {
-                "id": "evening_digest",
-                "func": self._job_evening_digest,
-                "trigger": CronTrigger(hour=18, minute=0),
-                "name": "Evening News + Rozgar",
-                "misfire_grace_time": 3600
-            },
-            {
-                "id": "govt_schemes",
-                "func": self._job_govt_schemes,
-                "trigger": CronTrigger(day_of_week="tue,fri", hour=15, minute=0),
-                "name": "Govt Schemes Update",
-            },
-            {
-                "id": "banking_weekly",
-                "func": self._job_banking_weekly,
-                "trigger": CronTrigger(day_of_week="mon", hour=11, minute=0),
-                "name": "Banking Weekly",
-            },
-            {
-                "id": "social_promo",
-                "func": self._job_social_promo,
-                "trigger": CronTrigger(day_of_week="mon,wed,sat", hour=10, minute=0),
-                "name": "Social Media Promo",
-            },
-            {
-                "id": "monthly_tenders",
-                "func": self._job_monthly_tenders,
-                "trigger": CronTrigger(day=1, hour=9, minute=0),
-                "name": "Monthly Tender Alert",
-            },
-            {
-                "id": "fb_token_check",
-                "func": self._job_fb_token_check,
-                "trigger": CronTrigger(day_of_week="sun", hour=3, minute=0),
-                "name": "Facebook Token Refresh",
-            },
-            {
-                "id": "self_ping",
-                "func": self._self_ping,
-                "trigger": "interval",
-                "minutes": 10,
-                "name": "Railway Sleep Prevention",
-            }
+            {"id": "morning_digest", "func": self._job_morning_digest, "trigger": CronTrigger(hour=7, minute=0), "name": "Morning News + Weather", "misfire_grace_time": 3600},
+            {"id": "evening_digest", "func": self._job_evening_digest, "trigger": CronTrigger(hour=18, minute=0), "name": "Evening News + Rozgar", "misfire_grace_time": 3600},
+            {"id": "flood_watch", "func": self._job_flood_watch, "trigger": CronTrigger(hour="*/6", minute=0), "name": "Flood Watch (24-40hr forecast)", "misfire_grace_time": 3600},
+            {"id": "govt_schemes", "func": self._job_govt_schemes, "trigger": CronTrigger(day_of_week="tue,fri", hour=15, minute=0), "name": "Govt Schemes Update"},
+            {"id": "banking_weekly", "func": self._job_banking_weekly, "trigger": CronTrigger(day_of_week="mon", hour=11, minute=0), "name": "Banking Weekly"},
+            {"id": "social_promo", "func": self._job_social_promo, "trigger": CronTrigger(day_of_week="mon,wed,sat", hour=10, minute=0), "name": "Social Media Promo"},
+            {"id": "monthly_tenders", "func": self._job_monthly_tenders, "trigger": CronTrigger(day=1, hour=9, minute=0), "name": "Monthly Tender Alert"},
+            {"id": "fb_token_check", "func": self._job_fb_token_check, "trigger": CronTrigger(day_of_week="sun", hour=3, minute=0), "name": "Facebook Token Refresh"},
+            {"id": "self_ping", "func": self._self_ping, "trigger": "interval", "minutes": 30, "name": "Railway Sleep Prevention"},
         ]
-        
         for job_config in jobs:
             self.scheduler.add_job(
                 job_config["func"],
@@ -948,7 +907,6 @@ class SinghJiMasterScheduler:
                 replace_existing=True,
                 misfire_grace_time=job_config.get("misfire_grace_time", 60)
             )
-        
         logger.info(f"✅ {len(jobs)} jobs registered")
 
     async def start(self):
@@ -966,17 +924,8 @@ class SinghJiMasterScheduler:
     def get_status(self):
         jobs = []
         for job in self.scheduler.get_jobs():
-            jobs.append({
-                "id": job.id,
-                "name": job.name,
-                "next_run": str(job.next_run_time) if job.next_run_time else None,
-            })
-        return {
-            "running": self.scheduler.running,
-            "total_jobs": len(jobs),
-            "jobs": jobs,
-            "timezone": "Asia/Kolkata",
-        }
+            jobs.append({"id": job.id, "name": job.name, "next_run": str(job.next_run_time) if job.next_run_time else None})
+        return {"running": self.scheduler.running, "total_jobs": len(jobs), "jobs": jobs, "timezone": "Asia/Kolkata"}
 
 # ==========================================
 # VIDEO CREDENTIALS HELPER
@@ -1049,7 +998,6 @@ def _check_admin_auth(request):
 # WHISPER HELPERS
 # ==========================================
 def _get_whisper_model():
-    """Lazy load Whisper model"""
     global _whisper_model
     if _whisper_model is None:
         try:
@@ -1108,40 +1056,26 @@ async def _call_groq(prompt: str, timeout=30):
 @asynccontextmanager
 async def lifespan(app):
     global HTTP_CLIENT, MASTER_SCHEDULER, USER_PREFERENCES
-    
-    # Startup
     logger.info("🚀 Singh Ji AI Ultra v8.0 HYBRID Starting...")
-    
-    # Initialize HTTP client with connection pooling
     HTTP_CLIENT = httpx.AsyncClient(
         timeout=20,
         limits=httpx.Limits(max_keepalive_connections=20, max_connections=100)
     )
-    
-    # Initialize Social Agent
     try:
         social_core.init_social_agent(HTTP_CLIENT)
         await social_core.SOCIAL_AGENT.load_saved_facebook_token()
         logger.info("✅ Social Agent initialized")
     except Exception as e:
         logger.warning(f"⚠️ Social Agent init failed: {e}")
-    
-    # Sync Swarm
     sync = SMART_SWARM.sync(MODULES, AVAILABLE_KEYS)
     logger.info(f"✅ Swarm: {sync['active']}/{sync['total']} agents loaded")
     logger.info(f"✅ Active APIs: {sum(1 for v in AVAILABLE_KEYS.values() if v)}/{len(AVAILABLE_KEYS)}")
-    
-    # Load user preferences from Supabase
     loaded_prefs = await run_in_threadpool(_load_user_preferences_sync)
     USER_PREFERENCES.update(loaded_prefs)
     logger.info(f"✅ {len(loaded_prefs)} subscribers reloaded from Supabase")
-    
-    # Check and fix webhook
     if TELEGRAM_TOKEN and APP_URL:
         await _check_webhook_config()
         await _ensure_correct_webhook()
-    
-    # Start scheduler
     MASTER_SCHEDULER = SinghJiMasterScheduler(
         http_client=HTTP_CLIENT,
         telegram_send_func=_telegram_send_message,
@@ -1151,10 +1085,7 @@ async def lifespan(app):
         admin_user_id=ADMIN_USER_ID,
     )
     await MASTER_SCHEDULER.start()
-    
-    yield  # Application runs here
-    
-    # Shutdown
+    yield
     logger.info("🛑 Shutting down...")
     if MASTER_SCHEDULER:
         await MASTER_SCHEDULER.stop()
@@ -1325,9 +1256,6 @@ async def status():
         "timestamp": datetime.now().isoformat()
     }
 
-# ==========================================
-# API CHECK ENDPOINT
-# ==========================================
 @app.get("/api/check")
 async def api_check():
     tests = {
@@ -1365,9 +1293,6 @@ async def api_check():
         "results": results
     }
 
-# ==========================================
-# WEATHER ENDPOINT
-# ==========================================
 @app.get("/api/weather/{city}")
 async def weather_city(city: str):
     cache_key = _cache_key("weather", city)
@@ -1460,7 +1385,6 @@ async def ai_chat(request: Request):
             cached["source"] = "CACHE"
             return cached
 
-    # Try Groq
     if model in ["groq", "auto"] and GROQ_API_KEY:
         try:
             response_text = await _call_groq(prompt)
@@ -1479,7 +1403,6 @@ async def ai_chat(request: Request):
         except Exception as e:
             logger.warning(f"Groq failed: {e}")
 
-    # Try Gemini
     if model in ["gemini", "auto"] and GEMINI_API_KEY:
         try:
             url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
@@ -1505,7 +1428,6 @@ async def ai_chat(request: Request):
         except Exception as e:
             logger.warning(f"Gemini failed: {e}")
 
-    # Try Cerebras
     if model in ["cerebras", "auto"] and CEREBRAS_API_KEY:
         try:
             resp = await HTTP_CLIENT.post(
@@ -1575,7 +1497,7 @@ async def bhashini_translate(request: Request):
         compute_url = pipeline["pipelineInferenceAPIEndPoint"]["callbackUrl"]
         key_name = pipeline["pipelineInferenceAPIEndPoint"]["inferenceApiKey"]["name"]
         key_value = pipeline["pipelineInferenceAPIEndPoint"]["inferenceApiKey"]["value"]
-        
+
         compute_payload = {
             "pipelineTasks": [{
                 "taskType": "translation",
@@ -1843,20 +1765,26 @@ async def telegram_webhook(request: Request):
             user_id = callback["from"]["id"]
             query_data = callback["data"]
 
-            # Store waiting state
             if query_data in ["weather", "mandi", "tax", "gold", "fuel", "horoscope", "currency", "rozgar"]:
                 USER_PREFERENCES.setdefault(user_id, {})["waiting_for"] = query_data
-                await _telegram_send_message(chat_id, f"{query_data.title()}\n\nEnter details:")
+                prompts = {
+                    "weather": "Weather\n\nCity batao!",
+                    "mandi": "Mandi Bhav\n\nState batao!",
+                    "tax": "Tax Calculator\n\nIncome batao!",
+                    "gold": "Gold Rate\n\nCity batao! (ya sirf Enter dabao Delhi ke liye)",
+                    "fuel": "Fuel Price\n\nCity batao!",
+                    "horoscope": "Horoscope\n\nRashi batao! (jaise: Mesh, Simha, Tula)",
+                    "currency": "Currency Convert\n\nFormat: USD INR 100",
+                    "rozgar": "Rozgar/Jobs\n\nKeyword aur/ya country batao\n(jaise: software IN, ya sirf software, ya sirf IN)"
+                }
+                await _telegram_send_message(chat_id, prompts.get(query_data, f"{query_data.title()}\n\nEnter details:"))
                 return {"status": "ok"}
 
-            # Handle various callback queries
             handlers = {
                 "status": lambda: SMART_SWARM.get_status(),
                 "news": lambda: modules.news.handler.get_news_digest_text(count=5),
                 "emergency": lambda: "\n".join(f"{k.title()}: {v['number']}" for k, v in EMERGENCY_DATA.items()),
                 "upi": lambda: f"UPI ID: {os.getenv('UPI_ID', 'jp200883@sbi')}\nDaily Limit: Rs 1,00,000",
-                "guard": lambda: f"Guard Agent\nCameras: {len(guard_module.singhji_guard.cameras_db)}\nAlerts: {len(guard_module.singhji_guard.alerts_db)}",
-                "social": lambda: f"Social Agent\nPosts: {len(social_core.SOCIAL_AGENT.posted_history)}" if social_core.SOCIAL_AGENT else "Social Agent not initialized",
             }
 
             if query_data in handlers:
@@ -1872,6 +1800,25 @@ async def telegram_webhook(request: Request):
                 await _telegram_send_message(chat_id, "🎤 Voice\n\nSend a voice message!")
             elif query_data == "plant":
                 await _telegram_send_message(chat_id, "🌿 Plant ID\n\nSend a photo of the plant!")
+            elif query_data == "guard":
+                try:
+                    import modules.guard_agent.handler as guard_module
+                    g = guard_module.singhji_guard
+                    guard_text = f"Guard Agent\n\nCameras: {len(g.cameras_db)}\nAlerts: {len(g.alerts_db)}\nDetection agents: vehicle, human, sound, face, anpr, fire, crowd, object, behavior"
+                except Exception as e:
+                    guard_text = f"Guard Agent not loaded: {str(e)[:100]}"
+                await _telegram_send_message(chat_id, guard_text)
+            elif query_data == "social":
+                try:
+                    s = social_core.SOCIAL_AGENT
+                    if s:
+                        on = getattr(s, "auto_post_enabled", True)
+                        social_text = f"Social Agent\n\nPosts published: {len(s.posted_history)}\nAuto-post: {'ON' if on else 'OFF'}\nPlatforms: Facebook, Instagram, Bluesky"
+                    else:
+                        social_text = "Social Agent not initialized"
+                except Exception as e:
+                    social_text = f"Social Agent not loaded: {str(e)[:100]}"
+                await _telegram_send_message(chat_id, social_text)
 
             return {"status": "ok"}
 
@@ -1949,7 +1896,6 @@ async def telegram_webhook(request: Request):
 # TELEGRAM HELPER FUNCTIONS
 # ==========================================
 async def _handle_voice_message(chat_id, user_id, message):
-    """Handle voice messages from Telegram"""
     voice = message["voice"]
     file_id = voice["file_id"]
     try:
@@ -1960,13 +1906,11 @@ async def _handle_voice_message(chat_id, user_id, message):
             file_url = f"https://api.telegram.org/file/bot{TELEGRAM_TOKEN}/{file_path}"
             audio_resp = await HTTP_CLIENT.get(file_url, timeout=15)
             audio_bytes = audio_resp.content
-            
+
             out = await run_in_threadpool(_transcribe_sync, audio_bytes, ".ogg", None)
             if out:
                 transcript, _, _ = out
                 await _telegram_send_message(chat_id, f"🎤 Transcript:\n{transcript}")
-                
-                # Get AI response
                 if GROQ_API_KEY:
                     ai_text = await _call_groq(transcript)
                     await _telegram_send_message(chat_id, f"🤖 AI Response:\n{ai_text[:4000]}")
@@ -1983,7 +1927,6 @@ async def _handle_voice_message(chat_id, user_id, message):
     return {"status": "ok"}
 
 async def _handle_photo_message(chat_id, message):
-    """Handle photo messages from Telegram (Plant ID)"""
     try:
         photos = message["photo"]
         file_id = photos[-1]["file_id"]
@@ -1995,17 +1938,17 @@ async def _handle_photo_message(chat_id, message):
             img_resp = await HTTP_CLIENT.get(file_url, timeout=15)
             img_b64 = base64.b64encode(img_resp.content).decode("utf-8")
             await _telegram_send_message(chat_id, "🌿 Analyzing plant...")
-            
+
             from modules.kisaan_doctor.handler import _detect_disease
             result = await _detect_disease(img_b64)
             if result is None:
                 await _telegram_send_message(chat_id, "❌ Plant ID API key not set")
             elif result["is_healthy"]:
-                await _telegram_send_message(chat_id, f"✅ Plant looks healthy! ({result['health_probability']:.0%})")
+                await _telegram_send_message(chat_id, f"✅ Plant looks healthy! ({result['health_probability']:.0%%})")
             else:
                 plant_text = "🌿 Disease Detection Result\n\n"
                 for d in result["diseases"]:
-                    plant_text += f"🔴 {d['name']} ({d['probability']:.0%})\n{d['description'][:200]}\n\n"
+                    plant_text += f"🔴 {d['name']} ({d['probability']:.0%%})\n{d['description'][:200]}\n\n"
                 await _telegram_send_message(chat_id, plant_text[:4000])
         else:
             await _telegram_send_message(chat_id, "❌ Could not download photo")
@@ -2015,14 +1958,11 @@ async def _handle_photo_message(chat_id, message):
     return {"status": "ok"}
 
 async def _handle_command(chat_id, user_id, text):
-    """Handle Telegram commands"""
-    # Start command
     if text == "/start":
         welcome = "🌅 Welcome to Singh Ji AI Ultra v8.0!\n\nI'm your AI assistant. Use the buttons below or commands like /help"
         await _telegram_send_message(chat_id, welcome, MAIN_KEYBOARD)
         return {"status": "ok"}
 
-    # Help command
     elif text == "/help":
         help_text = (
             "📚 Commands:\n\n"
@@ -2045,7 +1985,6 @@ async def _handle_command(chat_id, user_id, text):
         await _telegram_send_message(chat_id, help_text)
         return {"status": "ok"}
 
-    # Status command
     elif text == "/status":
         status = SMART_SWARM.get_status()
         status_text = (
@@ -2060,7 +1999,6 @@ async def _handle_command(chat_id, user_id, text):
         await _telegram_send_message(chat_id, status_text)
         return {"status": "ok"}
 
-    # Weather command
     elif text.startswith("/weather "):
         city = text.replace("/weather ", "").strip()
         if OPENWEATHER_API_KEY:
@@ -2072,7 +2010,7 @@ async def _handle_command(chat_id, user_id, text):
                     weather_text = (
                         f"🌤️ Weather in {city}\n\n"
                         f"🌡️ Temp: {data['main']['temp']}°C\n"
-                        f"💧 Humidity: {data['main']['humidity']}%\n"
+                        f"💧 Humidity: {data['main']['humidity']}%%\n"
                         f"🌬️ Wind: {data['wind']['speed']} m/s\n"
                         f"☁️ {data['weather'][0]['description'].title()}"
                     )
@@ -2085,7 +2023,6 @@ async def _handle_command(chat_id, user_id, text):
             await _telegram_send_message(chat_id, "❌ Weather API key missing")
         return {"status": "ok"}
 
-    # News command
     elif text == "/news":
         try:
             import modules.news.handler as news_module
@@ -2095,33 +2032,26 @@ async def _handle_command(chat_id, user_id, text):
             await _telegram_send_message(chat_id, f"❌ News error: {str(e)[:100]}")
         return {"status": "ok"}
 
-    # Mandi command
     elif text.startswith("/mandi "):
         state = text.replace("/mandi ", "").strip()
-        try:
-            from modules.mandi.handler import handler as mandi_handler
-            scope = {"type": "http", "query_string": f"state={state}&limit=5".encode()}
-            request = Request(scope)
-            response = await mandi_handler(request)
-            if response.status_code == 200:
-                import json
-                data = json.loads(response.body)
+        if MANDI_API_KEY:
+            try:
+                params = {"api-key": MANDI_API_KEY, "format": "json", "limit": 10, "filters[state.keyword]": state}
+                resp = await HTTP_CLIENT.get(MANDI_BASE_URL, params=params, timeout=45)
+                data = resp.json()
                 records = data.get("records", [])
-                if records:
-                    mandi_text = f"🌾 Mandi Bhav - {state}\n\n"
-                    for i, r in enumerate(records[:5], 1):
-                        mandi_text += f"{i}. {r.get('commodity', '?')}: ₹{r.get('modal_price', '?')}/quintal\n"
-                        mandi_text += f"   {r.get('market', 'N/A')}, {r.get('district', 'N/A')}\n\n"
-                    await _telegram_send_message(chat_id, mandi_text)
-                else:
-                    await _telegram_send_message(chat_id, f"❌ No data found for {state}")
-            else:
-                await _telegram_send_message(chat_id, f"❌ Mandi error: No data for {state}")
-        except Exception as e:
-            await _telegram_send_message(chat_id, f"❌ Mandi error: {str(e)[:100]}")
+                mandi_text = f"🌾 Mandi Bhav - {state}\n\n"
+                for i, record in enumerate(records[:5], 1):
+                    mandi_text += f"{i}. {record.get('commodity', 'Unknown')}\n"
+                    mandi_text += f"   Rs {record.get('modal_price', 'N/A')}/quintal\n"
+                    mandi_text += f"   {record.get('district', 'N/A')}, {record.get('market', 'N/A')}\n\n"
+                await _telegram_send_message(chat_id, mandi_text)
+            except Exception as e:
+                await _telegram_send_message(chat_id, f"❌ Mandi error: {str(e)[:100]}")
+        else:
+            await _telegram_send_message(chat_id, "❌ Mandi API key missing")
         return {"status": "ok"}
 
-    # Tax command
     elif text.startswith("/tax "):
         try:
             income = float(text.replace("/tax ", "").strip())
@@ -2139,7 +2069,6 @@ async def _handle_command(chat_id, user_id, text):
             await _telegram_send_message(chat_id, "❌ Invalid income. Example: /tax 500000")
         return {"status": "ok"}
 
-    # Gold command
     elif text.startswith("/gold"):
         city = text.replace("/gold", "").strip() or "delhi"
         try:
@@ -2160,7 +2089,6 @@ async def _handle_command(chat_id, user_id, text):
             await _telegram_send_message(chat_id, f"❌ Gold error: {str(e)[:100]}")
         return {"status": "ok"}
 
-    # Fuel command
     elif text.startswith("/fuel"):
         city = text.replace("/fuel", "").strip() or "delhi"
         try:
@@ -2179,7 +2107,6 @@ async def _handle_command(chat_id, user_id, text):
             await _telegram_send_message(chat_id, f"❌ Fuel error: {str(e)[:100]}")
         return {"status": "ok"}
 
-    # Horoscope command
     elif text.startswith("/horoscope"):
         rashi = text.replace("/horoscope", "").strip() or "मेष"
         try:
@@ -2190,7 +2117,6 @@ async def _handle_command(chat_id, user_id, text):
             await _telegram_send_message(chat_id, f"❌ Horoscope error: {str(e)[:100]}")
         return {"status": "ok"}
 
-    # Currency command
     elif text.startswith("/currency"):
         parts = text.replace("/currency", "").strip().split()
         try:
@@ -2215,7 +2141,6 @@ async def _handle_command(chat_id, user_id, text):
             await _telegram_send_message(chat_id, f"❌ Currency error: {str(e)[:100]}")
         return {"status": "ok"}
 
-    # Rozgar command
     elif text.startswith("/rozgar"):
         raw = text.replace("/rozgar", "").strip()
         parts = raw.split()
@@ -2253,7 +2178,6 @@ async def _handle_command(chat_id, user_id, text):
             await _telegram_send_message(chat_id, f"❌ Rozgar error: {str(e)[:100]}")
         return {"status": "ok"}
 
-    # Translate command
     elif text.startswith("/translate "):
         parts = text.replace("/translate ", "").strip().split(" ", 1)
         try:
@@ -2271,7 +2195,6 @@ async def _handle_command(chat_id, user_id, text):
             await _telegram_send_message(chat_id, f"❌ Translate error: {str(e)[:100]}")
         return {"status": "ok"}
 
-    # Emergency command
     elif text.startswith("/emergency"):
         type_ = text.replace("/emergency", "").strip().lower()
         if type_ and type_ in EMERGENCY_DATA:
@@ -2290,14 +2213,12 @@ async def _handle_command(chat_id, user_id, text):
         await _telegram_send_message(chat_id, emg_text)
         return {"status": "ok"}
 
-    # UPI command
     elif text == "/upi":
         upi_id = os.getenv("UPI_ID", "jp200883@sbi")
         upi_text = f"💳 UPI Info\n\nUPI ID: {upi_id}\nApps: PhonePe, Google Pay, Paytm, BHIM\nDaily Limit: ₹1,00,000"
         await _telegram_send_message(chat_id, upi_text)
         return {"status": "ok"}
 
-    # Search command
     elif text.startswith("/search "):
         query = text.replace("/search ", "").strip()
         if TAVILY_API_KEY:
@@ -2319,7 +2240,6 @@ async def _handle_command(chat_id, user_id, text):
             await _telegram_send_message(chat_id, "❌ Search API key missing")
         return {"status": "ok"}
 
-    # AI chat command
     elif text.startswith("/ai "):
         prompt = text.replace("/ai ", "").strip()
         if GROQ_API_KEY:
@@ -2335,7 +2255,6 @@ async def _handle_command(chat_id, user_id, text):
             await _telegram_send_message(chat_id, "❌ Groq API key missing")
         return {"status": "ok"}
 
-    # Broadcast command (admin only)
     elif text.startswith("/broadcast "):
         if user_id != ADMIN_USER_ID:
             await _telegram_send_message(chat_id, "⛔ Admin only command")
@@ -2348,7 +2267,6 @@ async def _handle_command(chat_id, user_id, text):
             await _telegram_send_message(chat_id, "❌ Scheduler not initialized")
         return {"status": "ok"}
 
-    # Default: unknown command
     else:
         await _telegram_send_message(chat_id, "❌ Unknown command. Type /help for available commands")
         return {"status": "ok"}
