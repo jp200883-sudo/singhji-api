@@ -1769,7 +1769,7 @@ async def telegram_webhook(request: Request):
                 USER_PREFERENCES.setdefault(user_id, {})["waiting_for"] = query_data
                 prompts = {
                     "weather": "Weather\n\nCity batao!",
-                    "mandi": "Mandi Bhav\n\nState batao!",
+                    "mandi": "Mandi Bhav\n\nState batao! (jaise: Uttar Pradesh)",
                     "tax": "Tax Calculator\n\nIncome batao!",
                     "gold": "Gold Rate\n\nCity batao! (ya sirf Enter dabao Delhi ke liye)",
                     "fuel": "Fuel Price\n\nCity batao!",
@@ -1780,45 +1780,41 @@ async def telegram_webhook(request: Request):
                 await _telegram_send_message(chat_id, prompts.get(query_data, f"{query_data.title()}\n\nEnter details:"))
                 return {"status": "ok"}
 
-            handlers = {
-                "status": lambda: SMART_SWARM.get_status(),
-                "news": lambda: modules.news.handler.get_news_digest_text(count=5),
-                "emergency": lambda: "\n".join(f"{k.title()}: {v['number']}" for k, v in EMERGENCY_DATA.items()),
-                "upi": lambda: f"UPI ID: {os.getenv('UPI_ID', 'jp200883@sbi')}\nDaily Limit: Rs 1,00,000",
-            }
-
-            if query_data in handlers:
-                result = await handlers[query_data]()
-                if isinstance(result, dict):
+            try:
+                if query_data == "status":
+                    result = SMART_SWARM.get_status()
                     text = f"Status\n\nAgents: {result['currently_loaded']}/330\nActive: {result['active_running']}\nAPIs: {sum(1 for v in AVAILABLE_KEYS.values() if v)}/{len(AVAILABLE_KEYS)}"
-                else:
-                    text = result
-                await _telegram_send_message(chat_id, text[:4000])
-            elif query_data == "ai_chat":
-                await _telegram_send_message(chat_id, "🤖 AI Chat\n\nSend any message to chat with AI!")
-            elif query_data == "voice":
-                await _telegram_send_message(chat_id, "🎤 Voice\n\nSend a voice message!")
-            elif query_data == "plant":
-                await _telegram_send_message(chat_id, "🌿 Plant ID\n\nSend a photo of the plant!")
-            elif query_data == "guard":
-                try:
+                elif query_data == "news":
+                    import modules.news.handler as news_module
+                    text = await news_module.get_news_digest_text(count=5)
+                elif query_data == "emergency":
+                    text = "\n".join(f"{k.title()}: {v['number']}" for k, v in EMERGENCY_DATA.items())
+                elif query_data == "upi":
+                    text = f"UPI ID: {os.getenv('UPI_ID', 'jp200883@sbi')}\nDaily Limit: Rs 1,00,000"
+                elif query_data == "ai_chat":
+                    text = "🤖 AI Chat\n\nSend any message to chat with AI!"
+                elif query_data == "voice":
+                    text = "🎤 Voice\n\nSend a voice message!"
+                elif query_data == "plant":
+                    text = "🌿 Plant ID\n\nSend a photo of the plant!"
+                elif query_data == "guard":
                     import modules.guard_agent.handler as guard_module
                     g = guard_module.singhji_guard
-                    guard_text = f"Guard Agent\n\nCameras: {len(g.cameras_db)}\nAlerts: {len(g.alerts_db)}\nDetection agents: vehicle, human, sound, face, anpr, fire, crowd, object, behavior"
-                except Exception as e:
-                    guard_text = f"Guard Agent not loaded: {str(e)[:100]}"
-                await _telegram_send_message(chat_id, guard_text)
-            elif query_data == "social":
-                try:
+                    text = f"Guard Agent\n\nCameras: {len(g.cameras_db)}\nAlerts: {len(g.alerts_db)}\nDetection agents: vehicle, human, sound, face, anpr, fire, crowd, object, behavior"
+                elif query_data == "social":
                     s = social_core.SOCIAL_AGENT
                     if s:
                         on = getattr(s, "auto_post_enabled", True)
-                        social_text = f"Social Agent\n\nPosts published: {len(s.posted_history)}\nAuto-post: {'ON' if on else 'OFF'}\nPlatforms: Facebook, Instagram, Bluesky"
+                        text = f"Social Agent\n\nPosts published: {len(s.posted_history)}\nAuto-post: {'ON' if on else 'OFF'}\nPlatforms: Facebook, Instagram, Bluesky"
                     else:
-                        social_text = "Social Agent not initialized"
-                except Exception as e:
-                    social_text = f"Social Agent not loaded: {str(e)[:100]}"
-                await _telegram_send_message(chat_id, social_text)
+                        text = "Social Agent not initialized"
+                else:
+                    text = None
+                if text:
+                    await _telegram_send_message(chat_id, text[:4000])
+            except Exception as e:
+                logger.error(f"❌ Callback '{query_data}' error: {e}", exc_info=True)
+                await _telegram_send_message(chat_id, f"❌ {query_data.title()} error: {str(e)[:100]}")
 
             return {"status": "ok"}
 
@@ -2045,6 +2041,8 @@ async def _handle_command(chat_id, user_id, text):
                     mandi_text += f"{i}. {record.get('commodity', 'Unknown')}\n"
                     mandi_text += f"   Rs {record.get('modal_price', 'N/A')}/quintal\n"
                     mandi_text += f"   {record.get('district', 'N/A')}, {record.get('market', 'N/A')}\n\n"
+                if not records:
+                    mandi_text += f"❌ '{state}' ke liye koi mandi data nahi mila. Poora RAJYA ka naam try karein (jaise: Uttar Pradesh, Bihar) — shehar/zila ka naam nahi chalega."
                 await _telegram_send_message(chat_id, mandi_text)
             except Exception as e:
                 await _telegram_send_message(chat_id, f"❌ Mandi error: {str(e)[:100]}")
