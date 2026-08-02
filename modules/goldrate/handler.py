@@ -158,23 +158,12 @@ def _apply_city_premium(base_rate: float, city: str) -> Dict[str, Any]:
         "price_10g_24k": round((base_rate + premium) * 10, 2),
         "price_10g_22k": round((base_rate + premium) * 10 * 0.9167, 2),
     }
-
-
-# ─── ROUTES ───
-@router.get("/{city}")
-async def gold_rate_city(city: str = "delhi"):
-    """
-    🪙 Gold rate for any Indian city.
-
-    Example: /goldrate/delhi, /goldrate/mumbai
-    """
-    logger.info(f"🪙 Gold rate request: {city}")
-
+    async def _get_gold_result(city: str) -> Dict[str, Any]:
+    """Internal use ke liye — dict lautata hai, JSONResponse nahi."""
     cached = _get_cached(city)
     if cached:
-        return JSONResponse({"cached": True, "data": cached})
+        return {"cached": True, "data": cached}
 
-    # Fetch base rate
     data = await _fetch_gold_api_com()
     if not data:
         data = await _fetch_goldapi()
@@ -199,8 +188,15 @@ async def gold_rate_city(city: str = "delhi"):
     }
 
     _set_cached(city, result)
-    return JSONResponse({"cached": False, "data": result})
+    return {"cached": False, "data": result}
 
+
+# ─── ROUTES ───
+@router.get("/{city}")
+async def gold_rate_city(city: str = "delhi"):
+    logger.info(f"🪙 Gold rate request: {city}")
+    result = await _get_gold_result(city)
+    return JSONResponse(result)
 
 @router.get("/silver/{city}")
 async def silver_rate_city(city: str = "delhi"):
