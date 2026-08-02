@@ -118,6 +118,30 @@ MAX_MEMORY_SIZE = 5000
 MANDI_RESOURCE_ID = "9ef84268-d588-465a-a308-a864a43d0070"
 MANDI_BASE_URL = f"https://api.data.gov.in/resource/{MANDI_RESOURCE_ID}"
 
+# State name normalization for Mandi API
+STATE_MAP = {
+    "up": "Uttar Pradesh", "uttar pradesh": "Uttar Pradesh", "uttarpradesh": "Uttar Pradesh",
+    "mp": "Madhya Pradesh", "madhya pradesh": "Madhya Pradesh", "madhyapradesh": "Madhya Pradesh",
+    "bihar": "Bihar", "rajasthan": "Rajasthan", "rajsthan": "Rajasthan",
+    "punjab": "Punjab", "haryana": "Haryana",
+    "maharashtra": "Maharashtra", "gujarat": "Gujarat",
+    "wb": "West Bengal", "west bengal": "West Bengal", "westbengal": "West Bengal",
+    "odisha": "Odisha", "orissa": "Odisha",
+    "telangana": "Telangana", "andhra": "Andhra Pradesh", "andhra pradesh": "Andhra Pradesh",
+    "karnataka": "Karnataka", "tamil nadu": "Tamil Nadu", "tamilnadu": "Tamil Nadu",
+    "kerala": "Kerala", "jharkhand": "Jharkhand",
+    "chhattisgarh": "Chhattisgarh", "chattisgarh": "Chhattisgarh",
+    "uttarakhand": "Uttarakhand", "uttranchal": "Uttarakhand",
+    "himachal": "Himachal Pradesh", "himachal pradesh": "Himachal Pradesh",
+    "assam": "Assam", "tripura": "Tripura", "meghalaya": "Meghalaya",
+}
+
+def _normalize_state(state: str) -> str:
+    """Convert short state names to full names for AGMARKNET API"""
+    key = state.strip().lower()
+    return STATE_MAP.get(key, state.strip().title())
+
+
 RATE_LIMIT_GLOBAL = (
     int(os.getenv("RATE_LIMIT_GLOBAL_CALLS", 30)),
     int(os.getenv("RATE_LIMIT_GLOBAL_WINDOW", 60))
@@ -528,15 +552,32 @@ MODULES = {
 # ==========================================
 MAIN_KEYBOARD = {
     "inline_keyboard": [
+        # Row 1: Daily essentials
         [{"text": "🌤️ Weather", "callback_data": "weather"}, {"text": "📰 News", "callback_data": "news"}],
-        [{"text": "🌾 Mandi Bhav", "callback_data": "mandi"}, {"text": "🤖 AI Chat", "callback_data": "ai_chat"}],
-        [{"text": "🎤 Voice", "callback_data": "voice"}, {"text": "📊 Status", "callback_data": "status"}],
-        [{"text": "💰 Tax Calc", "callback_data": "tax"}, {"text": "🌿 Plant ID", "callback_data": "plant"}],
+        # Row 2: Agriculture
+        [{"text": "🌾 Mandi Bhav", "callback_data": "mandi"}, {"text": "🌿 Plant Doctor", "callback_data": "plant"}],
+        # Row 3: Money
         [{"text": "🥇 Gold Rate", "callback_data": "gold"}, {"text": "⛽ Fuel Price", "callback_data": "fuel"}],
-        [{"text": "🔮 Horoscope", "callback_data": "horoscope"}, {"text": "💱 Currency", "callback_data": "currency"}],
+        # Row 4: Finance
+        [{"text": "💰 Tax Calc", "callback_data": "tax"}, {"text": "💱 Currency", "callback_data": "currency"}],
+        # Row 5: Govt & Jobs
+        [{"text": "🏛️ Govt Schemes", "callback_data": "govt"}, {"text": "💼 Rozgar/Jobs", "callback_data": "rozgar"}],
+        # Row 6: Services
+        [{"text": "💧 Pani Helpline", "callback_data": "pani"}, {"text": "🚽 Sewer/Swachh", "callback_data": "sewer"}],
+        # Row 7: AI & Tools
+        [{"text": "🤖 AI Chat", "callback_data": "ai_chat"}, {"text": "🎤 Voice AI", "callback_data": "voice"}],
+        # Row 8: Search & Translate
+        [{"text": "🔍 Search Web", "callback_data": "search"}, {"text": "🔤 Translate", "callback_data": "translate"}],
+        # Row 9: Media
+        [{"text": "📺 SinghJi TV", "callback_data": "tv"}, {"text": "🎬 Video Gen", "callback_data": "video"}],
+        # Row 10: Personal
+        [{"text": "🔮 Horoscope", "callback_data": "horoscope"}, {"text": "📋 Yojana Match", "callback_data": "yojana"}],
+        # Row 11: Emergency & UPI
         [{"text": "🚨 Emergency", "callback_data": "emergency"}, {"text": "💳 UPI Info", "callback_data": "upi"}],
+        # Row 12: Agents
         [{"text": "🛡️ Guard Agent", "callback_data": "guard"}, {"text": "📱 Social Agent", "callback_data": "social"}],
-        [{"text": "💼 Rozgar/Jobs", "callback_data": "rozgar"}],
+        # Row 13: System
+        [{"text": "📊 System Status", "callback_data": "status"}, {"text": "❓ Help / Commands", "callback_data": "help"}],
     ]
 }
 
@@ -651,22 +692,38 @@ class SinghJiMasterScheduler:
         if not MANDI_API_KEY:
             return "• Mandi API key missing"
         try:
-            params = {"api-key": MANDI_API_KEY, "format": "json", "limit": limit, "filters[state.keyword]": state}
+            normalized = _normalize_state(state)
+            params = {"api-key": MANDI_API_KEY, "format": "json", "limit": limit, "filters[state.keyword]": normalized}
             r = await self.http.get(MANDI_BASE_URL, params=params, timeout=45)
             data = r.json()
+
+            # Check API error
+            if "error" in data:
+                return f"• Mandi API error: {data.get('error', 'Unknown')}"
+
             records = data.get("records", [])
             if not records:
-                return "• Aaj mandi data available nahi hai"
-            lines = []
-            for r in records[:limit]:
-                commodity = r.get("commodity", "?")
-                market = r.get("market", "?")
-                price = r.get("modal_price", "?")
-                lines.append(f"{commodity} ({market}): ₹{price}/quintal")
+                return f"• {normalized} ke liye aaj mandi data available nahi hai\n• Koi aur state try karo: /mandi Punjab"
+
+            lines = [f"🌾 Mandi Bhav — {normalized}\n"]
+            for rec in records[:limit]:
+                commodity = rec.get("commodity", "?")
+                market = rec.get("market", "?")
+                district = rec.get("district", "")
+                price = rec.get("modal_price", "?")
+                min_price = rec.get("min_price", "?")
+                max_price = rec.get("max_price", "?")
+                date = rec.get("arrival_date", "")
+                lines.append(f"📍 {commodity}")
+                lines.append(f"   Market: {market}, {district}")
+                lines.append(f"   Price: ₹{price}/q (₹{min_price}-{max_price})")
+                if date:
+                    lines.append(f"   Date: {date}")
+                lines.append("")
             return "\n".join(lines)
         except Exception as e:
             logger.warning(f"⚠️ Mandi fetch failed: {e}")
-            return f"• Mandi error: {str(e)[:100]}"
+            return f"• Mandi error: {str(e)[:100]}\n• Format: /mandi Uttar Pradesh"
 
     async def _fetch_gold_silver(self, city="Delhi"):
         try:
@@ -1765,56 +1822,164 @@ async def telegram_webhook(request: Request):
             user_id = callback["from"]["id"]
             query_data = callback["data"]
 
-            if query_data in ["weather", "mandi", "tax", "gold", "fuel", "horoscope", "currency", "rozgar"]:
+            # ─── BUTTONS THAT NEED USER INPUT (waiting_for) ───
+            input_buttons = {
+                "weather": ("🌤️ Weather", "City batao! (jaise: Delhi, Mumbai, Kanpur)"),
+                "mandi": ("🌾 Mandi Bhav", "State batao! (jaise: UP, Punjab, Haryana)"),
+                "tax": ("💰 Tax Calc", "Annual income batao! (jaise: 500000)"),
+                "gold": ("🥇 Gold Rate", "City batao! (default: Delhi)"),
+                "fuel": ("⛽ Fuel Price", "City batao! (default: Delhi)"),
+                "horoscope": ("🔮 Horoscope", "Rashi batao! (jaise: मेष, सिंह, तुला)"),
+                "currency": ("💱 Currency", "Format: USD INR 100"),
+                "rozgar": ("💼 Rozgar", "Keyword + Country batao! (jaise: software IN)"),
+                "search": ("🔍 Search", "Kya search karna hai?"),
+                "translate": ("🔤 Translate", "Format: en Namaste kaise ho"),
+                "yojana": ("📋 Yojana", "Format: 30 100000 farmer"),
+                "tv": ("📺 SinghJi TV", "Category batao! (educational/news/health)"),
+                "video": ("🎬 Video", "Video ka prompt batao!"),
+            }
+
+            if query_data in input_buttons:
+                label, prompt = input_buttons[query_data]
                 USER_PREFERENCES.setdefault(user_id, {})["waiting_for"] = query_data
-                prompts = {
-                    "weather": "Weather\n\nCity batao!",
-                    "mandi": "Mandi Bhav\n\nState batao! (jaise: Uttar Pradesh)",
-                    "tax": "Tax Calculator\n\nIncome batao!",
-                    "gold": "Gold Rate\n\nCity batao! (ya sirf Enter dabao Delhi ke liye)",
-                    "fuel": "Fuel Price\n\nCity batao!",
-                    "horoscope": "Horoscope\n\nRashi batao! (jaise: Mesh, Simha, Tula)",
-                    "currency": "Currency Convert\n\nFormat: USD INR 100",
-                    "rozgar": "Rozgar/Jobs\n\nKeyword aur/ya country batao\n(jaise: software IN, ya sirf software, ya sirf IN)"
-                }
-                await _telegram_send_message(chat_id, prompts.get(query_data, f"{query_data.title()}\n\nEnter details:"))
+                await _telegram_send_message(chat_id, f"{label}\n\n{prompt}")
                 return {"status": "ok"}
 
-            try:
-                if query_data == "status":
-                    result = SMART_SWARM.get_status()
-                    text = f"Status\n\nAgents: {result['currently_loaded']}/330\nActive: {result['active_running']}\nAPIs: {sum(1 for v in AVAILABLE_KEYS.values() if v)}/{len(AVAILABLE_KEYS)}"
-                elif query_data == "news":
+            # ─── INSTANT REPLY BUTTONS ───
+            if query_data == "status":
+                status = SMART_SWARM.get_status()
+                api_count = sum(1 for v in AVAILABLE_KEYS.values() if v)
+                text = (
+                    f"📊 Singh Ji AI Status\n\n"
+                    f"🤖 Agents: {status['currently_loaded']}/330\n"
+                    f"⚡ Active: {status['active_running']}\n"
+                    f"😴 Idle: {status['idle']}\n"
+                    f"🔌 APIs: {api_count}/{len(AVAILABLE_KEYS)}\n"
+                    f"👥 Users: {len(USER_PREFERENCES)}\n"
+                    f"⏰ {datetime.now().strftime('%H:%M:%S')}"
+                )
+                await _telegram_send_message(chat_id, text)
+
+            elif query_data == "news":
+                try:
                     import modules.news.handler as news_module
-                    text = await news_module.get_news_digest_text(count=5)
-                elif query_data == "emergency":
-                    text = "\n".join(f"{k.title()}: {v['number']}" for k, v in EMERGENCY_DATA.items())
-                elif query_data == "upi":
-                    text = f"UPI ID: {os.getenv('UPI_ID', 'jp200883@sbi')}\nDaily Limit: Rs 1,00,000"
-                elif query_data == "ai_chat":
-                    text = "🤖 AI Chat\n\nSend any message to chat with AI!"
-                elif query_data == "voice":
-                    text = "🎤 Voice\n\nSend a voice message!"
-                elif query_data == "plant":
-                    text = "🌿 Plant ID\n\nSend a photo of the plant!"
-                elif query_data == "guard":
+                    text = "📰 Latest News\n\n" + await news_module.get_news_digest_text(count=5)
+                    await _telegram_send_message(chat_id, text)
+                except Exception as e:
+                    await _telegram_send_message(chat_id, f"❌ News error: {str(e)[:100]}")
+
+            elif query_data == "emergency":
+                emg_text = "🚨 Emergency Numbers\n\n"
+                for k, v in EMERGENCY_DATA.items():
+                    emg_text += f"{k.title()}: {v['number']}"
+                    if v.get("alt"):
+                        emg_text += f" / {v['alt']}"
+                    emg_text += "\n"
+                await _telegram_send_message(chat_id, emg_text)
+
+            elif query_data == "upi":
+                upi_id = os.getenv("UPI_ID", "jp200883@sbi")
+                upi_text = f"💳 UPI Info\n\nUPI ID: {upi_id}\nApps: PhonePe, GPay, Paytm, BHIM\nDaily Limit: ₹1,00,000"
+                await _telegram_send_message(chat_id, upi_text)
+
+            elif query_data == "pani":
+                pani_text = (
+                    "💧 Pani (Water) Helplines\n\n"
+                    "National: 1800-180-1818\n"
+                    "Jal Jeevan: 1800-111-555\n\n"
+                    "Schemes: Jal Jeevan Mission, AMRUT 2.0, Swajal\n"
+                    "Portal: jaljeevanmission.gov.in"
+                )
+                await _telegram_send_message(chat_id, pani_text)
+
+            elif query_data == "sewer":
+                sewer_text = (
+                    "🚽 Sewer/Sanitation Helplines\n\n"
+                    "Swachh Bharat: 1800-180-1818\n"
+                    "Urban Sewer: 1800-111-555\n"
+                    "Complaint: 1969\n\n"
+                    "Portal: swachhbharaturban.gov.in"
+                )
+                await _telegram_send_message(chat_id, sewer_text)
+
+            elif query_data == "govt":
+                govt_text = (
+                    "🏛️ Govt Services\n\n"
+                    "/govt aadhaar — Aadhaar services\n"
+                    "/govt pan — PAN card\n"
+                    "/govt passport — Passport\n"
+                    "/govt voter — Voter ID\n"
+                    "/govt ration — Ration card\n"
+                    "/govt driving — Driving license\n"
+                    "/govt ayushman — Ayushman Bharat\n"
+                    "/govt pmkisan — PM Kisan"
+                )
+                await _telegram_send_message(chat_id, govt_text)
+
+            elif query_data == "ai_chat":
+                await _telegram_send_message(chat_id, '🤖 AI Chat\n\nKuch bhi poochho! Main jawab dunga.\n\nExample: "India ka capital kya hai?"')
+
+            elif query_data == "voice":
+                await _telegram_send_message(chat_id, "🎤 Voice AI\n\nVoice message bhejo!\n\nMain transcribe karke AI se jawab launga.")
+
+            elif query_data == "plant":
+                await _telegram_send_message(chat_id, "🌿 Plant Doctor\n\nPlant ki photo bhejo!\n\nDisease detect karke ilaj bataunga.")
+
+            elif query_data == "guard":
+                try:
                     import modules.guard_agent.handler as guard_module
                     g = guard_module.singhji_guard
-                    text = f"Guard Agent\n\nCameras: {len(g.cameras_db)}\nAlerts: {len(g.alerts_db)}\nDetection agents: vehicle, human, sound, face, anpr, fire, crowd, object, behavior"
-                elif query_data == "social":
+                    guard_text = (
+                        f"🛡️ Guard Agent\n\n"
+                        f"📹 Cameras: {len(g.cameras_db)}\n"
+                        f"🚨 Alerts: {len(g.alerts_db)}\n"
+                        f"🔍 Detection: vehicle, human, sound, face, ANPR, fire, crowd"
+                    )
+                except Exception as e:
+                    guard_text = f"🛡️ Guard Agent\n\nStatus: Loading...\n{str(e)[:80]}"
+                await _telegram_send_message(chat_id, guard_text)
+
+            elif query_data == "social":
+                try:
                     s = social_core.SOCIAL_AGENT
                     if s:
-                        on = getattr(s, "auto_post_enabled", True)
-                        text = f"Social Agent\n\nPosts published: {len(s.posted_history)}\nAuto-post: {'ON' if on else 'OFF'}\nPlatforms: Facebook, Instagram, Bluesky"
+                        cfg = s.get_stats()["platforms_configured"]
+                        live = ", ".join(p for p, v in cfg.items() if v) or "none"
+                        social_text = (
+                            f"📱 Social Agent\n\n"
+                            f"📤 Posts: {len(s.posted_history)}\n"
+                            f"🟢 Live: {live}"
+                        )
                     else:
-                        text = "Social Agent not initialized"
-                else:
-                    text = None
-                if text:
-                    await _telegram_send_message(chat_id, text[:4000])
-            except Exception as e:
-                logger.error(f"❌ Callback '{query_data}' error: {e}", exc_info=True)
-                await _telegram_send_message(chat_id, f"❌ {query_data.title()} error: {str(e)[:100]}")
+                        social_text = "📱 Social Agent\n\nStatus: Initializing..."
+                except Exception as e:
+                    social_text = f"📱 Social Agent\n\nStatus: {str(e)[:80]}"
+                await _telegram_send_message(chat_id, social_text)
+
+            elif query_data == "help":
+                help_text = (
+                    "📚 Singh Ji AI Commands\n\n"
+                    "🌤️ /weather Delhi\n"
+                    "📰 /news\n"
+                    "🌾 /mandi UP\n"
+                    "💰 /tax 500000\n"
+                    "🥇 /gold Delhi\n"
+                    "⛽ /fuel Delhi\n"
+                    "🔮 /horoscope मेष\n"
+                    "💱 /currency USD INR 100\n"
+                    "🔍 /search AI news\n"
+                    "🔤 /translate en Namaste\n"
+                    "🚨 /emergency police\n"
+                    "💳 /upi\n"
+                    "💧 /pani\n"
+                    "🚽 /sewer\n"
+                    "🏛️ /govt aadhaar\n"
+                    "💼 /rozgar software IN\n"
+                    "📋 /yojana 30 100000 farmer\n"
+                    "🤖 /ai question\n"
+                    "📢 /broadcast message (admin only)"
+                )
+                await _telegram_send_message(chat_id, help_text)
 
             return {"status": "ok"}
 
@@ -1833,25 +1998,26 @@ async def telegram_webhook(request: Request):
             await _memory_save(f"user_pref:{user_id}", USER_PREFERENCES[user_id], table="user_memory")
             logger.info(f"✅ New user registered: {user_id}")
 
-        # Handle pending actions
+        # Handle pending actions (button press ke baad aaya text)
         pending = USER_PREFERENCES.get(user_id, {}).pop("waiting_for", None)
         if pending and text and not text.startswith("/"):
-            if pending == "weather":
-                text = "/weather " + text.strip()
-            elif pending == "mandi":
-                text = "/mandi " + text.strip()
-            elif pending == "tax":
-                text = "/tax " + text.strip()
-            elif pending == "gold":
-                text = "/gold " + text.strip()
-            elif pending == "fuel":
-                text = "/fuel " + text.strip()
-            elif pending == "horoscope":
-                text = "/horoscope " + text.strip()
-            elif pending == "currency":
-                text = "/currency " + text.strip()
-            elif pending == "rozgar":
-                text = "/rozgar " + text.strip()
+            pending_map = {
+                "weather": "/weather ",
+                "mandi": "/mandi ",
+                "tax": "/tax ",
+                "gold": "/gold ",
+                "fuel": "/fuel ",
+                "horoscope": "/horoscope ",
+                "currency": "/currency ",
+                "rozgar": "/rozgar ",
+                "search": "/search ",
+                "translate": "/translate ",
+                "yojana": "/yojana ",
+                "tv": "/tv ",
+                "video": "/video ",
+            }
+            if pending in pending_map:
+                text = pending_map[pending] + text.strip()
 
         # Rate limit check
         if _rate_check(f"tg_user:{user_id}", *RATE_LIMIT_TELEGRAM_USER):
@@ -1976,8 +2142,7 @@ async def _handle_command(chat_id, user_id, text):
             "/emergency type - Emergency numbers\n"
             "/upi - UPI information\n"
             "/search query - Web search\n"
-            "/rozgar keyword country - Jobs\n"
-            "/yojana - Sarkari yojanaen"
+            "/rozgar keyword country - Jobs"
         )
         await _telegram_send_message(chat_id, help_text)
         return {"status": "ok"}
@@ -1994,23 +2159,6 @@ async def _handle_command(chat_id, user_id, text):
             f"Time: {datetime.now().strftime('%H:%M:%S')}"
         )
         await _telegram_send_message(chat_id, status_text)
-        return {"status": "ok"}
-
-    elif text == "/yojana":
-        try:
-            schemes = [s for s in scheme_engine.schemes if s.get("is_active", True)][:10]
-            if not schemes:
-                await _telegram_send_message(chat_id, "❌ Abhi koi yojana available nahi hai")
-            else:
-                yojana_text = "🏛️ Sarkari Yojanaen (Top 10)\n\n"
-                for i, s in enumerate(schemes, 1):
-                    name = s.get("name_hi") or s.get("name", "Unknown")
-                    benefit = s.get("benefits", {}).get("benefit_summary", "")
-                    yojana_text += f"{i}. {name}\n   {benefit[:100]}\n\n"
-                await _telegram_send_message(chat_id, yojana_text[:4000])
-        except Exception as e:
-            logger.error(f"❌ Yojana command error: {type(e).__name__}: {e}", exc_info=True)
-            await _telegram_send_message(chat_id, f"❌ Yojana error: {type(e).__name__}: {str(e)[:100] or 'no details'}")
         return {"status": "ok"}
 
     elif text.startswith("/weather "):
@@ -2047,24 +2195,37 @@ async def _handle_command(chat_id, user_id, text):
         return {"status": "ok"}
 
     elif text.startswith("/mandi "):
-        state = text.replace("/mandi ", "").strip()
+        raw_state = text.replace("/mandi ", "").strip()
+        state = _normalize_state(raw_state)
         if MANDI_API_KEY:
             try:
                 params = {"api-key": MANDI_API_KEY, "format": "json", "limit": 10, "filters[state.keyword]": state}
                 resp = await HTTP_CLIENT.get(MANDI_BASE_URL, params=params, timeout=45)
                 data = resp.json()
+
+                if "error" in data:
+                    await _telegram_send_message(chat_id, f"❌ Mandi API error: {data.get('error', 'Unknown')}")
+                    return {"status": "ok"}
+
                 records = data.get("records", [])
-                mandi_text = f"🌾 Mandi Bhav - {state}\n\n"
-                for i, record in enumerate(records[:5], 1):
-                    mandi_text += f"{i}. {record.get('commodity', 'Unknown')}\n"
-                    mandi_text += f"   Rs {record.get('modal_price', 'N/A')}/quintal\n"
-                    mandi_text += f"   {record.get('district', 'N/A')}, {record.get('market', 'N/A')}\n\n"
                 if not records:
-                    mandi_text += f"❌ '{state}' ke liye koi mandi data nahi mila. Poora RAJYA ka naam try karein (jaise: Uttar Pradesh, Bihar) — shehar/zila ka naam nahi chalega."
+                    await _telegram_send_message(chat_id, f"❌ {state} ke liye data nahi mila\n\nTry karo:\n/mandi Punjab\n/mandi Haryana\n/mandi UP")
+                    return {"status": "ok"}
+
+                mandi_text = f"🌾 Mandi Bhav — {state}\n\n"
+                for i, record in enumerate(records[:5], 1):
+                    commodity = record.get("commodity", "Unknown")
+                    modal = record.get("modal_price", "N/A")
+                    min_p = record.get("min_price", "N/A")
+                    max_p = record.get("max_price", "N/A")
+                    market = record.get("market", "N/A")
+                    district = record.get("district", "N/A")
+                    mandi_text += f"{i}. {commodity}\n"
+                    mandi_text += f"   ₹{modal}/q (₹{min_p}-₹{max_p})\n"
+                    mandi_text += f"   📍 {market}, {district}\n\n"
                 await _telegram_send_message(chat_id, mandi_text)
             except Exception as e:
-                logger.error(f"❌ Mandi command error: {type(e).__name__}: {e}", exc_info=True)
-                await _telegram_send_message(chat_id, f"❌ Mandi error: {type(e).__name__}: {str(e)[:100] or 'no details'}")
+                await _telegram_send_message(chat_id, f"❌ Mandi error: {str(e)[:100]}\n\nFormat: /mandi Uttar Pradesh")
         else:
             await _telegram_send_message(chat_id, "❌ Mandi API key missing")
         return {"status": "ok"}
