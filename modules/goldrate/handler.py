@@ -1,5 +1,5 @@
 """
-🪙 SINGH JI AI — GOLDRATE MODULE v2.0 (POLISHED)
+SINGH JI AI - GOLDRATE MODULE v2.0 (POLISHED)
 Superior: Real-time gold/silver rates, City-wise, 22K/24K, Historical trends
 Sources: GoldAPI, MetalPriceAPI, Fallback scraping
 """
@@ -158,8 +158,10 @@ def _apply_city_premium(base_rate: float, city: str) -> Dict[str, Any]:
         "price_10g_24k": round((base_rate + premium) * 10, 2),
         "price_10g_22k": round((base_rate + premium) * 10 * 0.9167, 2),
     }
-    async def _get_gold_result(city: str) -> Dict[str, Any]:
-    """Internal use ke liye — dict lautata hai, JSONResponse nahi."""
+
+
+async def _get_gold_result(city: str) -> Dict[str, Any]:
+    """Internal use ke liye - dict lautata hai, JSONResponse nahi."""
     cached = _get_cached(city)
     if cached:
         return {"cached": True, "data": cached}
@@ -171,7 +173,7 @@ def _apply_city_premium(base_rate: float, city: str) -> Dict[str, Any]:
         data = await _fetch_metalprice()
 
     if not data:
-        raise HTTPException(status_code=503, detail="❌ Gold rate fetch nahi ho raha. Thodi der baad try karo.")
+        raise HTTPException(status_code=503, detail="Gold rate fetch nahi ho raha. Thodi der baad try karo.")
 
     base_rate = data.get("price_gram_24k", 0)
     city_data = _apply_city_premium(base_rate, city)
@@ -194,16 +196,16 @@ def _apply_city_premium(base_rate: float, city: str) -> Dict[str, Any]:
 # ─── ROUTES ───
 @router.get("/{city}")
 async def gold_rate_city(city: str = "delhi"):
-    logger.info(f"🪙 Gold rate request: {city}")
+    logger.info(f"Gold rate request: {city}")
     result = await _get_gold_result(city)
     return JSONResponse(result)
 
+
 @router.get("/silver/{city}")
 async def silver_rate_city(city: str = "delhi"):
-    """🥈 Silver rate (approximate: gold rate / 75 ratio)."""
-    gold_data = await gold_rate_city(city)
-    gold_body = gold_data.body if hasattr(gold_data, 'body') else {}
-    data = gold_body.get("data", {})
+    """Silver rate (approximate: gold rate / 75 ratio)."""
+    gold_result = await _get_gold_result(city)
+    data = gold_result.get("data", {})
     base_rate = data.get("base_rate_inr_per_gram_24k", 6000)
 
     silver_per_gram = round(base_rate / 75, 2)
@@ -222,7 +224,7 @@ async def silver_rate_city(city: str = "delhi"):
 @router.get("/")
 async def goldrate_root():
     return JSONResponse({
-        "module": "🪙 Gold Rate",
+        "module": "Gold Rate",
         "version": "2.0-polished",
         "sources": ["GoldAPI", "MetalPriceAPI"],
         "features": ["real-time", "cached", "retry", "city-wise", "silver"],
