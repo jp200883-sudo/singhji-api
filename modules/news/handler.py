@@ -202,7 +202,10 @@ async def _summarize_with_groq(news_items: List[Dict[str, Any]]) -> str:
     if not GROQ_API_KEY or len(news_items) < 3:
         return ""
     titles = " | ".join([n["title"] for n in news_items[:5]])
-    prompt = f"इन हेडलाइंस को हिंदी में 3 बुलेट पॉइंट में summarize करो: {titles}"
+    prompt = (
+        f"इन हेडलाइंस को हिंदी में ठीक 3 बुलेट पॉइंट (• से शुरू) में summarize करो। "
+        f"कोई भूमिका, इंट्रो लाइन, या नंबर-लिस्ट मत जोड़ो — सिर्फ़ 3 बुलेट पॉइंट दो: {titles}"
+    )
     try:
         async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
             resp = await client.post(
@@ -253,12 +256,20 @@ async def get_latest_news(query: str = "", category: str = "", country: str = "i
         all_news = [n for n in all_news if _is_hindi_text(n.get("title", ""))]
 
     seen_urls = set()
+    seen_titles = set()
     unique_news = []
     for n in all_news:
         url = n.get("url", "")
-        if url and url not in seen_urls:
+        title_key = n.get("title", "").strip().lower()[:40]  # अलग स्रोतों की मिलती-जुलती हेडलाइन पकड़ने के लिए
+        if url and url in seen_urls:
+            continue
+        if title_key and title_key in seen_titles:
+            continue
+        if url:
             seen_urls.add(url)
-            unique_news.append(n)
+        if title_key:
+            seen_titles.add(title_key)
+        unique_news.append(n)
     unique_news.sort(key=lambda x: x.get("published", ""), reverse=True)
 
     summary = await _summarize_with_groq(unique_news[:10])
@@ -290,11 +301,12 @@ async def get_news_digest_text(count: int = 5, hindi_only: bool = True) -> str:
     lines = []
     summary = data.get("summary", "")
     if summary:
+        # summary में पहले से headlines का सार है — नीचे वही titles दोबारा मत जोड़ो (डुप्लिकेशन बग)
         lines.append(summary.strip())
-        lines.append("")
-    for i, a in enumerate(articles[:count], 1):
-        title = a.get("title", "बिना शीर्षक")
-        lines.append(f"{i}. {title}")
+    else:
+        for i, a in enumerate(articles[:count], 1):
+            title = a.get("title", "बिना शीर्षक")
+            lines.append(f"{i}. {title}")
     return "\n".join(lines)
 
 
