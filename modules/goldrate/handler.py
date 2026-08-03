@@ -233,6 +233,26 @@ async def goldrate_root():
     })
 
 
+# ─── digest-builder या किसी और मॉड्यूल के लिए — यही इस्तेमाल करें, route function नहीं ───
+# route functions (gold_rate_city, silver_rate_city, handler) JSONResponse लौटाते हैं, dict नहीं।
+# JSONResponse पर .get() लगाने से "'JSONResponse' object has no attribute 'get'" एरर आता है।
+async def get_gold_silver_summary(city: str = "delhi") -> Dict[str, Any]:
+    """Plain dict लौटाता है — digest/scheduler जैसे internal callers इसे इस्तेमाल करें।"""
+    gold_result = await _get_gold_result(city)
+    gold_data = gold_result.get("data", {})
+    base_rate = gold_data.get("base_rate_inr_per_gram_24k", 0)
+    silver_per_gram = round(base_rate / 75, 2) if base_rate else 0
+
+    return {
+        "city": city.title(),
+        "gold_gram_24k": gold_data.get("city_rates", {}).get("price_gram_24k", 0),
+        "gold_gram_22k": gold_data.get("city_rates", {}).get("price_gram_22k", 0),
+        "silver_gram": silver_per_gram,
+        "silver_10g": round(silver_per_gram * 10, 2),
+        "source": gold_data.get("source", "unknown"),
+    }
+
+
 # Legacy handler
 async def handler(request: Request):
     city = request.query_params.get("city", "delhi")
