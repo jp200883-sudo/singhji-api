@@ -23,6 +23,7 @@ from fastapi.responses import JSONResponse
 from fastapi.concurrency import run_in_threadpool
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.interval import IntervalTrigger
 from apscheduler.events import EVENT_JOB_ERROR, EVENT_JOB_EXECUTED
 
 # ==========================================
@@ -958,7 +959,7 @@ class SinghJiMasterScheduler:
             {"id": "social_promo", "func": self._job_social_promo, "trigger": CronTrigger(day_of_week="mon,wed,sat", hour=10, minute=0), "name": "Social Media Promo"},
             {"id": "monthly_tenders", "func": self._job_monthly_tenders, "trigger": CronTrigger(day=1, hour=9, minute=0), "name": "Monthly Tender Alert"},
             {"id": "fb_token_check", "func": self._job_fb_token_check, "trigger": CronTrigger(day_of_week="sun", hour=3, minute=0), "name": "Facebook Token Refresh"},
-            {"id": "self_ping", "func": self._self_ping, "trigger": "interval", "minutes": 30, "name": "Railway Sleep Prevention"},
+            {"id": "self_ping", "func": self._self_ping, "trigger": IntervalTrigger(minutes=30), "name": "Railway Sleep Prevention"},
         ]
         for job_config in jobs:
             self.scheduler.add_job(
