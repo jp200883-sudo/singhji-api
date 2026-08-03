@@ -434,7 +434,7 @@ try:
     from modules.banking.handler import handler as banking_handler
     from modules.currency.handler import router as currency_router, singhji_currency
     from modules.aavishkar.handler import router as aavishkar_router
-    from modules.goldrate.handler import router as goldrate_router, gold_rate_city
+    from modules.goldrate.handler import router as goldrate_router, gold_rate_city, get_gold_silver_summary
     from modules.fuel.handler import router as fuel_router, fuel_price
     from modules.horoscope.handler import get_horoscope, get_all_horoscopes, format_telegram as _format_horoscope_telegram
     from modules.language.handler import LanguageModule
@@ -721,20 +721,25 @@ class SinghJiMasterScheduler:
                     lines.append(f"   Date: {date}")
                 lines.append("")
             return "\n".join(lines)
+        except (httpx.TimeoutException, asyncio.TimeoutError):
+            logger.warning("⚠️ Mandi fetch timeout (45s se zyada)")
+            return "• Mandi data.gov.in अभी धीमा है, थोड़ी देर बाद कोशिश करें\n• Format: /mandi Uttar Pradesh"
         except Exception as e:
-            logger.warning(f"⚠️ Mandi fetch failed: {e}")
-            return f"• Mandi error: {str(e)[:100]}\n• Format: /mandi Uttar Pradesh"
+            error_text = str(e) or type(e).__name__  # kuch exceptions ka str() khaali hota hai
+            logger.warning(f"⚠️ Mandi fetch failed: {error_text}")
+            return f"• Mandi error: {error_text[:100]}\n• Format: /mandi Uttar Pradesh"
 
     async def _fetch_gold_silver(self, city="Delhi"):
         try:
-            data = await gold_rate_city(city)
-            gold_24k = data.get("price_gram_24k")
-            gold_22k = data.get("price_gram_22k")
-            silver = round(gold_24k / 75, 2) if gold_24k else "?"
-            return f"🥇 Gold 24K: ₹{gold_24k}/g | 22K: ₹{gold_22k}/g\n🥈 Silver (approx): ₹{silver}/g"
+            data = await get_gold_silver_summary(city)
+            return (
+                f"🥇 Gold 24K: ₹{data.get('gold_gram_24k')}/g | 22K: ₹{data.get('gold_gram_22k')}/g\n"
+                f"🥈 Silver (approx): ₹{data.get('silver_gram')}/g"
+            )
         except Exception as e:
-            logger.warning(f"⚠️ Gold fetch failed: {e}")
-            return f"• Gold/Silver error: {str(e)[:100]}"
+            error_text = str(e) or type(e).__name__
+            logger.warning(f"⚠️ Gold fetch failed: {error_text}")
+            return f"• Gold/Silver error: {error_text[:100]}"
 
     def _fetch_horoscope_summary(self):
         try:
@@ -2224,8 +2229,11 @@ async def _handle_command(chat_id, user_id, text):
                     mandi_text += f"   ₹{modal}/q (₹{min_p}-₹{max_p})\n"
                     mandi_text += f"   📍 {market}, {district}\n\n"
                 await _telegram_send_message(chat_id, mandi_text)
+            except (httpx.TimeoutException, asyncio.TimeoutError):
+                await _telegram_send_message(chat_id, "❌ Mandi data.gov.in अभी धीमा है, थोड़ी देर बाद कोशिश करें\n\nFormat: /mandi Uttar Pradesh")
             except Exception as e:
-                await _telegram_send_message(chat_id, f"❌ Mandi error: {str(e)[:100]}\n\nFormat: /mandi Uttar Pradesh")
+                error_text = str(e) or type(e).__name__
+                await _telegram_send_message(chat_id, f"❌ Mandi error: {error_text[:100]}\n\nFormat: /mandi Uttar Pradesh")
         else:
             await _telegram_send_message(chat_id, "❌ Mandi API key missing")
         return {"status": "ok"}
