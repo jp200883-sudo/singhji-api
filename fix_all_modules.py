@@ -1,29 +1,46 @@
 import os
+import re
 
-# Aapke saare modules
-modules = [
-    "supreme_agent", "ai_chat", "weather", "mandi", "newsdata",
-    "plant_id", "telegram_bot", "whatsapp", "trolley",
-    "daily_report", "analytics", "upi", "news_scheduler",
-    "voice_tts", "language"
-]
+MODULES_DIR = "modules"
 
-print("🦁 Singh Ji AI - Sab Modules Theek Kar Raha Hun...")
+# Saare modules automatically detect karo
+modules = [d for d in os.listdir(MODULES_DIR) 
+           if os.path.isdir(os.path.join(MODULES_DIR, d)) 
+           and not d.startswith('__') 
+           and not d.endswith('.py')]
+
+print(f"🦁 Found {len(modules)} modules")
 print("="*50)
 
 for module in modules:
-    module_path = f"modules/{module}"
-    os.makedirs(module_path, exist_ok=True)
+    module_path = os.path.join(MODULES_DIR, module)
+    handler_path = os.path.join(module_path, "handler.py")
+    init_path = os.path.join(module_path, "__init__.py")
     
     # ========== __init__.py ==========
-    with open(f"{module_path}/__init__.py", "w") as f:
-        f.write(f"""from .handler import router
+    with open(init_path, "w") as f:
+        f.write("""from .handler import router
 
 __all__ = ['router']
 """)
     
     # ========== handler.py ==========
-    handler_content = f'''from fastapi import APIRouter
+    # Check if handler exists
+    if os.path.exists(handler_path):
+        with open(handler_path, 'r') as f:
+            content = f.read()
+        
+        # Agar already router hai toh skip
+        if 'router = APIRouter()' in content:
+            print(f"⏩ {module} already has router")
+            continue
+        
+        # Agar handler hai but router nahi hai toh replace
+        print(f"🔄 Fixing {module}...")
+        
+        # Extract any custom code if needed (optional)
+        # Simple template
+        new_content = f"""from fastapi import APIRouter
 
 router = APIRouter()
 
@@ -31,16 +48,28 @@ router = APIRouter()
 async def {module}_handler():
     return {{"status": "ok", "module": "{module}"}}
 
-# ========== Aapka actual logic yahan aayega ==========
-# Jaise:
+# ========== CUSTOM HANDLERS (Add below) ==========
 # @router.post("/action")
 # async def action():
 #     return {{"result": "done"}}
-'''
-    with open(f"{module_path}/handler.py", "w") as f:
-        f.write(handler_content)
+"""
+    else:
+        # Naya handler banao
+        print(f"✅ Creating {module}...")
+        new_content = f"""from fastapi import APIRouter
+
+router = APIRouter()
+
+@router.get("/")
+async def {module}_handler():
+    return {{"status": "ok", "module": "{module}"}}
+"""
     
-    print(f"✅ {module}")
+    with open(handler_path, 'w') as f:
+        f.write(new_content)
+    
+    print(f"✅ {module} fixed")
 
 print("="*50)
-print("🎉 Sab modules theek ho gaye!")
+print("🎉 ALL MODULES FIXED!")
+print("🔄 Now run: python main.py")
