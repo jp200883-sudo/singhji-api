@@ -11,10 +11,17 @@ from fastapi.staticfiles import StaticFiles
 # ==========================================
 # CORE IMPORTS
 # ==========================================
-from core.config import AVAILABLE_KEYS, RATE_LIMIT_GLOBAL, RATE_LIMIT_STRICT, APP_URL
+from core.config import (
+    AVAILABLE_KEYS, 
+    RATE_LIMIT_GLOBAL, 
+    RATE_LIMIT_STRICT, 
+    APP_URL,
+    TELEGRAM_TOKEN,      # ✅ यह जोड़ें
+    ADMIN_USER_ID        # ✅ यह जोड़ें
+)
 from core.database import SUPABASE_CLIENT
 from core.rate_limit import _init_rate_limit, _is_rate_limited
-from core.telegram import _ensure_correct_webhook
+from core.telegram import _ensure_correct_webhook, _check_webhook_config, _telegram_send_message
 from core.swarm import SMART_SWARM
 from core.scheduler import MASTER_SCHEDULER, USER_PREFERENCES, _load_user_preferences_sync, SinghJiMasterScheduler
 from core.cache import _cache_get, _cache_set
@@ -103,12 +110,12 @@ async def lifespan(app: FastAPI):
     
     # ---- Telegram Webhook ----
     if TELEGRAM_TOKEN and APP_URL:
-        from core.telegram import _check_webhook_config
         await _check_webhook_config(HTTP_CLIENT)
         await _ensure_correct_webhook(HTTP_CLIENT)
+    else:
+        logger.warning("⚠️ TELEGRAM_TOKEN or APP_URL missing — webhook not configured")
     
     # ---- Master Scheduler ----
-    from core.telegram import _telegram_send_message
     MASTER_SCHEDULER = SinghJiMasterScheduler(
         http_client=HTTP_CLIENT,
         telegram_send_func=_telegram_send_message,
@@ -120,7 +127,8 @@ async def lifespan(app: FastAPI):
     await MASTER_SCHEDULER.start()
     
     # ---- 1st Broadcast ----
-    await MASTER_SCHEDULER._broadcast_with_rate_limit("🌅 Singh Ji AI Ultra v8.3 Live!", parse_mode="HTML")
+    if TELEGRAM_TOKEN and APP_URL:
+        await MASTER_SCHEDULER._broadcast_with_rate_limit("🌅 Singh Ji AI Ultra v8.3 Live!", parse_mode="HTML")
     
     yield
     
