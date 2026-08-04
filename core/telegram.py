@@ -1,125 +1,100 @@
-# core/telegram.py
-import json
-import logging
-from core.config import TELEGRAM_TOKEN, APP_URL
-
-logger = logging.getLogger(__name__)
-TELEGRAM_API_BASE = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
+import httpx
+from typing import Optional
 
 # ==========================================
-# SEND MESSAGE FUNCTION
+# TELEGRAM FUNCTIONS
 # ==========================================
-async def _telegram_send_message(http_client, chat_id, text, reply_markup=None, parse_mode=None):
-    """Telegram par message bhejne ka function"""
-    if not TELEGRAM_TOKEN:
-        return {"error": "TELEGRAM_TOKEN missing"}
+
+async def send_telegram_message(message: str, bot_token: str = None, chat_id: str = None, parse_mode: str = "Markdown") -> bool:
+    """
+    Send message to Telegram
     
-    max_retries = 3
-    for attempt in range(max_retries):
+    Args:
+        message: Message text
+        bot_token: Telegram bot token (optional, uses config if not provided)
+        chat_id: Telegram chat ID (optional, uses config if not provided)
+        parse_mode: Markdown, HTML, or None
+    """
+    # अगर token/chat_id नहीं दिया तो config से ले लो
+    if not bot_token or not chat_id:
         try:
-            payload = {"chat_id": chat_id, "text": text}
-            if parse_mode:
-                payload["parse_mode"] = parse_mode
-            if reply_markup:
-                payload["reply_markup"] = json.dumps(reply_markup)
-            
-            resp = await http_client.post(f"{TELEGRAM_API_BASE}/sendMessage", json=payload)
-            result = resp.json()
-            
-            if result.get("ok"):
-                return result
-            else:
-                error_msg = result.get("description", "Unknown error")
-                if "Too Many Requests" in error_msg and attempt < max_retries - 1:
-                    import asyncio
-                    await asyncio.sleep(2 ** attempt)
-                    continue
-                logger.error(f"Telegram send failed: {error_msg}")
-                return result
-        except Exception as e:
-            if attempt < max_retries - 1:
-                import asyncio
-                await asyncio.sleep(2 ** attempt)
-                continue
-            logger.error(f"Telegram send exception: {e}")
-            return {"error": str(e)}
+            from core.config import config
+            bot_token = bot_token or config.get("TELEGRAM_TOKEN")
+            chat_id = chat_id or config.get("TELEGRAM_CHAT_ID")
+        except:
+            print("⚠️ Telegram config not available")
+            return False
     
-    return {"error": "Max retries exceeded"}
-
-# ==========================================
-# CHECK WEBHOOK CONFIG
-# ==========================================
-async def _check_webhook_config(http_client):
-    """Check current webhook configuration"""
-    if not TELEGRAM_TOKEN or not http_client:
-        return
+    if not bot_token or not chat_id:
+        return False
+    
+    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
     
     try:
-        resp = await http_client.get(f"{TELEGRAM_API_BASE}/getWebhookInfo", timeout=10)
-        info = resp.json().get("result", {})
-        url = info.get("url", "")
-        logger.info(f"🔍 Current webhook URL: {url or '(none)'}")
-        
-        correct_url = f"{APP_URL}/telegram/webhook"
-        if url.rstrip("/") != correct_url:
-            logger.warning(f"⚠️ Webhook points to {url} but should be {correct_url}")
-            await _ensure_correct_webhook(http_client)
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.post(
+                url,
+                json={
+                    "chat_id": chat_id,
+                    "text": message[:4096],  # Telegram limit
+                    "parse_mode": parse_mode if parse_mode else None
+                }
+            )
+            return response.status_code == 200
     except Exception as e:
-        logger.warning(f"⚠️ Webhook check failed: {e}")
+        print(f"Telegram error: {e}")
+        return False
+
+def format_telegram_message(module: str, status: str, detail: str = "", emoji: str = "🤖") -> str:
+    """Format message for Telegram"""
+    lines = [
+        f"{emoji} *{module}*",
+        f"Status: {status}"
+    ]
+    if detail:
+        lines.append(f"Details: {detail}")
+    return "\n".join(lines)
+
+def format_error_telegram(module: str, error: str) -> str:
+    """Format error message for Telegram"""
+    return format_telegram_message(
+        module=module,
+        status="❌ Error",
+        detail=error[:100],
+        emoji="⚠️"
+    )
 
 # ==========================================
-# ENSURE CORRECT WEBHOOK
+# SIMPLE SYNC VERSION (अगर async न चले तो)
 # ==========================================
-async def _ensure_correct_webhook(http_client):
-    """Set webhook to correct URL"""
-    if not TELEGRAM_TOKEN or not http_client or not APP_URL:
-        logger.warning("⚠️ Cannot set webhook: missing TELEGRAM_TOKEN or APP_URL")
-        return
+
+def send_telegram_message_sync(message: str, bot_token: str = None, chat_id: str = None) -> bool:
+    """Sync version - uses requests instead of httpx"""
+    import requests
     
-    correct_url = f"{APP_URL}/telegram/webhook"
+    if not bot_token or not chat_id:
+        try:
+            from core.config import config
+            bot_token = bot_token or config.get("TELEGRAM_TOKEN")
+            chat_id = chat_id or config.get("TELEGRAM_CHAT_ID")
+        except:
+            return False
+    
+    if not bot_token or not chat_id:
+        return False
+    
+    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+    
     try:
-        set_resp = await http_client.get(
-            f"{TELEGRAM_API_BASE}/setWebhook",
-            params={"url": correct_url},
+        response = requests.post(
+            url,
+            json={
+                "chat_id": chat_id,
+                "text": message[:4096]
+            },
             timeout=10
         )
-        result = set_resp.json()
-        if result.get("ok"):
-            logger.info(f"✅ Webhook set to: {correct_url}")
-        else:
-            logger.error(f"❌ Webhook set failed: {result}")
+        return response.status_code == 200
     except Exception as e:
-        logger.error(f"❌ Webhook set error: {e}")
-
-# ==========================================
-# DELETE WEBHOOK (Optional)
-# ==========================================
-async def _delete_webhook(http_client):
-    """Delete webhook (for testing)"""
-    if not TELEGRAM_TOKEN or not http_client:
-        return
-    
-    try:
-        resp = await http_client.get(f"{TELEGRAM_API_BASE}/deleteWebhook", timeout=10)
-        result = resp.json()
-        if result.get("ok"):
-            logger.info("✅ Webhook deleted")
-        else:
-            logger.error(f"❌ Webhook delete failed: {result}")
-    except Exception as e:
-        logger.error(f"❌ Webhook delete error: {e}")
-
-# ==========================================
-# GET WEBHOOK INFO
-# ==========================================
-async def _get_webhook_info(http_client):
-    """Get current webhook info"""
-    if not TELEGRAM_TOKEN or not http_client:
-        return None
-    
-    try:
-        resp = await http_client.get(f"{TELEGRAM_API_BASE}/getWebhookInfo", timeout=10)
-        return resp.json().get("result", {})
-    except Exception as e:
-        logger.error(f"❌ Get webhook info error: {e}")
-        return None
+        print(f"Telegram sync error: {e}")
+        return False
