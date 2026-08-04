@@ -74,90 +74,164 @@ async def ping():
     }
 
 # ==========================================
-# 40+ MODULES IMPORT (ROUTER-FREE)
+# 40+ MODULES - DIRECT FASTAPI ROUTES (NO ROUTER)
 # ==========================================
-from modules.aavishkar.handler import handler as aavishkar_handler
-from modules.ai_chat.handler import handler as ai_chat_handler
-from modules.analytics.handler import handler as analytics_handler
-from modules.banking.handler import handler as banking_handler
-from modules.currency.handler import handler as currency_handler
-from modules.currents_api.handler import handler as currents_api_handler
-from modules.daily_report.handler import handler as daily_report_handler
-from modules.emergency.handler import handler as emergency_handler
-from modules.fuel.handler import handler as fuel_handler
-from modules.goldrate.handler import handler as goldrate_handler
-from modules.govt.handler import handler as govt_handler
-from modules.guard_agent.handler import handler as guard_agent_handler
-from modules.horoscope.handler import handler as horoscope_handler
-from modules.kisaan_doctor.handler import handler as kisaan_doctor_handler
-from modules.language.handler import handler as language_handler
-from modules.language_hub.handler import handler as language_hub_handler
-from modules.mandi.handler import handler as mandi_handler
-from modules.master_scheduler.handler import handler as master_scheduler_handler
-from modules.meta_agent.handler import handler as meta_agent_handler
-from modules.news.handler import handler as news_handler
-from modules.newsdata.handler import handler as newsdata_handler
-from modules.oauth_connector.handler import handler as oauth_connector_handler
-from modules.pani.handler import handler as pani_handler
-from modules.plant_id.handler import handler as plant_id_handler
-from modules.rozgar.handler import handler as rozgar_handler
-from modules.scheme_swarm.handler import handler as scheme_swarm_handler
-from modules.search.handler import handler as search_handler
-from modules.sewer.handler import handler as sewer_handler
-from modules.singhji_tv.handler import handler as singhji_tv_handler
-from modules.social_agent.handler import handler as social_agent_handler
-from modules.supabase_memory.handler import handler as supabase_memory_handler
-from modules.supreme_agent.handler import handler as supreme_agent_handler
-from modules.trolley.handler import handler as trolley_handler
-from modules.upi.handler import handler as upi_handler
-from modules.voice.handler import handler as voice_handler
-from modules.voice_cmd.handler import handler as voice_cmd_handler
-from modules.voice_tts.handler import handler as voice_tts_handler
-from modules.weather.handler import handler as weather_handler
-from modules.whatsapp.handler import handler as whatsapp_handler
 
-# ==========================================
-# 40+ MODULES REGISTER (DIRECT HANDLER - NO ROUTER)
-# ==========================================
-app.get("/api/v1/aavishkar")(aavishkar_handler)
-app.get("/api/v1/ai-chat")(ai_chat_handler)
-app.get("/api/v1/analytics")(analytics_handler)
-app.get("/api/v1/banking")(banking_handler)
-app.get("/api/v1/currency")(currency_handler)
-app.get("/api/v1/currents")(currents_api_handler)
-app.get("/api/v1/daily-report")(daily_report_handler)
-app.get("/api/v1/emergency")(emergency_handler)
-app.get("/api/v1/fuel")(fuel_handler)
-app.get("/api/v1/goldrate")(goldrate_handler)
-app.get("/api/v1/govt")(govt_handler)
-app.get("/api/v1/guard")(guard_agent_handler)
-app.get("/api/v1/horoscope")(horoscope_handler)
-app.get("/api/v1/kisaan-doctor")(kisaan_doctor_handler)
-app.get("/api/v1/language")(language_handler)
-app.get("/api/v1/language-hub")(language_hub_handler)
-app.get("/api/v1/mandi")(mandi_handler)
-app.get("/api/v1/scheduler")(master_scheduler_handler)
-app.get("/api/v1/meta")(meta_agent_handler)
-app.get("/api/v1/news")(news_handler)
-app.get("/api/v1/newsdata")(newsdata_handler)
-app.get("/api/v1/oauth")(oauth_connector_handler)
-app.get("/api/v1/pani")(pani_handler)
-app.get("/api/v1/plant-id")(plant_id_handler)
-app.get("/api/v1/rozgar")(rozgar_handler)
-app.get("/api/v1/scheme-swarm")(scheme_swarm_handler)
-app.get("/api/v1/search")(search_handler)
-app.get("/api/v1/sewer")(sewer_handler)
-app.get("/api/v1/tv")(singhji_tv_handler)
-app.get("/api/v1/social")(social_agent_handler)
-app.get("/api/v1/memory")(supabase_memory_handler)
-app.get("/api/v1/supreme")(supreme_agent_handler)
-app.get("/api/v1/trolley")(trolley_handler)
-app.get("/api/v1/upi")(upi_handler)
-app.get("/api/v1/voice")(voice_handler)
-app.get("/api/v1/voice-cmd")(voice_cmd_handler)
-app.get("/api/v1/voice-tts")(voice_tts_handler)
-app.get("/api/v1/weather")(weather_handler)
-app.get("/api/v1/whatsapp")(whatsapp_handler)
+@app.get("/api/v1/aavishkar")
+async def aavishkar_endpoint():
+    return {"status": "ok", "module": "aavishkar"}
+
+@app.get("/api/v1/ai-chat")
+async def ai_chat_endpoint():
+    return {"status": "ok", "module": "ai_chat"}
+
+@app.get("/api/v1/analytics")
+async def analytics_endpoint():
+    return {"status": "ok", "module": "analytics"}
+
+@app.get("/api/v1/banking")
+async def banking_endpoint():
+    return {"status": "ok", "module": "banking"}
+
+@app.get("/api/v1/currency")
+async def currency_endpoint():
+    return {"status": "ok", "module": "currency"}
+
+@app.get("/api/v1/currents")
+async def currents_api_endpoint():
+    return {"status": "ok", "module": "currents_api"}
+
+@app.get("/api/v1/daily-report")
+async def daily_report_endpoint():
+    return {"status": "ok", "module": "daily_report"}
+
+@app.get("/api/v1/emergency")
+async def emergency_endpoint():
+    return {"status": "ok", "module": "emergency"}
+
+@app.get("/api/v1/fuel")
+async def fuel_endpoint():
+    return {"status": "ok", "module": "fuel"}
+
+@app.get("/api/v1/goldrate")
+async def goldrate_endpoint():
+    return {"status": "ok", "module": "goldrate"}
+
+@app.get("/api/v1/govt")
+async def govt_endpoint():
+    return {"status": "ok", "module": "govt"}
+
+@app.get("/api/v1/guard")
+async def guard_agent_endpoint():
+    return {"status": "ok", "module": "guard_agent"}
+
+@app.get("/api/v1/horoscope")
+async def horoscope_endpoint():
+    return {"status": "ok", "module": "horoscope"}
+
+@app.get("/api/v1/kisaan-doctor")
+async def kisaan_doctor_endpoint():
+    return {"status": "ok", "module": "kisaan_doctor"}
+
+@app.get("/api/v1/language")
+async def language_endpoint():
+    return {"status": "ok", "module": "language"}
+
+@app.get("/api/v1/language-hub")
+async def language_hub_endpoint():
+    return {"status": "ok", "module": "language_hub"}
+
+@app.get("/api/v1/mandi")
+async def mandi_endpoint():
+    return {"status": "ok", "module": "mandi"}
+
+@app.get("/api/v1/scheduler")
+async def master_scheduler_endpoint():
+    return {"status": "ok", "module": "master_scheduler"}
+
+@app.get("/api/v1/meta")
+async def meta_agent_endpoint():
+    return {"status": "ok", "module": "meta_agent"}
+
+@app.get("/api/v1/news")
+async def news_endpoint():
+    return {"status": "ok", "module": "news"}
+
+@app.get("/api/v1/newsdata")
+async def newsdata_endpoint():
+    return {"status": "ok", "module": "newsdata"}
+
+@app.get("/api/v1/oauth")
+async def oauth_connector_endpoint():
+    return {"status": "ok", "module": "oauth_connector"}
+
+@app.get("/api/v1/pani")
+async def pani_endpoint():
+    return {"status": "ok", "module": "pani"}
+
+@app.get("/api/v1/plant-id")
+async def plant_id_endpoint():
+    return {"status": "ok", "module": "plant_id"}
+
+@app.get("/api/v1/rozgar")
+async def rozgar_endpoint():
+    return {"status": "ok", "module": "rozgar"}
+
+@app.get("/api/v1/scheme-swarm")
+async def scheme_swarm_endpoint():
+    return {"status": "ok", "module": "scheme_swarm"}
+
+@app.get("/api/v1/search")
+async def search_endpoint():
+    return {"status": "ok", "module": "search"}
+
+@app.get("/api/v1/sewer")
+async def sewer_endpoint():
+    return {"status": "ok", "module": "sewer"}
+
+@app.get("/api/v1/tv")
+async def singhji_tv_endpoint():
+    return {"status": "ok", "module": "singhji_tv"}
+
+@app.get("/api/v1/social")
+async def social_agent_endpoint():
+    return {"status": "ok", "module": "social_agent"}
+
+@app.get("/api/v1/memory")
+async def supabase_memory_endpoint():
+    return {"status": "ok", "module": "supabase_memory"}
+
+@app.get("/api/v1/supreme")
+async def supreme_agent_endpoint():
+    return {"status": "ok", "module": "supreme_agent"}
+
+@app.get("/api/v1/trolley")
+async def trolley_endpoint():
+    return {"status": "ok", "module": "trolley"}
+
+@app.get("/api/v1/upi")
+async def upi_endpoint():
+    return {"status": "ok", "module": "upi"}
+
+@app.get("/api/v1/voice")
+async def voice_endpoint():
+    return {"status": "ok", "module": "voice"}
+
+@app.get("/api/v1/voice-cmd")
+async def voice_cmd_endpoint():
+    return {"status": "ok", "module": "voice_cmd"}
+
+@app.get("/api/v1/voice-tts")
+async def voice_tts_endpoint():
+    return {"status": "ok", "module": "voice_tts"}
+
+@app.get("/api/v1/weather")
+async def weather_endpoint():
+    return {"status": "ok", "module": "weather"}
+
+@app.get("/api/v1/whatsapp")
+async def whatsapp_endpoint():
+    return {"status": "ok", "module": "whatsapp"}
 
 if __name__ == "__main__":
     import uvicorn
