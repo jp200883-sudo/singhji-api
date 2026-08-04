@@ -39,8 +39,7 @@ class _SmartSarwanSwarm:
     def sync(self, modules_status, available_keys):
         to_load = set()
         for agent_id, agent in self.all_agents.items():
-            if agent["claw"] in ["claw_10_boss", "claw_11_core_ai"]:
-                to_load.add(agent_id)
+            to_load.add(agent_id)
         self.active_agents = {}
         for aid in to_load:
             agent = self.all_agents[aid].copy()
