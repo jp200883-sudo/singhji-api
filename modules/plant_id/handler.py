@@ -1,14 +1,26 @@
-# plant_id/handler.py
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+from typing import Optional, Dict, Any
 import os
 import json
 import requests
-import base64
 import time
-from typing import Dict, Any
+
+router = APIRouter()
 
 # ========== CONFIG ==========
 PLANT_ID_API = os.getenv("PLANT_ID_API")
-PLANT_ID_URL = os.getenv("PLANT_ID_URL", "https://api.plant.id/v2/identify")
+PLANT_ID_URL = os.getenv("PLANT_ID_URL", "https://api.plant.id/v2")
+
+# ========== PYDANTIC MODELS ==========
+class PlantIdentifyRequest(BaseModel):
+    image: str
+    action: Optional[str] = "identify"
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+
+class PlantDiagnoseRequest(BaseModel):
+    image: str
 
 # ========== PLANT ID MODULE ==========
 class PlantIDModule:
@@ -17,7 +29,6 @@ class PlantIDModule:
         self.base_url = PLANT_ID_URL.rstrip("/")
     
     def identify_plant(self, image_base64: str, latitude: float = None, longitude: float = None) -> Dict[str, Any]:
-        """Identify plant from image using Plant.id API"""
         if not self.api_key:
             return self._mock_identify()
         
@@ -69,7 +80,6 @@ class PlantIDModule:
             return self._mock_identify()
     
     def diagnose_disease(self, image_base64: str) -> Dict[str, Any]:
-        """Diagnose plant disease from image"""
         if not self.api_key:
             return self._mock_diagnose()
         
@@ -160,64 +170,34 @@ class PlantIDModule:
             "status": "✅ Ready" if self.api_key else "⚠️ Mock Mode"
         }
 
-
-# ========== RENDER HANDLER ==========
-def handler(request):
-    if request.method == "GET":
-        p = PlantIDModule()
-        return {
-            "statusCode": 200,
-            "headers": {
-                "Content-Type": "application/json",
-                "Access-Control-Allow-Origin": "*"
-            },
-            "body": json.dumps({
-                "module": "plant_id",
-                "status": "LIVE",
-                "health": p.health_check()
-            })
-        }
-    
-    elif request.method == "POST":
-        try:
-            body = json.loads(request.body) if hasattr(request, 'body') else request.json()
-            image_base64 = body.get("image")
-            action = body.get("action", "identify")  # identify or diagnose
-            lat = body.get("latitude")
-            lon = body.get("longitude")
-            
-            if not image_base64:
-                return {
-                    "statusCode": 400,
-                    "body": json.dumps({"error": "Image base64 required"})
-                }
-            
-            p = PlantIDModule()
-            if action == "diagnose":
-                result = p.diagnose_disease(image_base64)
-            else:
-                result = p.identify_plant(image_base64, lat, lon)
-            
-            return {
-                "statusCode": 200,
-                "headers": {
-                    "Content-Type": "application/json",
-                    "Access-Control-Allow-Origin": "*"
-                },
-                "body": json.dumps(result, ensure_ascii=False)
-            }
-            
-        except Exception as e:
-            return {"statusCode": 500, "body": json.dumps({"error": str(e)})}
-    
-    return {"statusCode": 405, "body": json.dumps({"error": "Method not allowed"})}
-
-
-if __name__ == "__main__":
+# ========== FASTAPI ENDPOINTS ==========
+@router.get("/")
+async def plant_id_root():
     p = PlantIDModule()
-    print("🦁 SINGH JI AI ULTRA v7.0 — Plant ID Module")
-    print("Health:", p.health_check())
-    print("\nMock Identify:")
-    print(json.dumps(p.identify_plant(""), indent=2, ensure_ascii=False))
-    print("\nMock Diagnose:")
-    print(json.dumps(p.diagnose_disease(""), indent=2, ensure_ascii=False))
+    return {
+        "module": "plant_id",
+        "status": "LIVE",
+        "health": p.health_check()
+    }
+
+@router.get("/ping")
+async def plant_id_ping():
+    return {"status": "alive", "module": "plant_id"}
+
+@router.post("/identify")
+async def identify_plant(request: PlantIdentifyRequest):
+    try:
+        p = PlantIDModule()
+        result = p.identify_plant(request.image, request.latitude, request.longitude)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/diagnose")
+async def diagnose_plant(request: PlantDiagnoseRequest):
+    try:
+        p = PlantIDModule()
+        result = p.diagnose_disease(request.image)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
