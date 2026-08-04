@@ -67,34 +67,30 @@ CACHE_TTL = {
 # ==========================================
 # AVAILABLE KEYS STATUS
 # ==========================================
-class Config:
-    def __init__(self):
-        self.ADMIN_API_KEY = ADMIN_API_KEY
-        self.CEREBRAS_API_KEY = CEREBRAS_API_KEY
-        self.GEMINI_API_KEY = GEMINI_API_KEY
-        self.GROQ_API_KEY = GROQ_API_KEY
-        self.OPENWEATHER_API_KEY = OPENWEATHER_API_KEY
-        self.NEWSDATA_API_KEY = NEWSDATA_API_KEY
-        self.MANDI_API_KEY = MANDI_API_KEY
-        self.SUPABASE_URL = SUPABASE_URL
-        self.SUPABASE_SERVICE_KEY = SUPABASE_SERVICE_KEY
-        self.TELEGRAM_TOKEN = TELEGRAM_TOKEN
-        self.FACEBOOK_ACCESS_TOKEN = FACEBOOK_ACCESS_TOKEN
-        self.FACEBOOK_PAGE_ID = FACEBOOK_PAGE_ID
-        self.MANDI_RESOURCE_ID = MANDI_RESOURCE_ID
-        self.MANDI_BASE_URL = MANDI_BASE_URL
-        self.CACHE_TTL = CACHE_TTL
-        self.RATE_LIMIT_GLOBAL = RATE_LIMIT_GLOBAL
-        self.RATE_LIMIT_STRICT = RATE_LIMIT_STRICT
-        self.AVAILABLE_KEYS = AVAILABLE_KEYS
-        self.STATE_MAP = STATE_MAP
-        self.APP_URL = APP_URL
-        self.DEBUG = True
-        self.APP_VERSION = "8.0"
-
-# ✅ यह लाइन सबसे ज़रूरी है – config object बनाओ
-config = Config()
-
+config = {
+    "ADMIN_API_KEY": ADMIN_API_KEY,
+    "CEREBRAS_API_KEY": CEREBRAS_API_KEY,
+    "GEMINI_API_KEY": GEMINI_API_KEY,
+    "GROQ_API_KEY": GROQ_API_KEY,
+    "OPENWEATHER_API_KEY": OPENWEATHER_API_KEY,
+    "NEWSDATA_API_KEY": NEWSDATA_API_KEY,
+    "MANDI_API_KEY": MANDI_API_KEY,
+    "SUPABASE_URL": SUPABASE_URL,
+    "SUPABASE_SERVICE_KEY": SUPABASE_SERVICE_KEY,
+    "TELEGRAM_TOKEN": TELEGRAM_TOKEN,
+    "FACEBOOK_ACCESS_TOKEN": FACEBOOK_ACCESS_TOKEN,
+    "FACEBOOK_PAGE_ID": FACEBOOK_PAGE_ID,
+    "MANDI_RESOURCE_ID": MANDI_RESOURCE_ID,
+    "MANDI_BASE_URL": MANDI_BASE_URL,
+    "CACHE_TTL": CACHE_TTL,
+    "RATE_LIMIT_GLOBAL": RATE_LIMIT_GLOBAL,
+    "RATE_LIMIT_STRICT": RATE_LIMIT_STRICT,
+    "AVAILABLE_KEYS": AVAILABLE_KEYS,
+    "STATE_MAP": STATE_MAP,
+    "APP_URL": APP_URL,
+    "DEBUG": True,
+    "APP_VERSION": "8.0"
+}
 # ==========================================
 # STATE MAP (for Mandi)
 # ==========================================
