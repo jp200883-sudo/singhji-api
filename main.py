@@ -443,6 +443,7 @@ _import_errors = []
 # --- CORE MODULES ---
 try:
     from modules.kisaan_doctor.handler import router as kisaan_router
+    from modules.kisaan_doctor import disease_detector, treatment_advisor
     _imported_modules["kisaan_doctor"] = "router"
 except Exception as e:
     logger.warning(f"⚠️ kisaan_doctor: {e}"); _import_errors.append("kisaan_doctor")
@@ -521,6 +522,12 @@ except Exception as e:
 try:
     from modules.scheme_swarm.api_routes import router as scheme_swarm_router, engine as scheme_engine
     from modules.scheme_swarm.eligibility import UserProfile
+    from modules.scheme_swarm.db_helpers import get_db_connection, save_scheme_application, get_user_applications
+    from modules.scheme_swarm.form_filler import fill_form, validate_form_data
+    from modules.scheme_swarm.handler import handle_scheme_query, get_scheme_list
+    from modules.scheme_swarm.notifications import send_notification, check_deadlines
+    from modules.scheme_swarm.status_tracker import track_application, get_status_summary
+    import modules.scheme_swarm.data as scheme_data
     _imported_modules["scheme_swarm"] = "router"
 except Exception as e:
     logger.warning(f"⚠️ scheme_swarm: {e}"); _import_errors.append("scheme_swarm")
@@ -549,6 +556,7 @@ except Exception as e:
 
 try:
     from modules.guard_agent.handler import router as guard_router
+    from modules.guard_agent import threat_detector, alert_manager, camera_monitor
     _imported_modules["guard_agent"] = "router"
 except Exception as e:
     logger.warning(f"⚠️ guard_agent: {e}"); _import_errors.append("guard_agent")
@@ -564,6 +572,7 @@ except Exception as e:
 try:
     from modules.social_agent.handler import router as social_router
     import modules.social_agent.core as social_core
+    from modules.social_agent import post_scheduler, analytics_reporter, content_generator
     _imported_modules["social_agent"] = "router"
 except Exception as e:
     logger.warning(f"⚠️ social_agent: {e}"); _import_errors.append("social_agent")
