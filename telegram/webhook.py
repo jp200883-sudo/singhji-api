@@ -43,4 +43,67 @@ async def telegram_webhook(request: Request):
             return {"status": "ok"}
 
         message = data["message"]
-        chat_id =
+        chat_id = message["chat"]["id"]
+        text = message.get("text", "")
+        user_id = message["from"]["id"]
+
+        # ---- Register New User ----
+        if user_id not in USER_PREFERENCES:
+            USER_PREFERENCES[user_id] = {"language": "hi", "location": None}
+            await _memory_save(f"user_pref:{user_id}", USER_PREFERENCES[user_id], table="user_memory")
+            logger.info(f"New user registered: {user_id}")
+
+        # ---- Pending Input (from button) ----
+        pending = USER_PREFERENCES.get(user_id, {}).pop("waiting_for", None)
+        if pending and text and not text.startswith("/"):
+            pending_map = {
+                "weather": "/weather ",
+                "mandi": "/mandi ",
+                "tax": "/tax ",
+                "gold": "/gold ",
+                "fuel": "/fuel ",
+                "horoscope": "/horoscope ",
+                "currency": "/currency ",
+                "rozgar": "/rozgar ",
+                "search": "/search ",
+                "translate": "/translate ",
+                "yojana": "/yojana ",
+                "tv": "/tv ",
+            }
+            if pending in pending_map:
+                text = pending_map[pending] + text.strip()
+
+        # ---- Rate Limit ----
+        if _rate_check(f"tg_user:{user_id}", 10, 60):
+            await send_message(chat_id, "⏳ Please slow down! Try again in 1 minute.")
+            return {"status": "ok"}
+
+        # ---- Voice Message ----
+        if "voice" in message:
+            return await handle_voice(chat_id, user_id, message)
+
+        # ---- Photo Message ----
+        if "photo" in message:
+            return await handle_photo(chat_id, message)
+
+        # ---- Command ----
+        if text.startswith("/"):
+            return await handle_command(chat_id, user_id, text)
+
+        # ---- Default: AI Chat ----
+        if GROQ_API_KEY and text:
+            try:
+                from api.ai import _call_groq
+                ai_response = await _call_groq(text)
+                await send_message(chat_id, ai_response[:4000])
+                await _memory_save(f"telegram_chat:{user_id}:{int(datetime.now().timestamp())}", 
+                                   {"prompt": text, "response": ai_response})
+            except Exception as e:
+                await send_message(chat_id, f"❌ AI Error: {str(e)[:100]}")
+            return {"status": "ok"}
+
+        return {"status": "ok"}
+
+    except Exception as e:
+        logger.error(f"Telegram webhook error: {e}", exc_info=True)
+        return {"status": "error", "message": str(e)}
