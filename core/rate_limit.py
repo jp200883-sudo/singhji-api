@@ -1,4 +1,6 @@
 import time
+import threading
+from collections import defaultdict
 from typing import Dict, List
 from fastapi import Request, HTTPException
 
@@ -6,6 +8,29 @@ from fastapi import Request, HTTPException
 # RATE LIMIT STORE
 # ==========================================
 RATE_LIMIT: Dict[str, List[float]] = {}
+
+# ==========================================
+# GENERIC KEYED RATE LIMIT (Telegram per-user, etc.)
+# ==========================================
+_rate_lock = threading.Lock()
+_rate_buckets: Dict[str, List[float]] = defaultdict(list)
+
+
+def _rate_check(key: str, max_calls: int, window_seconds: int) -> bool:
+    """
+    Generic keyed rate limiter — koi bhi custom key (jaise 'tg_user:12345')
+    ke liye rate limit check karta hai. IP-based middleware se alag hai.
+    Return: True agar limit cross ho gayi (rate-limited), False agar OK hai.
+    """
+    now = time.time()
+    with _rate_lock:
+        bucket = _rate_buckets[key]
+        while bucket and bucket[0] < now - window_seconds:
+            bucket.pop(0)
+        if len(bucket) >= max_calls:
+            return True
+        bucket.append(now)
+        return False
 
 # Default limits (आप चाहें तो config से ले सकते हैं)
 RATE_LIMIT_WINDOW = 60  # 60 seconds
