@@ -1,7 +1,10 @@
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # ==========================================
-# ENVIRONMENT VARIABLES
+# 1. ENVIRONMENT VARIABLES
 # ==========================================
 ADMIN_API_KEY = os.getenv("ADMIN_API_KEY")
 CEREBRAS_API_KEY = os.getenv("CEREBRAS_API_KEY")
@@ -44,14 +47,13 @@ VEO_API_KEY = os.getenv("VEO_API_KEY")
 APP_URL = os.getenv("APP_URL", "").rstrip('/')
 
 # ==========================================
-# CONSTANTS
+# 2. CONSTANTS
 # ==========================================
 MAX_B64_BYTES = 10 * 1024 * 1024
 MAX_MEMORY_SIZE = 5000
 MANDI_RESOURCE_ID = "9ef84268-d588-465a-a308-a864a43d0070"
 MANDI_BASE_URL = f"https://api.data.gov.in/resource/{MANDI_RESOURCE_ID}"
 
-# Rate limits
 RATE_LIMIT_GLOBAL = (int(os.getenv("RATE_LIMIT_GLOBAL_CALLS", 30)), int(os.getenv("RATE_LIMIT_GLOBAL_WINDOW", 60)))
 RATE_LIMIT_STRICT = (int(os.getenv("RATE_LIMIT_STRICT_CALLS", 5)), int(os.getenv("RATE_LIMIT_STRICT_WINDOW", 60)))
 RATE_LIMIT_TELEGRAM_USER = (int(os.getenv("RATE_LIMIT_TELEGRAM_CALLS", 10)), int(os.getenv("RATE_LIMIT_TELEGRAM_WINDOW", 60)))
@@ -65,34 +67,37 @@ CACHE_TTL = {
 }
 
 # ==========================================
-# AVAILABLE KEYS STATUS
+# 3. AVAILABLE KEYS STATUS ✅ (यही missing था)
 # ==========================================
-config = {
-    "ADMIN_API_KEY": ADMIN_API_KEY,
-    "CEREBRAS_API_KEY": CEREBRAS_API_KEY,
-    "GEMINI_API_KEY": GEMINI_API_KEY,
-    "GROQ_API_KEY": GROQ_API_KEY,
-    "OPENWEATHER_API_KEY": OPENWEATHER_API_KEY,
-    "NEWSDATA_API_KEY": NEWSDATA_API_KEY,
-    "MANDI_API_KEY": MANDI_API_KEY,
-    "SUPABASE_URL": SUPABASE_URL,
-    "SUPABASE_SERVICE_KEY": SUPABASE_SERVICE_KEY,
-    "TELEGRAM_TOKEN": TELEGRAM_TOKEN,
-    "FACEBOOK_ACCESS_TOKEN": FACEBOOK_ACCESS_TOKEN,
-    "FACEBOOK_PAGE_ID": FACEBOOK_PAGE_ID,
-    "MANDI_RESOURCE_ID": MANDI_RESOURCE_ID,
-    "MANDI_BASE_URL": MANDI_BASE_URL,
-    "CACHE_TTL": CACHE_TTL,
-    "RATE_LIMIT_GLOBAL": RATE_LIMIT_GLOBAL,
-    "RATE_LIMIT_STRICT": RATE_LIMIT_STRICT,
-    "AVAILABLE_KEYS": AVAILABLE_KEYS,
-    "STATE_MAP": STATE_MAP,
-    "APP_URL": APP_URL,
-    "DEBUG": True,
-    "APP_VERSION": "8.0"
+AVAILABLE_KEYS = {
+    "ADMIN": bool(ADMIN_API_KEY),
+    "CEREBRAS": bool(CEREBRAS_API_KEY),
+    "CF": bool(CF_API_TOKEN),
+    "CURRENTS": bool(CURRENTS_API_KEY),
+    "DATABASE": bool(DATABASE_URL),
+    "FACEBOOK": bool(FACEBOOK_ACCESS_TOKEN),
+    "GEMINI": bool(GEMINI_API_KEY),
+    "GROQ": bool(GROQ_API_KEY),
+    "HUGGINGFACE": bool(HUGGINGFACE_TOKEN),
+    "MANDI": bool(MANDI_API_KEY),
+    "NEWSDATA": bool(NEWSDATA_API_KEY),
+    "OPENWEATHER": bool(OPENWEATHER_API_KEY),
+    "PLANT_ID": bool(PLANT_ID_API),
+    "RAPIDAPI": bool(RAPIDAPI_KEY),
+    "RAZORPAY": bool(RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET),
+    "SUPABASE": bool(SUPABASE_URL and SUPABASE_SERVICE_KEY),
+    "TAVILY": bool(TAVILY_API_KEY),
+    "TELEGRAM": bool(TELEGRAM_TOKEN),
+    "TWILIO": bool(TWILIO_SID and TWILIO_TOKEN),
+    "YOUTUBE": bool(YOUTUBE_API_KEY),
+    "BHASHINI": bool(BHASHINI_USER_ID and BHASHINI_ULCA_API_KEY),
+    "GMAIL": bool(GMAIL_CLIENT_ID and GMAIL_CLIENT_SECRET),
+    "INSTAGRAM": bool(INSTAGRAM_ACCESS_TOKEN),
+    "BLUESKY": bool(os.getenv("BLUESKY_HANDLE") and os.getenv("BLUESKY_APP_PASSWORD")),
 }
+
 # ==========================================
-# STATE MAP (for Mandi)
+# 4. STATE MAP
 # ==========================================
 STATE_MAP = {
     "up": "Uttar Pradesh", "uttar pradesh": "Uttar Pradesh", "uttarpradesh": "Uttar Pradesh",
@@ -109,4 +114,32 @@ STATE_MAP = {
     "uttarakhand": "Uttarakhand", "uttranchal": "Uttarakhand",
     "himachal": "Himachal Pradesh", "himachal pradesh": "Himachal Pradesh",
     "assam": "Assam", "tripura": "Tripura", "meghalaya": "Meghalaya",
+}
+
+# ==========================================
+# 5. CONFIG DICTIONARY ✅
+# ==========================================
+config = {
+    "ADMIN_API_KEY": ADMIN_API_KEY,
+    "GROQ_API_KEY": GROQ_API_KEY,
+    "GEMINI_API_KEY": GEMINI_API_KEY,
+    "CEREBRAS_API_KEY": CEREBRAS_API_KEY,
+    "OPENWEATHER_API_KEY": OPENWEATHER_API_KEY,
+    "NEWSDATA_API_KEY": NEWSDATA_API_KEY,
+    "MANDI_API_KEY": MANDI_API_KEY,
+    "SUPABASE_URL": SUPABASE_URL,
+    "SUPABASE_SERVICE_KEY": SUPABASE_SERVICE_KEY,
+    "TELEGRAM_TOKEN": TELEGRAM_TOKEN,
+    "FACEBOOK_ACCESS_TOKEN": FACEBOOK_ACCESS_TOKEN,
+    "FACEBOOK_PAGE_ID": FACEBOOK_PAGE_ID,
+    "MANDI_RESOURCE_ID": MANDI_RESOURCE_ID,
+    "MANDI_BASE_URL": MANDI_BASE_URL,
+    "CACHE_TTL": CACHE_TTL,
+    "RATE_LIMIT_GLOBAL": RATE_LIMIT_GLOBAL,
+    "RATE_LIMIT_STRICT": RATE_LIMIT_STRICT,
+    "AVAILABLE_KEYS": AVAILABLE_KEYS,
+    "STATE_MAP": STATE_MAP,
+    "APP_URL": APP_URL,
+    "DEBUG": os.getenv("DEBUG", "False").lower() == "true",
+    "APP_VERSION": "8.0"
 }
