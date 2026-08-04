@@ -67,32 +67,33 @@ CACHE_TTL = {
 # ==========================================
 # AVAILABLE KEYS STATUS
 # ==========================================
-AVAILABLE_KEYS = {
-    "ADMIN": bool(ADMIN_API_KEY),
-    "CEREBRAS": bool(CEREBRAS_API_KEY),
-    "CF": bool(CF_API_TOKEN),
-    "CURRENTS": bool(CURRENTS_API_KEY),
-    "DATABASE": bool(DATABASE_URL),
-    "FACEBOOK": bool(FACEBOOK_ACCESS_TOKEN),
-    "GEMINI": bool(GEMINI_API_KEY),
-    "GROQ": bool(GROQ_API_KEY),
-    "HUGGINGFACE": bool(HUGGINGFACE_TOKEN),
-    "MANDI": bool(MANDI_API_KEY),
-    "NEWSDATA": bool(NEWSDATA_API_KEY),
-    "OPENWEATHER": bool(OPENWEATHER_API_KEY),
-    "PLANT_ID": bool(PLANT_ID_API),
-    "RAPIDAPI": bool(RAPIDAPI_KEY),
-    "RAZORPAY": bool(RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET),
-    "SUPABASE": bool(SUPABASE_URL and SUPABASE_SERVICE_KEY),
-    "TAVILY": bool(TAVILY_API_KEY),
-    "TELEGRAM": bool(TELEGRAM_TOKEN),
-    "TWILIO": bool(TWILIO_SID and TWILIO_TOKEN),
-    "YOUTUBE": bool(YOUTUBE_API_KEY),
-    "BHASHINI": bool(BHASHINI_USER_ID and BHASHINI_ULCA_API_KEY),
-    "GMAIL": bool(GMAIL_CLIENT_ID and GMAIL_CLIENT_SECRET),
-    "INSTAGRAM": bool(INSTAGRAM_ACCESS_TOKEN),
-    "BLUESKY": bool(os.getenv("BLUESKY_HANDLE") and os.getenv("BLUESKY_APP_PASSWORD")),
-}
+class Config:
+    def __init__(self):
+        self.ADMIN_API_KEY = ADMIN_API_KEY
+        self.CEREBRAS_API_KEY = CEREBRAS_API_KEY
+        self.GEMINI_API_KEY = GEMINI_API_KEY
+        self.GROQ_API_KEY = GROQ_API_KEY
+        self.OPENWEATHER_API_KEY = OPENWEATHER_API_KEY
+        self.NEWSDATA_API_KEY = NEWSDATA_API_KEY
+        self.MANDI_API_KEY = MANDI_API_KEY
+        self.SUPABASE_URL = SUPABASE_URL
+        self.SUPABASE_SERVICE_KEY = SUPABASE_SERVICE_KEY
+        self.TELEGRAM_TOKEN = TELEGRAM_TOKEN
+        self.FACEBOOK_ACCESS_TOKEN = FACEBOOK_ACCESS_TOKEN
+        self.FACEBOOK_PAGE_ID = FACEBOOK_PAGE_ID
+        self.MANDI_RESOURCE_ID = MANDI_RESOURCE_ID
+        self.MANDI_BASE_URL = MANDI_BASE_URL
+        self.CACHE_TTL = CACHE_TTL
+        self.RATE_LIMIT_GLOBAL = RATE_LIMIT_GLOBAL
+        self.RATE_LIMIT_STRICT = RATE_LIMIT_STRICT
+        self.AVAILABLE_KEYS = AVAILABLE_KEYS
+        self.STATE_MAP = STATE_MAP
+        self.APP_URL = APP_URL
+        self.DEBUG = True
+        self.APP_VERSION = "8.0"
+
+# ✅ यह लाइन सबसे ज़रूरी है – config object बनाओ
+config = Config()
 
 # ==========================================
 # STATE MAP (for Mandi)
