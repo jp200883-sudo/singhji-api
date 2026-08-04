@@ -17,13 +17,13 @@ from modules.mandi.handler import router as mandi_router
 from modules.ai_chat.handler import router as ai_chat_router
 from modules.news.handler import router as news_router
 from modules.plant_id.handler import router as plant_router
-from modules.whatsapp.handler import router as whatsapp_router
-from modules.trolley.handler import router as trolley_router
+from modules.whatsapp.handler import handler as whatsapp_handler
+from modules.trolley.handler import handler as trolley_handler
 from modules.daily_report.handler import router as daily_report_router
-from modules.analytics.handler import router as analytics_router
-from modules.upi.handler import router as upi_router
-from modules.voice_tts.handler import router as voice_tts_router
-from modules.language.handler import router as language_router
+from modules.analytics.handler import handler as analytics_handler
+from modules.upi.handler import handler as upi_handler
+from modules.voice_tts.handler import handler as voice_tts_handler
+from modules.language.handler import handler as language_handler
 from modules.supreme_agent.handler import router as supreme_agent_router
 
 # ==========================================
@@ -94,13 +94,13 @@ app.include_router(mandi_router, prefix="/api/v1/mandi")
 app.include_router(news_router, prefix="/api/v1/news")
 app.include_router(plant_router, prefix="/api/v1/plant")
 app.include_router(telegram_router, prefix="/api/v1/telegram")  # ✅ Direct root wala
-app.include_router(whatsapp_router, prefix="/api/v1/whatsapp")
-app.include_router(trolley_router, prefix="/api/v1/trolley")
+app.add_api_route("/api/v1/whatsapp", whatsapp_handler, methods=["GET", "POST"])
+app.add_api_route("/api/v1/trolley", trolley_handler, methods=["GET", "POST"])
 app.include_router(daily_report_router, prefix="/api/v1/daily-report")
-app.include_router(analytics_router, prefix="/api/v1/analytics")
-app.include_router(upi_router, prefix="/api/v1/upi")
-app.include_router(voice_tts_router, prefix="/api/v1/voice-tts")
-app.include_router(language_router, prefix="/api/v1/language")
+app.add_api_route("/api/v1/analytics", analytics_handler, methods=["GET", "POST"])
+app.add_api_route("/api/v1/upi", upi_handler, methods=["GET", "POST"])
+app.add_api_route("/api/v1/voice-tts", voice_tts_handler, methods=["GET", "POST"])
+app.add_api_route("/api/v1/language", language_handler, methods=["GET", "POST"])
 
 if __name__ == "__main__":
     import uvicorn
