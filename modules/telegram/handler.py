@@ -234,7 +234,9 @@ async def on_any_message(message: types.Message):
         f"💡 <b>Better experience ke liye Capsule App kholo:</b>",
         reply_markup=get_webapp_button()
     )
-  @router.message(Command("settings"))
+
+
+@router.message(Command("settings"))
 async def cmd_settings(message: types.Message):
     settings_text = (
         "⚙️ <b>Singh Ji AI — Settings</b>\n\n"
