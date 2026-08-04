@@ -3,38 +3,39 @@ import logging
 from fastapi import FastAPI, Request
 from contextlib import asynccontextmanager
 
-# Core
+# Core imports (अब ये अलग files से आएंगे)
 from core.config import config
 from core.cache import cache_store
+from core.rate_limit import rate_limit_middleware
+from core.telegram import send_telegram_message
 
-# === यहाँ सारे 15 Modules Import करो ===
+# सारे modules import (36)
 from modules.weather.handler import router as weather_router
+from modules.news.handler import router as news_router
 from modules.mandi.handler import router as mandi_router
-from modules.ai_chat.handler import router as ai_chat_router
-# ... बाकी 12 modules (supreme_agent, newsdata, plant_id, etc.)
+# ... बाकी सब
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+app = FastAPI(title="Singh Ji AI ULTRA", version="8.3")
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    logger.info("🚀 Singh Ji AI ULTRA v8.0 शुरू")
-    yield
-    logger.info("👋 शटडाउन")
+# Rate limit middleware
+@app.middleware("http")
+async def rate_limit(request: Request, call_next):
+    rate_limit_middleware(request)
+    return await call_next(request)
 
-app = FastAPI(
-    title=config.APP_NAME,
-    version=config.APP_VERSION,
-    lifespan=lifespan
-)
-
+# Root
 @app.get("/")
 async def root():
-    return {
-        "status": "ok",
-        "version": "8.0",
-        "modules": 15,
-        "message": "🦁 JAI HIND! 🇮🇳"
+    return {"status": "ok", "version": "8.3", "modules": 36}
+
+# सारे routers register
+app.include_router(weather_router, prefix="/api/v1/weather")
+app.include_router(news_router, prefix="/api/v1/news")
+# ... बाकी सब
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)        "message": "🦁 JAI HIND! 🇮🇳"
     }
 
 # === सारे Routers Register ===
