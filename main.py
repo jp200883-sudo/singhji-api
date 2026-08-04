@@ -435,81 +435,409 @@ async def _ensure_correct_webhook():
         logger.error(f"❌ Webhook set error: {e}")
 
 # ==========================================
-# MODULES IMPORT
+# MODULES IMPORT — SAFE (individual try/except)
 # ==========================================
+_imported_modules = {}
+_import_errors = []
+
+# --- CORE MODULES ---
 try:
     from modules.kisaan_doctor.handler import router as kisaan_router
+    _imported_modules["kisaan_doctor"] = "router"
+except Exception as e:
+    logger.warning(f"⚠️ kisaan_doctor: {e}"); _import_errors.append("kisaan_doctor")
+    kisaan_router = None
+
+try:
     from modules.banking.handler import handler as banking_handler
+    _imported_modules["banking"] = "handler"
+except Exception as e:
+    logger.warning(f"⚠️ banking: {e}"); _import_errors.append("banking")
+    banking_handler = None
+
+try:
     from modules.currency.handler import router as currency_router, singhji_currency
+    _imported_modules["currency"] = "router"
+except Exception as e:
+    logger.warning(f"⚠️ currency: {e}"); _import_errors.append("currency")
+    currency_router = None; singhji_currency = None
+
+try:
     from modules.aavishkar.handler import router as aavishkar_router
+    _imported_modules["aavishkar"] = "router"
+except Exception as e:
+    logger.warning(f"⚠️ aavishkar: {e}"); _import_errors.append("aavishkar")
+    aavishkar_router = None
+
+try:
     from modules.goldrate.handler import router as goldrate_router, gold_rate_city, get_gold_silver_summary
+    _imported_modules["goldrate"] = "router"
+except Exception as e:
+    logger.warning(f"⚠️ goldrate: {e}"); _import_errors.append("goldrate")
+    goldrate_router = None; gold_rate_city = None; get_gold_silver_summary = None
+
+try:
     from modules.fuel.handler import router as fuel_router, fuel_price
+    _imported_modules["fuel"] = "router"
+except Exception as e:
+    logger.warning(f"⚠️ fuel: {e}"); _import_errors.append("fuel")
+    fuel_router = None; fuel_price = None
+
+try:
     from modules.horoscope.handler import get_horoscope, get_all_horoscopes, format_telegram as _format_horoscope_telegram
+    _imported_modules["horoscope"] = "functions"
+except Exception as e:
+    logger.warning(f"⚠️ horoscope: {e}"); _import_errors.append("horoscope")
+    get_horoscope = None; get_all_horoscopes = None; _format_horoscope_telegram = None
+
+try:
     from modules.language.handler import LanguageModule
+    _imported_modules["language"] = "class"
+except Exception as e:
+    logger.warning(f"⚠️ language: {e}"); _import_errors.append("language")
+    LanguageModule = None
+
+try:
     from modules.emergency.handler import EMERGENCY_DATA
+    _imported_modules["emergency"] = "data"
+except Exception as e:
+    logger.warning(f"⚠️ emergency: {e}"); _import_errors.append("emergency")
+    EMERGENCY_DATA = {}
+
+try:
     from modules.govt.handler import GOVT_DATA
+    _imported_modules["govt"] = "data"
+except Exception as e:
+    logger.warning(f"⚠️ govt: {e}"); _import_errors.append("govt")
+    GOVT_DATA = {}
+
+try:
     from modules.trishul.handler import router as trishul_router
+    _imported_modules["trishul"] = "router"
+except Exception as e:
+    logger.warning(f"⚠️ trishul: {e}"); _import_errors.append("trishul")
+    trishul_router = None
+
+try:
     from modules.scheme_swarm.api_routes import router as scheme_swarm_router, engine as scheme_engine
     from modules.scheme_swarm.eligibility import UserProfile
+    _imported_modules["scheme_swarm"] = "router"
+except Exception as e:
+    logger.warning(f"⚠️ scheme_swarm: {e}"); _import_errors.append("scheme_swarm")
+    scheme_swarm_router = None; scheme_engine = None; UserProfile = None
+
+try:
     from modules.pani.handler import handler as pani_handler
+    _imported_modules["pani"] = "handler"
+except Exception as e:
+    logger.warning(f"⚠️ pani: {e}"); _import_errors.append("pani")
+    pani_handler = None
+
+try:
     from modules.sewer.handler import handler as sewer_handler
+    _imported_modules["sewer"] = "handler"
+except Exception as e:
+    logger.warning(f"⚠️ sewer: {e}"); _import_errors.append("sewer")
+    sewer_handler = None
+
+try:
     from modules.upi.handler import handler as upi_handler
+    _imported_modules["upi"] = "handler"
+except Exception as e:
+    logger.warning(f"⚠️ upi: {e}"); _import_errors.append("upi")
+    upi_handler = None
+
+try:
     from modules.guard_agent.handler import router as guard_router
+    _imported_modules["guard_agent"] = "router"
+except Exception as e:
+    logger.warning(f"⚠️ guard_agent: {e}"); _import_errors.append("guard_agent")
+    guard_router = None
+
+try:
     from modules.oauth_connector.handler import router as oauth_router
+    _imported_modules["oauth_connector"] = "router"
+except Exception as e:
+    logger.warning(f"⚠️ oauth_connector: {e}"); _import_errors.append("oauth_connector")
+    oauth_router = None
+
+try:
     from modules.social_agent.handler import router as social_router
     import modules.social_agent.core as social_core
+    _imported_modules["social_agent"] = "router"
+except Exception as e:
+    logger.warning(f"⚠️ social_agent: {e}"); _import_errors.append("social_agent")
+    social_router = None; social_core = None
+
+try:
     from modules.oauth_connector.router import SmartVideoRouter
     from modules.oauth_connector.base import PlatformCredentials, VideoGenerationRequest
+    _imported_modules["oauth_connector_router"] = "class"
+except Exception as e:
+    logger.warning(f"⚠️ oauth_connector.router: {e}"); _import_errors.append("oauth_connector_router")
+    SmartVideoRouter = None; PlatformCredentials = None; VideoGenerationRequest = None
+
+try:
     from modules.search.handler import handler as search_handler
+    _imported_modules["search"] = "handler"
+except Exception as e:
+    logger.warning(f"⚠️ search: {e}"); _import_errors.append("search")
+    search_handler = None
+
+try:
     from modules.rozgar.handler import handler as rozgar_handler
     from modules.rozgar import handler as rozgar_module
+    _imported_modules["rozgar"] = "handler"
+except Exception as e:
+    logger.warning(f"⚠️ rozgar: {e}"); _import_errors.append("rozgar")
+    rozgar_handler = None; rozgar_module = None
+
+try:
     from modules.news.handler import router as news_router
+    _imported_modules["news"] = "router"
+except Exception as e:
+    logger.warning(f"⚠️ news: {e}"); _import_errors.append("news")
+    news_router = None
+
+try:
     from miniprogram.portal import router as miniprogram_router
+    _imported_modules["miniprogram"] = "router"
+except Exception as e:
+    logger.warning(f"⚠️ miniprogram: {e}"); _import_errors.append("miniprogram")
+    miniprogram_router = None
+
+try:
     from modules.mandi.handler import handler as mandi_handler
+    _imported_modules["mandi"] = "handler"
+except Exception as e:
+    logger.warning(f"⚠️ mandi: {e}"); _import_errors.append("mandi")
+    mandi_handler = None
 
-    # --- NEW MODULES v8.3 (All 42 modules) ---
+# --- NEW MODULES v8.3 ---
+try:
     from modules.ai_chat.handler import handler as ai_chat_handler
+    _imported_modules["ai_chat"] = "handler"
+except Exception as e:
+    logger.warning(f"⚠️ ai_chat: {e}"); _import_errors.append("ai_chat")
+    ai_chat_handler = None
+
+try:
     from modules.analytics.handler import handler as analytics_handler
+    _imported_modules["analytics"] = "handler"
+except Exception as e:
+    logger.warning(f"⚠️ analytics: {e}"); _import_errors.append("analytics")
+    analytics_handler = None
+
+try:
     from modules.currents_api.handler import handler as currents_handler
+    _imported_modules["currents_api"] = "handler"
+except Exception as e:
+    logger.warning(f"⚠️ currents_api: {e}"); _import_errors.append("currents_api")
+    currents_handler = None
+
+try:
     from modules.daily_report.handler import handler as daily_report_handler
+    _imported_modules["daily_report"] = "handler"
+except Exception as e:
+    logger.warning(f"⚠️ daily_report: {e}"); _import_errors.append("daily_report")
+    daily_report_handler = None
+
+try:
     from modules.init.handler import handler as init_handler
+    _imported_modules["init"] = "handler"
+except Exception as e:
+    logger.warning(f"⚠️ init: {e}"); _import_errors.append("init")
+    init_handler = None
+
+try:
     from modules.language_hub.handler import handler as language_hub_handler
+    _imported_modules["language_hub"] = "handler"
+except Exception as e:
+    logger.warning(f"⚠️ language_hub: {e}"); _import_errors.append("language_hub")
+    language_hub_handler = None
+
+try:
     from modules.meta_agent.handler import handler as meta_handler
+    _imported_modules["meta_agent"] = "handler"
+except Exception as e:
+    logger.warning(f"⚠️ meta_agent: {e}"); _import_errors.append("meta_agent")
+    meta_handler = None
+
+try:
     from modules.newsdata.handler import router as newsdata_router
+    _imported_modules["newsdata"] = "router"
+except Exception as e:
+    logger.warning(f"⚠️ newsdata: {e}"); _import_errors.append("newsdata")
+    newsdata_router = None
+
+try:
     from modules.plant_id.handler import handler as plant_id_handler
+    _imported_modules["plant_id"] = "handler"
+except Exception as e:
+    logger.warning(f"⚠️ plant_id: {e}"); _import_errors.append("plant_id")
+    plant_id_handler = None
+
+try:
     from modules.singhji_tv.handler import handler as singhji_tv_handler
+    _imported_modules["singhji_tv"] = "handler"
+except Exception as e:
+    logger.warning(f"⚠️ singhji_tv: {e}"); _import_errors.append("singhji_tv")
+    singhji_tv_handler = None
+
+try:
     from modules.supabase_memory.handler import handler as supabase_memory_handler
-    from modules.supreme_agent.handler import handler as supreme_handler
+    _imported_modules["supabase_memory"] = "handler"
+except Exception as e:
+    logger.warning(f"⚠️ supabase_memory: {e}"); _import_errors.append("supabase_memory")
+    supabase_memory_handler = None
+
+# FIX: supreme_agent exports router, not handler
+try:
+    from modules.supreme_agent.handler import router as supreme_router
+    _imported_modules["supreme_agent"] = "router"
+except Exception as e:
+    logger.warning(f"⚠️ supreme_agent: {e}"); _import_errors.append("supreme_agent")
+    supreme_router = None
+
+try:
     from modules.telegram.handler import handler as telegram_handler
+    _imported_modules["telegram"] = "handler"
+except Exception as e:
+    logger.warning(f"⚠️ telegram: {e}"); _import_errors.append("telegram")
+    telegram_handler = None
+
+try:
     from modules.trolley.handler import handler as trolley_handler
+    _imported_modules["trolley"] = "handler"
+except Exception as e:
+    logger.warning(f"⚠️ trolley: {e}"); _import_errors.append("trolley")
+    trolley_handler = None
+
+try:
     from modules.voice.handler import handler as voice_handler
+    _imported_modules["voice"] = "handler"
+except Exception as e:
+    logger.warning(f"⚠️ voice: {e}"); _import_errors.append("voice")
+    voice_handler = None
+
+try:
     from modules.voice_cmd.handler import handler as voice_cmd_handler
+    _imported_modules["voice_cmd"] = "handler"
+except Exception as e:
+    logger.warning(f"⚠️ voice_cmd: {e}"); _import_errors.append("voice_cmd")
+    voice_cmd_handler = None
+
+try:
     from modules.voice_tts.handler import handler as voice_tts_handler
+    _imported_modules["voice_tts"] = "handler"
+except Exception as e:
+    logger.warning(f"⚠️ voice_tts: {e}"); _import_errors.append("voice_tts")
+    voice_tts_handler = None
+
+try:
     from modules.weather.handler import router as weather_router
+    _imported_modules["weather"] = "router"
+except Exception as e:
+    logger.warning(f"⚠️ weather: {e}"); _import_errors.append("weather")
+    weather_router = None
+
+try:
     from modules.whatsapp.handler import handler as whatsapp_handler
+    _imported_modules["whatsapp"] = "handler"
+except Exception as e:
+    logger.warning(f"⚠️ whatsapp: {e}"); _import_errors.append("whatsapp")
+    whatsapp_handler = None
 
-    # Root level modules
+# --- ROOT FILES ---
+try:
     import agent_swarm_system
+    _imported_modules["agent_swarm_system"] = "module"
+except Exception as e:
+    logger.warning(f"⚠️ agent_swarm_system: {e}")
+    agent_swarm_system = None
+
+try:
     import auto_account
+    _imported_modules["auto_account"] = "module"
+except Exception as e:
+    logger.warning(f"⚠️ auto_account: {e}")
+    auto_account = None
+
+try:
     import auto_monetize
+    _imported_modules["auto_monetize"] = "module"
+except Exception as e:
+    logger.warning(f"⚠️ auto_monetize: {e}")
+    auto_monetize = None
+
+try:
     import facebook_long_token
+    _imported_modules["facebook_long_token"] = "module"
+except Exception as e:
+    logger.warning(f"⚠️ facebook_long_token: {e}")
+    facebook_long_token = None
+
+try:
     import singhji_visual
+    _imported_modules["singhji_visual"] = "module"
+except Exception as e:
+    logger.warning(f"⚠️ singhji_visual: {e}")
+    singhji_visual = None
+
+try:
     import trend_analysis
+    _imported_modules["trend_analysis"] = "module"
+except Exception as e:
+    logger.warning(f"⚠️ trend_analysis: {e}")
+    trend_analysis = None
 
-    # Services
+# --- SERVICES ---
+try:
     import services.bhashini_integration as bhashini_service
+    _imported_modules["bhashini_service"] = "service"
+except Exception as e:
+    logger.warning(f"⚠️ bhashini_service: {e}")
+    bhashini_service = None
+
+try:
     import services.ddg_search as ddg_search
+    _imported_modules["ddg_search"] = "service"
+except Exception as e:
+    logger.warning(f"⚠️ ddg_search: {e}")
+    ddg_search = None
+
+try:
     import services.mandi_rates as mandi_rates_service
+    _imported_modules["mandi_rates_service"] = "service"
+except Exception as e:
+    logger.warning(f"⚠️ mandi_rates_service: {e}")
+    mandi_rates_service = None
+
+try:
     import services.pnr as pnr_service
+    _imported_modules["pnr_service"] = "service"
+except Exception as e:
+    logger.warning(f"⚠️ pnr_service: {e}")
+    pnr_service = None
+
+try:
     import services.train_tracking as train_tracking_service
+    _imported_modules["train_tracking_service"] = "service"
+except Exception as e:
+    logger.warning(f"⚠️ train_tracking_service: {e}")
+    train_tracking_service = None
+
+try:
     import services.travily_search as travily_search_service
+    _imported_modules["travily_search_service"] = "service"
+except Exception as e:
+    logger.warning(f"⚠️ travily_search_service: {e}")
+    travily_search_service = None
 
-except ImportError as e:
-    logger.error(f"❌ Module import error: {e}")
-    sys.exit(1)
+if _import_errors:
+    logger.warning(f"⚠️ {_import_errors} modules failed to import (see above)")
+logger.info(f"✅ Module imports complete: {len(_imported_modules)} modules loaded successfully")
 
-# ==========================================
-# SMART SWARM
 # ==========================================
 class _SmartSarwanSwarm:
     def __init__(self):
@@ -1340,7 +1668,9 @@ app.include_router(newsdata_router, prefix="/api/newsdata")
 app.add_api_route("/api/plant_id", plant_id_handler, methods=["GET", "POST"])
 app.add_api_route("/api/singhji_tv", singhji_tv_handler, methods=["GET", "POST"])
 app.add_api_route("/api/supabase_memory", supabase_memory_handler, methods=["GET", "POST"])
-app.add_api_route("/api/supreme", supreme_handler, methods=["GET", "POST"])
+if supreme_router:
+    app.include_router(supreme_router, prefix="/api/supreme")
+    _registered_routes.append("supreme_agent")
 app.add_api_route("/api/telegram", telegram_handler, methods=["GET", "POST"])
 app.add_api_route("/api/trolley", trolley_handler, methods=["GET", "POST"])
 app.add_api_route("/api/voice", voice_handler, methods=["GET", "POST"])
