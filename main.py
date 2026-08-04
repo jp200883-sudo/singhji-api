@@ -3,7 +3,7 @@ import logging
 from fastapi import FastAPI, Request
 from contextlib import asynccontextmanager
 
-# Core imports 
+# Core imports
 from core.config import config
 from core.cache import cache_store
 from core.rate_limit import rate_limit_middleware
@@ -74,90 +74,90 @@ async def ping():
     }
 
 # ==========================================
-# 40+ MODULES IMPORT (AUTO-GENERATED)
+# 40+ MODULES IMPORT (ROUTER-FREE)
 # ==========================================
-from modules.aavishkar.handler import router as aavishkar_router
-from modules.ai_chat.handler import router as ai_chat_router
-from modules.analytics.handler import router as analytics_router
-from modules.banking.handler import router as banking_router
-from modules.currency.handler import router as currency_router
-from modules.currents_api.handler import router as currents_api_router
-from modules.daily_report.handler import router as daily_report_router
-from modules.emergency.handler import router as emergency_router
-from modules.fuel.handler import router as fuel_router
-from modules.goldrate.handler import router as goldrate_router
-from modules.govt.handler import router as govt_router
-from modules.guard_agent.handler import router as guard_agent_router
-from modules.horoscope.handler import router as horoscope_router
-from modules.kisaan_doctor.handler import router as kisaan_doctor_router
-from modules.language.handler import router as language_router
-from modules.language_hub.handler import router as language_hub_router
-from modules.mandi.handler import router as mandi_router
-from modules.master_scheduler.handler import router as master_scheduler_router
-from modules.meta_agent.handler import router as meta_agent_router
-from modules.news.handler import router as news_router
-from modules.newsdata.handler import router as newsdata_router
-from modules.oauth_connector.handler import router as oauth_connector_router
-from modules.pani.handler import router as pani_router
-from modules.plant_id.handler import router as plant_id_router
-from modules.rozgar.handler import router as rozgar_router
-from modules.scheme_swarm.handler import router as scheme_swarm_router
-from modules.search.handler import router as search_router
-from modules.sewer.handler import router as sewer_router
-from modules.singhji_tv.handler import router as singhji_tv_router
-from modules.social_agent.handler import router as social_agent_router
-from modules.supabase_memory.handler import router as supabase_memory_router
-from modules.supreme_agent.handler import router as supreme_agent_router
-from modules.trolley.handler import router as trolley_router
-from modules.upi.handler import router as upi_router
-from modules.voice.handler import router as voice_router
-from modules.voice_cmd.handler import router as voice_cmd_router
-from modules.voice_tts.handler import router as voice_tts_router
-from modules.weather.handler import router as weather_router
-from modules.whatsapp.handler import router as whatsapp_router
+from modules.aavishkar.handler import handler as aavishkar_handler
+from modules.ai_chat.handler import handler as ai_chat_handler
+from modules.analytics.handler import handler as analytics_handler
+from modules.banking.handler import handler as banking_handler
+from modules.currency.handler import handler as currency_handler
+from modules.currents_api.handler import handler as currents_api_handler
+from modules.daily_report.handler import handler as daily_report_handler
+from modules.emergency.handler import handler as emergency_handler
+from modules.fuel.handler import handler as fuel_handler
+from modules.goldrate.handler import handler as goldrate_handler
+from modules.govt.handler import handler as govt_handler
+from modules.guard_agent.handler import handler as guard_agent_handler
+from modules.horoscope.handler import handler as horoscope_handler
+from modules.kisaan_doctor.handler import handler as kisaan_doctor_handler
+from modules.language.handler import handler as language_handler
+from modules.language_hub.handler import handler as language_hub_handler
+from modules.mandi.handler import handler as mandi_handler
+from modules.master_scheduler.handler import handler as master_scheduler_handler
+from modules.meta_agent.handler import handler as meta_agent_handler
+from modules.news.handler import handler as news_handler
+from modules.newsdata.handler import handler as newsdata_handler
+from modules.oauth_connector.handler import handler as oauth_connector_handler
+from modules.pani.handler import handler as pani_handler
+from modules.plant_id.handler import handler as plant_id_handler
+from modules.rozgar.handler import handler as rozgar_handler
+from modules.scheme_swarm.handler import handler as scheme_swarm_handler
+from modules.search.handler import handler as search_handler
+from modules.sewer.handler import handler as sewer_handler
+from modules.singhji_tv.handler import handler as singhji_tv_handler
+from modules.social_agent.handler import handler as social_agent_handler
+from modules.supabase_memory.handler import handler as supabase_memory_handler
+from modules.supreme_agent.handler import handler as supreme_agent_handler
+from modules.trolley.handler import handler as trolley_handler
+from modules.upi.handler import handler as upi_handler
+from modules.voice.handler import handler as voice_handler
+from modules.voice_cmd.handler import handler as voice_cmd_handler
+from modules.voice_tts.handler import handler as voice_tts_handler
+from modules.weather.handler import handler as weather_handler
+from modules.whatsapp.handler import handler as whatsapp_handler
 
 # ==========================================
-# 40+ MODULES REGISTER
+# 40+ MODULES REGISTER (DIRECT HANDLER - NO ROUTER)
 # ==========================================
-app.include_router(aavishkar_router, prefix="/api/v1/aavishkar")
-app.include_router(ai_chat_router, prefix="/api/v1/ai-chat")
-app.include_router(analytics_router, prefix="/api/v1/analytics")
-app.include_router(banking_router, prefix="/api/v1/banking")
-app.include_router(currency_router, prefix="/api/v1/currency")
-app.include_router(currents_api_router, prefix="/api/v1/currents")
-app.include_router(daily_report_router, prefix="/api/v1/daily-report")
-app.include_router(emergency_router, prefix="/api/v1/emergency")
-app.include_router(fuel_router, prefix="/api/v1/fuel")
-app.include_router(goldrate_router, prefix="/api/v1/goldrate")
-app.include_router(govt_router, prefix="/api/v1/govt")
-app.include_router(guard_agent_router, prefix="/api/v1/guard")
-app.include_router(horoscope_router, prefix="/api/v1/horoscope")
-app.include_router(kisaan_doctor_router, prefix="/api/v1/kisaan-doctor")
-app.include_router(language_router, prefix="/api/v1/language")
-app.include_router(language_hub_router, prefix="/api/v1/language-hub")
-app.include_router(mandi_router, prefix="/api/v1/mandi")
-app.include_router(master_scheduler_router, prefix="/api/v1/scheduler")
-app.include_router(meta_agent_router, prefix="/api/v1/meta")
-app.include_router(news_router, prefix="/api/v1/news")
-app.include_router(newsdata_router, prefix="/api/v1/newsdata")
-app.include_router(oauth_connector_router, prefix="/api/v1/oauth")
-app.include_router(pani_router, prefix="/api/v1/pani")
-app.include_router(plant_id_router, prefix="/api/v1/plant-id")
-app.include_router(rozgar_router, prefix="/api/v1/rozgar")
-app.include_router(scheme_swarm_router, prefix="/api/v1/scheme-swarm")
-app.include_router(search_router, prefix="/api/v1/search")
-app.include_router(sewer_router, prefix="/api/v1/sewer")
-app.include_router(singhji_tv_router, prefix="/api/v1/tv")
-app.include_router(social_agent_router, prefix="/api/v1/social")
-app.include_router(supabase_memory_router, prefix="/api/v1/memory")
-app.include_router(supreme_agent_router, prefix="/api/v1/supreme")
-app.include_router(trolley_router, prefix="/api/v1/trolley")
-app.include_router(upi_router, prefix="/api/v1/upi")
-app.include_router(voice_router, prefix="/api/v1/voice")
-app.include_router(voice_cmd_router, prefix="/api/v1/voice-cmd")
-app.include_router(voice_tts_router, prefix="/api/v1/voice-tts")
-app.include_router(weather_router, prefix="/api/v1/weather")
-app.include_router(whatsapp_router, prefix="/api/v1/whatsapp")
+app.get("/api/v1/aavishkar")(aavishkar_handler)
+app.get("/api/v1/ai-chat")(ai_chat_handler)
+app.get("/api/v1/analytics")(analytics_handler)
+app.get("/api/v1/banking")(banking_handler)
+app.get("/api/v1/currency")(currency_handler)
+app.get("/api/v1/currents")(currents_api_handler)
+app.get("/api/v1/daily-report")(daily_report_handler)
+app.get("/api/v1/emergency")(emergency_handler)
+app.get("/api/v1/fuel")(fuel_handler)
+app.get("/api/v1/goldrate")(goldrate_handler)
+app.get("/api/v1/govt")(govt_handler)
+app.get("/api/v1/guard")(guard_agent_handler)
+app.get("/api/v1/horoscope")(horoscope_handler)
+app.get("/api/v1/kisaan-doctor")(kisaan_doctor_handler)
+app.get("/api/v1/language")(language_handler)
+app.get("/api/v1/language-hub")(language_hub_handler)
+app.get("/api/v1/mandi")(mandi_handler)
+app.get("/api/v1/scheduler")(master_scheduler_handler)
+app.get("/api/v1/meta")(meta_agent_handler)
+app.get("/api/v1/news")(news_handler)
+app.get("/api/v1/newsdata")(newsdata_handler)
+app.get("/api/v1/oauth")(oauth_connector_handler)
+app.get("/api/v1/pani")(pani_handler)
+app.get("/api/v1/plant-id")(plant_id_handler)
+app.get("/api/v1/rozgar")(rozgar_handler)
+app.get("/api/v1/scheme-swarm")(scheme_swarm_handler)
+app.get("/api/v1/search")(search_handler)
+app.get("/api/v1/sewer")(sewer_handler)
+app.get("/api/v1/tv")(singhji_tv_handler)
+app.get("/api/v1/social")(social_agent_handler)
+app.get("/api/v1/memory")(supabase_memory_handler)
+app.get("/api/v1/supreme")(supreme_agent_handler)
+app.get("/api/v1/trolley")(trolley_handler)
+app.get("/api/v1/upi")(upi_handler)
+app.get("/api/v1/voice")(voice_handler)
+app.get("/api/v1/voice-cmd")(voice_cmd_handler)
+app.get("/api/v1/voice-tts")(voice_tts_handler)
+app.get("/api/v1/weather")(weather_handler)
+app.get("/api/v1/whatsapp")(whatsapp_handler)
 
 if __name__ == "__main__":
     import uvicorn
