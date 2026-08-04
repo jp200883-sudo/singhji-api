@@ -1,362 +1,164 @@
-"""
-Singh Ji AI Ultra v8.4 — Main Application
-SAFE MODE — Railway Production Ready
-"""
-
-import os
-import sys
-import importlib
-import importlib.util
-from contextlib import asynccontextmanager
-from typing import List, Dict, Any
-
+import time
+import logging
 from fastapi import FastAPI, Request
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, PlainTextResponse
+from contextlib import asynccontextmanager
 
-# ==================== CORE IMPORTS (with fallback) ====================
+# Core imports 
+from core.config import config
+from core.cache import cache_store
+from core.rate_limit import rate_limit_middleware
+from core.telegram import send_telegram_message
 
-try:
-    from core.config import settings, Constants
-except ImportError:
-    class Constants:
-        APP_NAME = "Singh Ji AI Ultra"
-        APP_VERSION = "v8.4"
-        APP_DESCRIPTION = "Bharat ka AI super app"
-        TELEGRAM_WEBHOOK_PATH = "/webhook/telegram"
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-    class Settings:
-        ENV = os.getenv("ENV", "production")
-        PORT = int(os.getenv("PORT", "8000"))
-        DEBUG = os.getenv("DEBUG", "false").lower() == "true"
-        RAILWAY_STATIC_URL = os.getenv("RAILWAY_STATIC_URL", "")
-        TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
-        TELEGRAM_WEBHOOK_SECRET = os.getenv("TELEGRAM_WEBHOOK_SECRET", "")
-        SUPABASE_URL = os.getenv("SUPABASE_URL", "")
-        SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
-        GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
-        GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-        OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
-
-        @property
-        def is_production(self): return self.ENV == "production"
-        @property
-        def is_development(self): return self.ENV == "development"
-        def required_keys_present(self):
-            missing = []
-            if not self.SUPABASE_URL or not self.SUPABASE_KEY: missing.append("SUPABASE")
-            if not self.TELEGRAM_BOT_TOKEN: missing.append("TELEGRAM_BOT_TOKEN")
-            if not self.GROQ_API_KEY and not self.GEMINI_API_KEY: missing.append("AI_KEY")
-            return missing
-
-    settings = Settings()
-
-try:
-    from core.database import get_supabase_client, supabase
-except ImportError:
-    get_supabase_client = lambda: None
-    supabase = None
-
-try:
-    from core.rate_limit import rate_limit_middleware
-except ImportError:
-    from starlette.middleware.base import BaseHTTPMiddleware
-    class DummyMiddleware(BaseHTTPMiddleware):
-        async def dispatch(self, request, call_next): return await call_next(request)
-    def rate_limit_middleware(): return DummyMiddleware
-
-try:
-    from core.telegram import set_webhook_telegram
-except ImportError:
-    def set_webhook_telegram(url): return {"ok": False}
-
-try:
-    from utils.helpers import format_response, format_error
-except ImportError:
-    def format_response(success=True, data=None, message="", status_code=200, meta=None):
-        r = {"success": success, "data": data, "message": message, "status_code": status_code}
-        if meta: r["meta"] = meta
-        return r
-    def format_error(message="Error", error_code="ERROR", details=None, status_code=500):
-        return format_response(False, None, message, status_code, {"error_code": error_code, "details": details})
-
-
-# ==================== MODULE DISCOVERY ====================
-
-MODULES_REGISTRY: List[Dict[str, Any]] = []
-
-
-def _find_modules_dir() -> str:
-    """Sab possible paths check karta hai modules/ ke liye"""
-    possible_paths = [
-        os.path.join(os.path.dirname(__file__), "modules"),
-        "/app/modules",
-        "/app/singhji-api/modules",
-        os.path.join(os.getcwd(), "modules"),
-    ]
-
-    for p in possible_paths:
-        if os.path.exists(p) and os.path.isdir(p):
-            print(f"   📁 modules found: {p}")
-            return p
-
-    # Fallback — current dir mein dhundo
-    return os.path.join(os.path.dirname(__file__), "modules")
-
-
-def _discover_modules() -> List[Dict[str, Any]]:
-    """SIRF router.py wale modules discover karta hai"""
-    modules_dir = _find_modules_dir()
-    discovered = []
-
-    if not os.path.exists(modules_dir):
-        print(f"⚠️  modules/ directory nahi mili: {modules_dir}")
-        return discovered
-
-    print(f"   🔍 Scanning: {modules_dir}")
-
-    for module_name in sorted(os.listdir(modules_dir)):
-        module_path = os.path.join(modules_dir, module_name)
-
-        if not os.path.isdir(module_path):
-            continue
-        if module_name.startswith("__") or module_name.startswith("."):
-            continue
-
-        router_file = os.path.join(module_path, "router.py")
-
-        if os.path.exists(router_file):
-            discovered.append({
-                "name": module_name,
-                "path": module_path,
-                "import_path": f"modules.{module_name}.router",
-            })
-
-    return discovered
-
-
-def _safe_import_module(import_path: str, file_path: str):
-    """Module ko safely import karta hai"""
-    try:
-        if import_path in sys.modules:
-            return sys.modules[import_path]
-
-        if not os.path.exists(file_path):
-            return None
-
-        spec = importlib.util.spec_from_file_location(import_path, file_path)
-        if spec is None or spec.loader is None:
-            return None
-
-        module = importlib.util.module_from_spec(spec)
-        sys.modules[import_path] = module
-        spec.loader.exec_module(module)
-        return module
-    except Exception as e:
-        print(f"   ⚠️  Import error: {e}")
-        return None
-
-
-def _register_module(module_info: Dict[str, Any], app: FastAPI) -> bool:
-    """Module ki routes register karta hai"""
-    name = module_info["name"]
-    file_path = os.path.join(module_info["path"], "router.py")
-    import_path = module_info["import_path"]
-
-    try:
-        module = _safe_import_module(import_path, file_path)
-        if module is None:
-            return False
-
-        if not hasattr(module, "router"):
-            print(f"   ⚠️  {name}: 'router' object nahi mila")
-            return False
-
-        router_obj = module.router
-        prefix = f"/api/{name}"
-        tag = name.replace("_", " ").title()
-
-        app.include_router(router_obj, prefix=prefix, tags=[tag])
-        print(f"   ✅ {name} → {prefix}")
-        return True
-    except Exception as e:
-        print(f"   ❌ {name}: {e}")
-        return False
-
-
-# ==================== LIFESPAN ====================
-
+# ==========================================
+# LIFESPAN MANAGER
+# ==========================================
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("=" * 60)
-    print(f"🚀 {Constants.APP_NAME} {Constants.APP_VERSION}")
-    print(f"🌐 Environment: {settings.ENV}")
-    print(f"🔌 Port: {settings.PORT}")
-    print(f"📂 CWD: {os.getcwd()}")
-    print("=" * 60)
-
-    try:
-        get_supabase_client()
-    except Exception as e:
-        print(f"⚠️  Supabase: {e}")
-
-    try:
-        missing = settings.required_keys_present()
-        if missing:
-            print(f"⚠️  Missing keys: {missing}")
-        else:
-            print("✅ All required keys present")
-    except:
-        pass
-
-    if settings.is_production and settings.TELEGRAM_BOT_TOKEN:
-        try:
-            webhook_url = f"{settings.RAILWAY_STATIC_URL}{Constants.TELEGRAM_WEBHOOK_PATH}"
-            if settings.RAILWAY_STATIC_URL:
-                result = set_webhook_telegram(webhook_url)
-                print(f"📡 Webhook: {result.get('ok', False)}")
-        except Exception as e:
-            print(f"⚠️  Webhook: {e}")
-
-    global MODULES_REGISTRY
-    MODULES_REGISTRY = _discover_modules()
-
-    print(f"\n📦 {len(MODULES_REGISTRY)} modules found")
-    print("-" * 40)
-
-    loaded = 0
-    failed = 0
-
-    for module_info in MODULES_REGISTRY:
-        if _register_module(module_info, app):
-            loaded += 1
-        else:
-            failed += 1
-
-    print("-" * 40)
-    print(f"✅ Loaded: {loaded} | ⚠️ Skipped: {failed}")
-    print("=" * 60)
-    print("🚀 App ready!")
-
+    logger.info("🚀 Singh Ji AI ULTRA v8.0 Shuru Ho Raha Hai...")
+    await send_telegram_message("🦁 Singh Ji AI ULTRA v8.0 Started!")
     yield
-    print("🛑 Shutting down...")
+    logger.info("👋 Singh Ji AI ULTRA Band Ho Raha Hai...")
 
-
-# ==================== FASTAPI APP ====================
-
+# ==========================================
+# FASTAPI APP
+# ==========================================
 app = FastAPI(
-    title=Constants.APP_NAME,
-    version=Constants.APP_VERSION,
-    description=Constants.APP_DESCRIPTION,
-    docs_url="/docs" if not settings.is_production else None,
-    redoc_url="/redoc" if not settings.is_production else None,
-    lifespan=lifespan,
+    title="Singh Ji AI ULTRA",
+    version="8.0",
+    description="40+ Modules, AI-Powered WhatsApp Bot",
+    lifespan=lifespan
 )
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# ==========================================
+# RATE LIMIT MIDDLEWARE
+# ==========================================
+@app.middleware("http")
+async def rate_limit_wrapper(request: Request, call_next):
+    try:
+        rate_limit_middleware(request)
+    except Exception:
+        pass
+    response = await call_next(request)
+    return response
 
-try:
-    app.add_middleware(rate_limit_middleware())
-except:
-    pass
+# ==========================================
+# ROOT ENDPOINTS
+# ==========================================
+@app.get("/")
+async def root():
+    return {
+        "status": "ok",
+        "version": "8.0",
+        "bot": "Singh Ji AI ULTRA",
+        "message": "🦁 JAI HIND! 🇮🇳"
+    }
 
-
-# ==================== RAILWAY HEALTHCHECK ====================
-# Railway ko /ping chahiye — yeh zaroori hai!
+@app.get("/health")
+async def health():
+    return {
+        "status": "healthy",
+        "timestamp": time.time(),
+        "cache_size": len(cache_store)
+    }
 
 @app.get("/ping")
 async def ping():
-    """Railway healthcheck endpoint"""
-    return PlainTextResponse("pong", status_code=200)
+    return {
+        "status": "ok",
+        "message": "pong",
+        "timestamp": time.time(),
+        "version": "8.0"
+    }
 
+# ==========================================
+# 40+ MODULES IMPORT (AUTO-GENERATED)
+# ==========================================
+from modules.aavishkar.handler import router as aavishkar_router
+from modules.ai_chat.handler import router as ai_chat_router
+from modules.analytics.handler import router as analytics_router
+from modules.banking.handler import router as banking_router
+from modules.currency.handler import router as currency_router
+from modules.currents_api.handler import router as currents_api_router
+from modules.daily_report.handler import router as daily_report_router
+from modules.emergency.handler import router as emergency_router
+from modules.fuel.handler import router as fuel_router
+from modules.goldrate.handler import router as goldrate_router
+from modules.govt.handler import router as govt_router
+from modules.guard_agent.handler import router as guard_agent_router
+from modules.horoscope.handler import router as horoscope_router
+from modules.kisaan_doctor.handler import router as kisaan_doctor_router
+from modules.language.handler import router as language_router
+from modules.language_hub.handler import router as language_hub_router
+from modules.mandi.handler import router as mandi_router
+from modules.master_scheduler.handler import router as master_scheduler_router
+from modules.meta_agent.handler import router as meta_agent_router
+from modules.news.handler import router as news_router
+from modules.newsdata.handler import router as newsdata_router
+from modules.oauth_connector.handler import router as oauth_connector_router
+from modules.pani.handler import router as pani_router
+from modules.plant_id.handler import router as plant_id_router
+from modules.rozgar.handler import router as rozgar_router
+from modules.scheme_swarm.handler import router as scheme_swarm_router
+from modules.search.handler import router as search_router
+from modules.sewer.handler import router as sewer_router
+from modules.singhji_tv.handler import router as singhji_tv_router
+from modules.social_agent.handler import router as social_agent_router
+from modules.supabase_memory.handler import router as supabase_memory_router
+from modules.supreme_agent.handler import router as supreme_agent_router
+from modules.trolley.handler import router as trolley_router
+from modules.upi.handler import router as upi_router
+from modules.voice.handler import router as voice_router
+from modules.voice_cmd.handler import router as voice_cmd_router
+from modules.voice_tts.handler import router as voice_tts_router
+from modules.weather.handler import router as weather_router
+from modules.whatsapp.handler import router as whatsapp_router
 
-# ==================== EXCEPTION HANDLER ====================
-
-@app.exception_handler(Exception)
-async def global_exception_handler(request: Request, exc: Exception):
-    return JSONResponse(
-        status_code=500,
-        content=format_error(
-            message="Internal server error",
-            error_code="INTERNAL_ERROR",
-            details=str(exc) if settings.is_development else None,
-        )
-    )
-
-
-# ==================== HEALTH & STATUS ====================
-
-@app.get("/")
-@app.get("/health")
-async def health_check():
-    return format_response(
-        data={
-            "name": Constants.APP_NAME,
-            "version": Constants.APP_VERSION,
-            "status": "healthy",
-            "environment": settings.ENV,
-            "port": settings.PORT,
-            "modules_loaded": len(MODULES_REGISTRY),
-        },
-        message=f"{Constants.APP_NAME} chal raha hai! 🚀",
-    )
-
-
-@app.get("/status")
-async def status():
-    modules_status = []
-    for m in MODULES_REGISTRY:
-        modules_status.append({"name": m["name"], "prefix": f"/api/{m['name']}"})
-
-    return format_response(
-        data={
-            "app": Constants.APP_NAME,
-            "version": Constants.APP_VERSION,
-            "environment": settings.ENV,
-            "port": settings.PORT,
-            "modules": modules_status,
-            "modules_count": len(MODULES_REGISTRY),
-        },
-        message="System status OK",
-    )
-
-
-@app.get("/modules")
-async def list_modules():
-    return format_response(
-        data=MODULES_REGISTRY,
-        message=f"{len(MODULES_REGISTRY)} modules available",
-    )
-
-
-# ==================== TELEGRAM WEBHOOK FALLBACK ====================
-
-@app.post(Constants.TELEGRAM_WEBHOOK_PATH)
-async def telegram_webhook_fallback(request: Request):
-    try:
-        data = await request.json()
-        return format_response(
-            data={"update_id": data.get("update_id")},
-            message="Webhook received (fallback)",
-        )
-    except Exception as e:
-        return format_error(message=str(e), status_code=400)
-
-
-# ==================== MAIN ====================
+# ==========================================
+# 40+ MODULES REGISTER
+# ==========================================
+app.include_router(aavishkar_router, prefix="/api/v1/aavishkar")
+app.include_router(ai_chat_router, prefix="/api/v1/ai-chat")
+app.include_router(analytics_router, prefix="/api/v1/analytics")
+app.include_router(banking_router, prefix="/api/v1/banking")
+app.include_router(currency_router, prefix="/api/v1/currency")
+app.include_router(currents_api_router, prefix="/api/v1/currents")
+app.include_router(daily_report_router, prefix="/api/v1/daily-report")
+app.include_router(emergency_router, prefix="/api/v1/emergency")
+app.include_router(fuel_router, prefix="/api/v1/fuel")
+app.include_router(goldrate_router, prefix="/api/v1/goldrate")
+app.include_router(govt_router, prefix="/api/v1/govt")
+app.include_router(guard_agent_router, prefix="/api/v1/guard")
+app.include_router(horoscope_router, prefix="/api/v1/horoscope")
+app.include_router(kisaan_doctor_router, prefix="/api/v1/kisaan-doctor")
+app.include_router(language_router, prefix="/api/v1/language")
+app.include_router(language_hub_router, prefix="/api/v1/language-hub")
+app.include_router(mandi_router, prefix="/api/v1/mandi")
+app.include_router(master_scheduler_router, prefix="/api/v1/scheduler")
+app.include_router(meta_agent_router, prefix="/api/v1/meta")
+app.include_router(news_router, prefix="/api/v1/news")
+app.include_router(newsdata_router, prefix="/api/v1/newsdata")
+app.include_router(oauth_connector_router, prefix="/api/v1/oauth")
+app.include_router(pani_router, prefix="/api/v1/pani")
+app.include_router(plant_id_router, prefix="/api/v1/plant-id")
+app.include_router(rozgar_router, prefix="/api/v1/rozgar")
+app.include_router(scheme_swarm_router, prefix="/api/v1/scheme-swarm")
+app.include_router(search_router, prefix="/api/v1/search")
+app.include_router(sewer_router, prefix="/api/v1/sewer")
+app.include_router(singhji_tv_router, prefix="/api/v1/tv")
+app.include_router(social_agent_router, prefix="/api/v1/social")
+app.include_router(supabase_memory_router, prefix="/api/v1/memory")
+app.include_router(supreme_agent_router, prefix="/api/v1/supreme")
+app.include_router(trolley_router, prefix="/api/v1/trolley")
+app.include_router(upi_router, prefix="/api/v1/upi")
+app.include_router(voice_router, prefix="/api/v1/voice")
+app.include_router(voice_cmd_router, prefix="/api/v1/voice-cmd")
+app.include_router(voice_tts_router, prefix="/api/v1/voice-tts")
+app.include_router(weather_router, prefix="/api/v1/weather")
+app.include_router(whatsapp_router, prefix="/api/v1/whatsapp")
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(
-        "main:app",
-        host="0.0.0.0",
-        port=settings.PORT,
-        reload=settings.is_development,
-        log_level="info",
-    )
+    uvicorn.run(app, host="0.0.0.0", port=8000)
