@@ -468,25 +468,25 @@ try:
     from modules.mandi.handler import handler as mandi_handler
 
     # --- NEW MODULES v8.3 (All 42 modules) ---
-    from modules.ai_chat.handler import router as ai_chat_router
-    from modules.analytics.handler import router as analytics_router
-    from modules.currents_api.handler import router as currents_router
+    from modules.ai_chat.handler import handler as ai_chat_handler
+    from modules.analytics.handler import handler as analytics_handler
+    from modules.currents_api.handler import handler as currents_handler
     from modules.daily_report.handler import handler as daily_report_handler
-    from modules.init.handler import router as init_router
-    from modules.language_hub.handler import router as language_hub_router
-    from modules.meta_agent.handler import router as meta_router
+    from modules.init.handler import handler as init_handler
+    from modules.language_hub.handler import handler as language_hub_handler
+    from modules.meta_agent.handler import handler as meta_handler
     from modules.newsdata.handler import router as newsdata_router
-    from modules.plant_id.handler import router as plant_id_router
-    from modules.singhji_tv.handler import router as singhji_tv_router
-    from modules.supabase_memory.handler import router as supabase_memory_router
-    from modules.supreme_agent.handler import router as supreme_router
-    from modules.telegram.handler import router as telegram_router
-    from modules.trolley.handler import router as trolley_router
-    from modules.voice.handler import router as voice_router
-    from modules.voice_cmd.handler import router as voice_cmd_router
-    from modules.voice_tts.handler import router as voice_tts_router
+    from modules.plant_id.handler import handler as plant_id_handler
+    from modules.singhji_tv.handler import handler as singhji_tv_handler
+    from modules.supabase_memory.handler import handler as supabase_memory_handler
+    from modules.supreme_agent.handler import handler as supreme_handler
+    from modules.telegram.handler import handler as telegram_handler
+    from modules.trolley.handler import handler as trolley_handler
+    from modules.voice.handler import handler as voice_handler
+    from modules.voice_cmd.handler import handler as voice_cmd_handler
+    from modules.voice_tts.handler import handler as voice_tts_handler
     from modules.weather.handler import router as weather_router
-    from modules.whatsapp.handler import router as whatsapp_router
+    from modules.whatsapp.handler import handler as whatsapp_handler
 
     # Root level modules
     import agent_swarm_system
@@ -1330,24 +1330,24 @@ app.add_api_route("/api/search", search_handler, methods=["GET", "POST"])
 app.add_api_route("/api/rozgar", rozgar_handler, methods=["GET", "POST"])
 
 # --- NEW ROUTES v8.3 (All 42+ modules) ---
-app.include_router(ai_chat_router, prefix="/api/ai_chat")
-app.include_router(analytics_router, prefix="/api/analytics")
-app.include_router(currents_router, prefix="/api/currents")
-app.include_router(init_router, prefix="/api/init")
-app.include_router(language_hub_router, prefix="/api/language_hub")
-app.include_router(meta_router, prefix="/api/meta")
+app.add_api_route("/api/ai_chat", ai_chat_handler, methods=["GET", "POST"])
+app.add_api_route("/api/analytics", analytics_handler, methods=["GET", "POST"])
+app.add_api_route("/api/currents", currents_handler, methods=["GET", "POST"])
+app.add_api_route("/api/init", init_handler, methods=["GET", "POST"])
+app.add_api_route("/api/language_hub", language_hub_handler, methods=["GET", "POST"])
+app.add_api_route("/api/meta", meta_handler, methods=["GET", "POST"])
 app.include_router(newsdata_router, prefix="/api/newsdata")
-app.include_router(plant_id_router, prefix="/api/plant_id")
-app.include_router(singhji_tv_router, prefix="/api/singhji_tv")
-app.include_router(supabase_memory_router, prefix="/api/supabase_memory")
-app.include_router(supreme_router, prefix="/api/supreme")
-app.include_router(telegram_router, prefix="/api/telegram")
-app.include_router(trolley_router, prefix="/api/trolley")
-app.include_router(voice_router, prefix="/api/voice")
-app.include_router(voice_cmd_router, prefix="/api/voice_cmd")
-app.include_router(voice_tts_router, prefix="/api/voice_tts")
+app.add_api_route("/api/plant_id", plant_id_handler, methods=["GET", "POST"])
+app.add_api_route("/api/singhji_tv", singhji_tv_handler, methods=["GET", "POST"])
+app.add_api_route("/api/supabase_memory", supabase_memory_handler, methods=["GET", "POST"])
+app.add_api_route("/api/supreme", supreme_handler, methods=["GET", "POST"])
+app.add_api_route("/api/telegram", telegram_handler, methods=["GET", "POST"])
+app.add_api_route("/api/trolley", trolley_handler, methods=["GET", "POST"])
+app.add_api_route("/api/voice", voice_handler, methods=["GET", "POST"])
+app.add_api_route("/api/voice_cmd", voice_cmd_handler, methods=["GET", "POST"])
+app.add_api_route("/api/voice_tts", voice_tts_handler, methods=["GET", "POST"])
 app.include_router(weather_router, prefix="/api/weather")
-app.include_router(whatsapp_router, prefix="/api/whatsapp")
+app.add_api_route("/api/whatsapp", whatsapp_handler, methods=["GET", "POST"])
 
 # Daily Report handler route
 app.add_api_route("/api/daily_report", daily_report_handler, methods=["GET", "POST"])
