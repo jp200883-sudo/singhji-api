@@ -1,11 +1,13 @@
-# ai_chat/handler.py — FASTAPI VERSION
+# ai_chat/handler.py — FASTAPI VERSION WITH ROUTER
 import os
 import json
 import requests
 import time
 import asyncio
-from fastapi import Request
+from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
+
+router = APIRouter()  # ✅ Yeh add kiya
 
 # ========== CONFIG ==========
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
@@ -117,43 +119,52 @@ class HybridAIChat:
             status[engine["name"]] = "✅ Ready" if engine["key"] else "❌ No Key"
         return status
 
+# ==========================================
+# ✅ FASTAPI ROUTERS (APIRouter ki jagah)
+# ==========================================
 
-# ========== FASTAPI HANDLER ==========
-async def handler(request: Request):
-    """
-    FastAPI handler for ai_chat module
-    Supports: GET (health), POST (chat)
-    """
-    if request.method == "GET":
+@router.get("/")
+async def get_health():
+    """Health check endpoint"""
+    ai = HybridAIChat()
+    return JSONResponse(content={
+        "module": "ai_chat",
+        "version": "8.0",
+        "status": "LIVE",
+        "engines": ai.health_check()
+    })
+
+@router.post("/chat")
+async def chat_endpoint(request: Request):
+    """Chat endpoint - POST with message"""
+    try:
+        body = await request.json()
+        message = body.get("message", "")
+        system_prompt = body.get("system_prompt", "You are Singh Ji AI, a helpful Indian AI assistant.")
+        
+        if not message:
+            return JSONResponse(status_code=400, content={"error": "Message required"})
+        
         ai = HybridAIChat()
-        return JSONResponse(content={
-            "module": "ai_chat",
-            "version": "7.0",
-            "status": "LIVE",
-            "engines": ai.health_check()
-        })
-    
-    elif request.method == "POST":
-        try:
-            body = await request.json()
-            message = body.get("message", "")
-            system_prompt = body.get("system_prompt", "You are Singh Ji AI, a helpful Indian AI assistant.")
-            
-            if not message:
-                return JSONResponse(status_code=400, content={"error": "Message required"})
-            
-            ai = HybridAIChat()
-            
-            # Run sync chat in executor (non-blocking)
-            loop = asyncio.get_event_loop()
-            result = await loop.run_in_executor(None, ai.chat, message, system_prompt)
-            
-            return JSONResponse(
-                status_code=200 if result["success"] else 503,
-                content=result
-            )
-            
-        except Exception as e:
-            return JSONResponse(status_code=500, content={"error": str(e)})
-    
-    return JSONResponse(status_code=405, content={"error": "Method not allowed"})
+        
+        # Run sync chat in executor (non-blocking)
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(None, ai.chat, message, system_prompt)
+        
+        return JSONResponse(
+            status_code=200 if result["success"] else 503,
+            content=result
+        )
+        
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+@router.get("/health")
+async def health_check():
+    """Detailed health check"""
+    ai = HybridAIChat()
+    return JSONResponse(content={
+        "status": "ok",
+        "module": "ai_chat",
+        "engines": ai.health_check()
+    })
