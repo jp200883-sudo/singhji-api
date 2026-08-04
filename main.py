@@ -1633,56 +1633,130 @@ async def rate_limit_middleware(request, call_next):
     return await call_next(request)
 
 # ==========================================
-# REGISTER ROUTERS
+# REGISTER ROUTERS — SAFE
 # ==========================================
-app.include_router(kisaan_router, prefix="/modules/kisaan_doctor")
-app.include_router(currency_router, prefix="/api")
-app.include_router(aavishkar_router, prefix="/modules/aavishkar")
-app.include_router(goldrate_router, prefix="/api/goldrate")
-app.include_router(fuel_router, prefix="/api/fuel")
-app.include_router(scheme_swarm_router)
-app.include_router(trishul_router, prefix="/api/trishul")
-app.include_router(guard_router, prefix="/api")
-app.include_router(oauth_router, prefix="/api")
-app.include_router(social_router)
-app.include_router(news_router)
-app.include_router(miniprogram_router, prefix="/api/v1/miniprogram")
+_registered_routes = []
 
-# API Routes
-app.add_api_route("/api/banking", banking_handler, methods=["GET"])
-app.add_api_route("/api/pani", pani_handler, methods=["GET", "POST"])
-app.add_api_route("/api/sewer", sewer_handler, methods=["GET", "POST"])
-app.add_api_route("/api/upi", upi_handler, methods=["GET", "POST"])
-app.add_api_route("/api/mandi", mandi_handler, methods=["GET"])
-app.add_api_route("/api/search", search_handler, methods=["GET", "POST"])
-app.add_api_route("/api/rozgar", rozgar_handler, methods=["GET", "POST"])
-
-# --- NEW ROUTES v8.3 (All 42+ modules) ---
-app.add_api_route("/api/ai_chat", ai_chat_handler, methods=["GET", "POST"])
-app.add_api_route("/api/analytics", analytics_handler, methods=["GET", "POST"])
-app.add_api_route("/api/currents", currents_handler, methods=["GET", "POST"])
-app.add_api_route("/api/init", init_handler, methods=["GET", "POST"])
-app.add_api_route("/api/language_hub", language_hub_handler, methods=["GET", "POST"])
-app.add_api_route("/api/meta", meta_handler, methods=["GET", "POST"])
-app.include_router(newsdata_router, prefix="/api/newsdata")
-app.add_api_route("/api/plant_id", plant_id_handler, methods=["GET", "POST"])
-app.add_api_route("/api/singhji_tv", singhji_tv_handler, methods=["GET", "POST"])
-app.add_api_route("/api/supabase_memory", supabase_memory_handler, methods=["GET", "POST"])
+if kisaan_router:
+    app.include_router(kisaan_router, prefix="/modules/kisaan_doctor")
+    _registered_routes.append("kisaan_doctor")
+if currency_router:
+    app.include_router(currency_router, prefix="/api")
+    _registered_routes.append("currency")
+if aavishkar_router:
+    app.include_router(aavishkar_router, prefix="/modules/aavishkar")
+    _registered_routes.append("aavishkar")
+if goldrate_router:
+    app.include_router(goldrate_router, prefix="/api/goldrate")
+    _registered_routes.append("goldrate")
+if fuel_router:
+    app.include_router(fuel_router, prefix="/api/fuel")
+    _registered_routes.append("fuel")
+if scheme_swarm_router:
+    app.include_router(scheme_swarm_router)
+    _registered_routes.append("scheme_swarm")
+if trishul_router:
+    app.include_router(trishul_router, prefix="/api/trishul")
+    _registered_routes.append("trishul")
+if guard_router:
+    app.include_router(guard_router, prefix="/api")
+    _registered_routes.append("guard_agent")
+if oauth_router:
+    app.include_router(oauth_router, prefix="/api")
+    _registered_routes.append("oauth_connector")
+if social_router:
+    app.include_router(social_router)
+    _registered_routes.append("social_agent")
+if news_router:
+    app.include_router(news_router)
+    _registered_routes.append("news")
+if miniprogram_router:
+    app.include_router(miniprogram_router, prefix="/api/v1/miniprogram")
+    _registered_routes.append("miniprogram")
+if newsdata_router:
+    app.include_router(newsdata_router, prefix="/api/newsdata")
+    _registered_routes.append("newsdata")
+if weather_router:
+    app.include_router(weather_router, prefix="/api/weather")
+    _registered_routes.append("weather")
 if supreme_router:
     app.include_router(supreme_router, prefix="/api/supreme")
     _registered_routes.append("supreme_agent")
-app.add_api_route("/api/telegram", telegram_handler, methods=["GET", "POST"])
-app.add_api_route("/api/trolley", trolley_handler, methods=["GET", "POST"])
-app.add_api_route("/api/voice", voice_handler, methods=["GET", "POST"])
-app.add_api_route("/api/voice_cmd", voice_cmd_handler, methods=["GET", "POST"])
-app.add_api_route("/api/voice_tts", voice_tts_handler, methods=["GET", "POST"])
-app.include_router(weather_router, prefix="/api/weather")
-app.add_api_route("/api/whatsapp", whatsapp_handler, methods=["GET", "POST"])
 
-# Daily Report handler route
-app.add_api_route("/api/daily_report", daily_report_handler, methods=["GET", "POST"])
+# API Routes (handler-based)
+if banking_handler:
+    app.add_api_route("/api/banking", banking_handler, methods=["GET"])
+    _registered_routes.append("banking")
+if pani_handler:
+    app.add_api_route("/api/pani", pani_handler, methods=["GET", "POST"])
+    _registered_routes.append("pani")
+if sewer_handler:
+    app.add_api_route("/api/sewer", sewer_handler, methods=["GET", "POST"])
+    _registered_routes.append("sewer")
+if upi_handler:
+    app.add_api_route("/api/upi", upi_handler, methods=["GET", "POST"])
+    _registered_routes.append("upi")
+if mandi_handler:
+    app.add_api_route("/api/mandi", mandi_handler, methods=["GET"])
+    _registered_routes.append("mandi")
+if search_handler:
+    app.add_api_route("/api/search", search_handler, methods=["GET", "POST"])
+    _registered_routes.append("search")
+if rozgar_handler:
+    app.add_api_route("/api/rozgar", rozgar_handler, methods=["GET", "POST"])
+    _registered_routes.append("rozgar")
+if ai_chat_handler:
+    app.add_api_route("/api/ai_chat", ai_chat_handler, methods=["GET", "POST"])
+    _registered_routes.append("ai_chat")
+if analytics_handler:
+    app.add_api_route("/api/analytics", analytics_handler, methods=["GET", "POST"])
+    _registered_routes.append("analytics")
+if currents_handler:
+    app.add_api_route("/api/currents", currents_handler, methods=["GET", "POST"])
+    _registered_routes.append("currents_api")
+if init_handler:
+    app.add_api_route("/api/init", init_handler, methods=["GET", "POST"])
+    _registered_routes.append("init")
+if language_hub_handler:
+    app.add_api_route("/api/language_hub", language_hub_handler, methods=["GET", "POST"])
+    _registered_routes.append("language_hub")
+if meta_handler:
+    app.add_api_route("/api/meta", meta_handler, methods=["GET", "POST"])
+    _registered_routes.append("meta_agent")
+if plant_id_handler:
+    app.add_api_route("/api/plant_id", plant_id_handler, methods=["GET", "POST"])
+    _registered_routes.append("plant_id")
+if singhji_tv_handler:
+    app.add_api_route("/api/singhji_tv", singhji_tv_handler, methods=["GET", "POST"])
+    _registered_routes.append("singhji_tv")
+if supabase_memory_handler:
+    app.add_api_route("/api/supabase_memory", supabase_memory_handler, methods=["GET", "POST"])
+    _registered_routes.append("supabase_memory")
+if telegram_handler:
+    app.add_api_route("/api/telegram", telegram_handler, methods=["GET", "POST"])
+    _registered_routes.append("telegram")
+if trolley_handler:
+    app.add_api_route("/api/trolley", trolley_handler, methods=["GET", "POST"])
+    _registered_routes.append("trolley")
+if voice_handler:
+    app.add_api_route("/api/voice", voice_handler, methods=["GET", "POST"])
+    _registered_routes.append("voice")
+if voice_cmd_handler:
+    app.add_api_route("/api/voice_cmd", voice_cmd_handler, methods=["GET", "POST"])
+    _registered_routes.append("voice_cmd")
+if voice_tts_handler:
+    app.add_api_route("/api/voice_tts", voice_tts_handler, methods=["GET", "POST"])
+    _registered_routes.append("voice_tts")
+if whatsapp_handler:
+    app.add_api_route("/api/whatsapp", whatsapp_handler, methods=["GET", "POST"])
+    _registered_routes.append("whatsapp")
+if daily_report_handler:
+    app.add_api_route("/api/daily_report", daily_report_handler, methods=["GET", "POST"])
+    _registered_routes.append("daily_report")
 
-logger.info("✅ All 42+ module routes registered successfully")
+logger.info(f"✅ Routes registered: {len(_registered_routes)} modules active")
+for r in _registered_routes:
+    logger.info(f"   ✅ {r}")
 
 # ==========================================
 # VIDEO GENERATION ENDPOINTS
