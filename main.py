@@ -232,6 +232,38 @@ async def weather_endpoint():
 @app.get("/api/v1/whatsapp")
 async def whatsapp_endpoint():
     return {"status": "ok", "module": "whatsapp"}
+    # ==========================================
+# TELEGRAM WEBHOOK ENDPOINT
+# ==========================================
+@app.post("/telegram/webhook")
+async def telegram_webhook(request: Request):
+    """
+    Handle incoming Telegram messages
+    """
+    try:
+        body = await request.json()
+        print(f"📨 Telegram message received: {body}")
+        
+        # Extract message details
+        message = body.get("message", {})
+        chat_id = message.get("chat", {}).get("id")
+        text = message.get("text", "")
+        
+        if not chat_id:
+            return {"status": "error", "message": "No chat_id found"}
+        
+        # Send auto-reply (optional)
+        # await send_telegram_message(chat_id, f"🦁 Namaste! Aapne kaha: {text}")
+        
+        return {
+            "status": "ok", 
+            "message": "Webhook received", 
+            "chat_id": chat_id,
+            "text": text
+        }
+    except Exception as e:
+        print(f"❌ Telegram webhook error: {e}")
+        return {"status": "error", "error": str(e)}
 
 if __name__ == "__main__":
     import uvicorn
