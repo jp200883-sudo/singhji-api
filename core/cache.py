@@ -42,3 +42,5 @@ def cache_stats() -> dict:
         "expired_keys": expired,
         "active_keys": total - expired
     }
+_cache_get = cache_get
+_cache_set = cache_set
