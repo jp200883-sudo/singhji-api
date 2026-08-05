@@ -44,3 +44,7 @@ def cache_stats() -> dict:
     }
 _cache_get = cache_get
 _cache_set = cache_set
+
+def _cache_key(*parts) -> str:
+    """कई हिस्सों को जोड़कर एक cache key बनाएँ, जैसे _cache_key('weather', 'delhi') -> 'weather:delhi'"""
+    return ":".join(str(p) for p in parts)
