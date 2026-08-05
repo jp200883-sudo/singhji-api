@@ -49,3 +49,21 @@ def get_rate_limit_status() -> dict:
         "strict_total_requests": sum(len(v) for v in _strict_requests.values()),
         "global_total_requests": sum(len(v) for v in _global_requests.values())
     }
+    # ==========================================================
+# tg_bot/webhook.py जिस नाम से इस्तेमाल करता है
+# ==========================================================
+_key_requests = defaultdict(list)
+
+def _rate_check(key: str, limit: int, window_seconds: int) -> bool:
+    """
+    सीधे किसी key (जैसे 'tg_user:123') के आधार पर rate-limit जाँचें।
+    True = limit पार हो गई (रोकना है), False = ठीक है, आगे बढ़ने दें।
+    """
+    now = time.time()
+    _key_requests[key] = [t for t in _key_requests[key] if now - t < window_seconds]
+
+    if len(_key_requests[key]) >= limit:
+        return True
+
+    _key_requests[key].append(now)
+    return False
