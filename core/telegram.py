@@ -98,3 +98,61 @@ def send_telegram_message_sync(message: str, bot_token: str = None, chat_id: str
     except Exception as e:
         print(f"Telegram sync error: {e}")
         return False
+        # ==========================================
+# WEBHOOK MANAGEMENT (main.py lifespan में इस्तेमाल होता है)
+# ==========================================
+async def _telegram_send_message(http_client, chat_id, message: str, parse_mode: str = None) -> bool:
+    """Shared HTTP client से मैसेज भेजें (scheduler broadcast के लिए)"""
+    from core.config import TELEGRAM_TOKEN
+    if not TELEGRAM_TOKEN:
+        return False
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+    try:
+        response = await http_client.post(
+            url,
+            json={"chat_id": chat_id, "text": message[:4096], "parse_mode": parse_mode}
+        )
+        return response.status_code == 200
+    except Exception as e:
+        print(f"Telegram send error: {e}")
+        return False
+
+
+async def _check_webhook_config(http_client) -> dict:
+    """Telegram से मौजूदा webhook जानकारी लाएँ (लॉगिंग के लिए)"""
+    from core.config import TELEGRAM_TOKEN
+    if not TELEGRAM_TOKEN:
+        return {}
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getWebhookInfo"
+    try:
+        response = await http_client.get(url, timeout=10)
+        data = response.json()
+        print(f"📡 Current webhook: {data.get('result', {})}")
+        return data.get("result", {})
+    except Exception as e:
+        print(f"Webhook check error: {e}")
+        return {}
+
+
+async def _ensure_correct_webhook(http_client) -> bool:
+    """Webhook हमारे /telegram/webhook पते पर सेट है, यह पक्का करें"""
+    from core.config import TELEGRAM_TOKEN, APP_URL
+    if not TELEGRAM_TOKEN or not APP_URL:
+        return False
+    expected_url = f"{APP_URL}/telegram/webhook"
+    info = await _check_webhook_config(http_client)
+    if info.get("url", "") == expected_url:
+        print("✅ Webhook already correct")
+        return True
+    set_url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/setWebhook"
+    try:
+        response = await http_client.post(set_url, json={"url": expected_url})
+        data = response.json()
+        if data.get("ok"):
+            print(f"✅ Webhook set to {expected_url}")
+            return True
+        print(f"❌ Webhook set failed: {data}")
+        return False
+    except Exception as e:
+        print(f"Webhook set error: {e}")
+        return False
