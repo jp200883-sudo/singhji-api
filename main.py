@@ -16,13 +16,14 @@ from core.config import (
     RATE_LIMIT_GLOBAL, 
     RATE_LIMIT_STRICT, 
     APP_URL,
-    TELEGRAM_TOKEN,      
-    ADMIN_USER_ID        
+    TELEGRAM_TOKEN,      # ✅ यह जोड़ें
+    ADMIN_USER_ID        # ✅ यह जोड़ें
 )
 from core.database import SUPABASE_CLIENT
 from core.rate_limit import _init_rate_limit, _is_rate_limited
 from core.telegram import _ensure_correct_webhook, _check_webhook_config, _telegram_send_message
 from core.swarm import SMART_SWARM
+from core.scheduler import MASTER_SCHEDULER, USER_PREFERENCES, _load_user_preferences_sync, SinghJiMasterScheduler
 from core.cache import _cache_get, _cache_set
 from core.memory import _memory_get, _memory_save
 
@@ -37,9 +38,9 @@ from api.social import router as social_router, set_http_client as set_social_ht
 from api.ai import router as ai_router, set_http_client as set_ai_http_client
 
 # ==========================================
-# TELEGRAM WEBHOOK
+# TELEGRAM WEBHOOK (tg_bot/ — replaces old telegram/ folder)
 # ==========================================
-from telegram.webhook import router as telegram_router, set_http_client as set_tg_http_client
+from tg_bot.webhook import router as telegram_router, set_http_client as set_tg_http_client
 
 # ==========================================
 # UTILS
@@ -62,12 +63,6 @@ logging.getLogger("apscheduler").setLevel(logging.WARNING)
 # GLOBAL VARIABLES
 # ==========================================
 HTTP_CLIENT = None
-MASTER_SCHEDULER = None
-
-# ==========================================
-# UPDATE: IMPORT NEW SCHEDULER INSTANCE HERE
-# ==========================================
-from core.scheduler import SinghJiMasterScheduler
 
 # ==========================================
 # LIFESPAN
@@ -110,11 +105,7 @@ async def lifespan(app: FastAPI):
     # ---- Load Users ----
     from fastapi.concurrency import run_in_threadpool
     loaded_prefs = await run_in_threadpool(_load_user_preferences_sync)
-    
-    # Update the new Scheduler's internal user_preferences
-    if hasattr(MASTER_SCHEDULER, 'users'):
-        MASTER_SCHEDULER.users.update(loaded_prefs)
-    
+    USER_PREFERENCES.update(loaded_prefs)
     logger.info(f"✅ {len(loaded_prefs)} subscribers reloaded from Supabase")
     
     # ---- Telegram Webhook ----
