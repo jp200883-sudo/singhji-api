@@ -1,12 +1,141 @@
-# telegram/buttons.py
-import logging
-from datetime import datetime
-from core.config import AVAILABLE_KEYS
-from core.swarm import SMART_SWARM
-from core.scheduler import USER_PREFERENCES
-from tg_bot.helpers import send_message
+"""
+📱 tg_bot/buttons.py — Singh Ji AI Ultra v8.3 | 2026
+Complete Keyboard + Input Handler
+"""
+from telegram import ReplyKeyboardMarkup, KeyboardButton
 
-logger = logging.getLogger(__name__)
+# ==========================================
+# MAIN KEYBOARD — ALL MODULES (2026)
+# ==========================================
+
+def get_main_keyboard():
+    """Complete keyboard with all modules"""
+    keyboard = [
+        # Row 1: Agriculture
+        [KeyboardButton("🌾 Mandi Bhav"), KeyboardButton("🌱 Kisaan Doctor")],
+        [KeyboardButton("🌿 Plant ID"), KeyboardButton("💧 Pani")],
+
+        # Row 2: Finance
+        [KeyboardButton("🥇 Gold Rate"), KeyboardButton("⛽ Fuel Price")],
+        [KeyboardButton("💰 Tax Calc"), KeyboardButton("💱 Currency")],
+        [KeyboardButton("🏦 Banking"), KeyboardButton("💳 UPI")],
+
+        # Row 3: News & Info
+        [KeyboardButton("📰 News"), KeyboardButton("📡 NewsData")],
+        [KeyboardButton("📊 Currents"), KeyboardButton("📋 Daily Report")],
+        [KeyboardButton("🔍 Search"), KeyboardButton("🌐 DDG Search")],
+
+        # Row 4: AI & Language
+        [KeyboardButton("🤖 AI Chat"), KeyboardButton("🔤 Language")],
+        [KeyboardButton("🌍 Language Hub"), KeyboardButton("🗣️ Bhashini")],
+        [KeyboardButton("🎙️ Voice"), KeyboardButton("🔊 Voice TTS")],
+
+        # Row 5: Government
+        [KeyboardButton("🏛️ Govt Schemes"), KeyboardButton("📜 Scheme Swarm")],
+        [KeyboardButton("💼 Rozgar"), KeyboardButton("🚨 Emergency")],
+        [KeyboardButton("🚰 Sewer"), KeyboardButton("🎯 Aavishkar")],
+        [KeyboardButton("📋 Yojana")],
+
+        # Row 6: Social & Media
+        [KeyboardButton("📱 Social Agent"), KeyboardButton("💬 WhatsApp")],
+        [KeyboardButton("📘 Facebook"), KeyboardButton("📺 SinghJi TV")],
+        [KeyboardButton("🔐 OAuth"), KeyboardButton("🛒 Trolley")],
+
+        # Row 7: System & Agents
+        [KeyboardButton("📊 System Status"), KeyboardButton("📈 Analytics")],
+        [KeyboardButton("👑 Supreme Agent"), KeyboardButton("🧠 Meta Agent")],
+        [KeyboardButton("🛡️ Guard Agent"), KeyboardButton("⚡ Trishul")],
+
+        # Row 8: Transport
+        [KeyboardButton("🚆 PNR Status"), KeyboardButton("🚂 Train Tracking")],
+
+        # Row 9: Other
+        [KeyboardButton("🔮 Horoscope"), KeyboardButton("🌤️ Weather")],
+        [KeyboardButton("🤖 Auto Account"), KeyboardButton("💵 Auto Monetize")],
+        [KeyboardButton("📸 Visual AI"), KeyboardButton("📈 Trend Analysis")],
+
+        # Row 10: Help
+        [KeyboardButton("❓ Help / Commands")],
+    ]
+    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+
+
+# ==========================================
+# BUTTON → COMMAND MAP
+# ==========================================
+
+BUTTON_COMMAND_MAP = {
+    # Agriculture
+    "🌾 Mandi Bhav": "/mandi",
+    "🌱 Kisaan Doctor": "/kisaan",
+    "🌿 Plant ID": "/plant",
+    "💧 Pani": "/pani",
+
+    # Finance
+    "🥇 Gold Rate": "/gold",
+    "⛽ Fuel Price": "/fuel",
+    "💰 Tax Calc": "/tax",
+    "💱 Currency": "/currency",
+    "🏦 Banking": "/banking",
+    "💳 UPI": "/upi",
+
+    # News & Info
+    "📰 News": "/news",
+    "📡 NewsData": "/newsdata",
+    "📊 Currents": "/currents",
+    "📋 Daily Report": "/dailyreport",
+    "🔍 Search": "/search",
+    "🌐 DDG Search": "/ddg",
+
+    # AI & Language
+    "🤖 AI Chat": "/ai",
+    "🔤 Language": "/language",
+    "🌍 Language Hub": "/langhub",
+    "🗣️ Bhashini": "/bhashini",
+    "🎙️ Voice": "/voice",
+    "🔊 Voice TTS": "/voicetts",
+
+    # Government
+    "🏛️ Govt Schemes": "/govt",
+    "📜 Scheme Swarm": "/schemes",
+    "💼 Rozgar": "/rozgar",
+    "🚨 Emergency": "/emergency",
+    "🚰 Sewer": "/sewer",
+    "🎯 Aavishkar": "/aavishkar",
+    "📋 Yojana": "/yojana",
+
+    # Social & Media
+    "📱 Social Agent": "/social",
+    "💬 WhatsApp": "/whatsapp",
+    "📘 Facebook": "/facebook",
+    "📺 SinghJi TV": "/singhjtv",
+    "🔐 OAuth": "/oauth",
+    "🛒 Trolley": "/trolley",
+
+    # System & Agents
+    "📊 System Status": "/status",
+    "📈 Analytics": "/analytics",
+    "👑 Supreme Agent": "/supreme",
+    "🧠 Meta Agent": "/meta",
+    "🛡️ Guard Agent": "/guard",
+    "⚡ Trishul": "/trishul",
+
+    # Transport
+    "🚆 PNR Status": "/pnr",
+    "🚂 Train Tracking": "/train",
+
+    # Other
+    "🔮 Horoscope": "/horoscope",
+    "🌤️ Weather": "/weather",
+    "🤖 Auto Account": "/autoaccount",
+    "💵 Auto Monetize": "/monetize",
+    "📸 Visual AI": "/visual",
+    "📈 Trend Analysis": "/trend",
+
+    # Help
+    "❓ Help / Commands": "/help",
+}
+
 
 # ==========================================
 # BUTTONS THAT NEED USER INPUT
@@ -24,153 +153,28 @@ INPUT_BUTTONS = {
     "translate": ("🔤 Translate", "Format: en Namaste kaise ho"),
     "yojana": ("📋 Yojana", "Format: 30 100000 farmer"),
     "tv": ("📺 SinghJi TV", "Category batao! (educational/news/health)"),
+    "pnr": ("🚆 PNR Status", "PNR number batao!"),
+    "train": ("🚂 Train Tracking", "Train number batao!"),
+    "plant": ("🌿 Plant ID", "Plant ki photo bhejo ya naam batao!"),
+    "kisaan": ("🌱 Kisaan Doctor", "Problem batao! (jaise: gehu mein keeda)"),
+    "ai": ("🤖 AI Chat", "Kya puchna hai?"),
+    "language": ("🔤 Language", "Format: en Namaste kaise ho"),
+    "bhashini": ("🗣️ Bhashini", "Text batao jo translate karna hai!"),
+    "visual": ("📸 Visual AI", "Image bhejo ya prompt batao!"),
+    "trend": ("📈 Trend Analysis", "Topic batao! (jaise: crypto, stock)"),
+    "autoaccount": ("🤖 Auto Account", "Account type batao!"),
+    "monetize": ("💵 Auto Monetize", "Platform batao!"),
 }
 
-# ==========================================
-# INSTANT REPLY BUTTONS
-# ==========================================
-async def handle_button(chat_id, user_id, query_data):
-    # ---- INPUT BUTTONS ----
-    if query_data in INPUT_BUTTONS:
-        label, prompt = INPUT_BUTTONS[query_data]
-        USER_PREFERENCES.setdefault(user_id, {})["waiting_for"] = query_data
-        await send_message(chat_id, f"{label}\n\n{prompt}")
-        return {"status": "ok"}
 
-    # ---- STATUS ----
-    if query_data == "status":
-        status = SMART_SWARM.get_status()
-        api_count = sum(1 for v in AVAILABLE_KEYS.values() if v)
-        text = (
-            f"📊 Singh Ji AI Status\n\n"
-            f"🤖 Agents: {status['currently_loaded']}/330\n"
-            f"⚡ Active: {status['active_running']}\n"
-            f"😴 Idle: {status['idle']}\n"
-            f"🔌 APIs: {api_count}/{len(AVAILABLE_KEYS)}\n"
-            f"👥 Users: {len(USER_PREFERENCES)}\n"
-            f"⏰ {datetime.now().strftime('%H:%M:%S')}"
-        )
-        await send_message(chat_id, text)
-        return {"status": "ok"}
+def button_to_command(text: str) -> str:
+    """Button text ko command mein convert kare"""
+    return BUTTON_COMMAND_MAP.get(text, text)
 
-    # ---- NEWS ----
-    if query_data == "news":
-        try:
-            import modules.news.handler as news_module
-            text = "📰 Latest News\n\n" + await news_module.get_news_digest_text(count=5)
-            await send_message(chat_id, text)
-        except Exception as e:
-            await send_message(chat_id, f"❌ News error: {str(e)[:100]}")
-        return {"status": "ok"}
 
-    # ---- EMERGENCY ----
-    if query_data == "emergency":
-        try:
-            from modules.emergency.handler import EMERGENCY_DATA
-            emg_text = "🚨 Emergency Numbers\n\n"
-            for k, v in EMERGENCY_DATA.items():
-                emg_text += f"{k.title()}: {v['number']}"
-                if v.get("alt"):
-                    emg_text += f" / {v['alt']}"
-                emg_text += "\n"
-            await send_message(chat_id, emg_text)
-        except Exception as e:
-            await send_message(chat_id, f"Emergency error: {str(e)[:100]}")
-        return {"status": "ok"}
-
-    # ---- UPI ----
-    if query_data == "upi":
-        upi_id = os.getenv("UPI_ID", "jp200883@sbi")
-        await send_message(chat_id, f"💳 UPI Info\n\nUPI ID: {upi_id}\nApps: PhonePe, GPay, Paytm, BHIM")
-        return {"status": "ok"}
-
-    # ---- HELP ----
-    if query_data == "help":
-        help_text = (
-            "📚 Singh Ji AI Commands\n\n"
-            "🌤️ /weather Delhi\n"
-            "📰 /news\n"
-            "🌾 /mandi UP\n"
-            "💰 /tax 500000\n"
-            "🥇 /gold Delhi\n"
-            "⛽ /fuel Delhi\n"
-            "🔮 /horoscope मेष\n"
-            "💱 /currency USD INR 100\n"
-            "🔍 /search AI news\n"
-            "🔤 /translate en Namaste\n"
-            "🤖 /ai question\n"
-            "📊 /status\n"
-        )
-        await send_message(chat_id, help_text)
-        return {"status": "ok"}
-
-    # ---- AI CHAT ----
-    if query_data == "ai_chat":
-        await send_message(chat_id, "🤖 AI Chat\n\nKuch bhi poochho! Main jawab dunga.")
-        return {"status": "ok"}
-
-    # ---- VOICE ----
-    if query_data == "voice":
-        await send_message(chat_id, "🎤 Voice AI\n\nVoice message bhejo! Main transcribe karunga.")
-        return {"status": "ok"}
-
-    # ---- PLANT DOCTOR ----
-    if query_data == "plant":
-        await send_message(chat_id, "🌿 Plant Doctor\n\nPlant ki photo bhejo! Disease detect karunga.")
-        return {"status": "ok"}
-
-    # ---- GOVT SCHEMES ----
-    if query_data == "govt":
-        govt_text = (
-            "🏛️ Govt Services\n\n"
-            "/govt aadhaar — Aadhaar services\n"
-            "/govt pan — PAN card\n"
-            "/govt passport — Passport\n"
-            "/govt voter — Voter ID\n"
-            "/govt ration — Ration card\n"
-            "/govt driving — Driving license\n"
-            "/govt ayushman — Ayushman Bharat\n"
-            "/govt pmkisan — PM Kisan"
-        )
-        await send_message(chat_id, govt_text)
-        return {"status": "ok"}
-
-    # ---- GUARD AGENT ----
-    if query_data == "guard":
-        try:
-            from modules.guard_agent.handler import singhji_guard
-            g = singhji_guard
-            guard_text = (
-                f"🛡️ Guard Agent\n\n"
-                f"📹 Cameras: {len(g.cameras_db)}\n"
-                f"🚨 Alerts: {len(g.alerts_db)}\n"
-                f"🔍 Detection: vehicle, human, sound, face, ANPR, fire, crowd"
-            )
-            await send_message(chat_id, guard_text)
-        except Exception as e:
-            await send_message(chat_id, f"🛡️ Guard Agent\n\nStatus: Loading...\n{str(e)[:80]}")
-        return {"status": "ok"}
-
-    # ---- SOCIAL AGENT ----
-    if query_data == "social":
-        try:
-            from modules.social_agent import core as social_core
-            s = social_core.SOCIAL_AGENT
-            if s:
-                cfg = s.get_stats()["platforms_configured"]
-                live = ", ".join(p for p, v in cfg.items() if v) or "none"
-                social_text = (
-                    f"📱 Social Agent\n\n"
-                    f"📤 Posts: {len(s.posted_history)}\n"
-                    f"🟢 Live: {live}"
-                )
-            else:
-                social_text = "📱 Social Agent\n\nStatus: Initializing..."
-            await send_message(chat_id, social_text)
-        except Exception as e:
-            await send_message(chat_id, f"📱 Social Agent\n\nStatus: {str(e)[:80]}")
-        return {"status": "ok"}
-
-    # ---- DEFAULT ----
-    await send_message(chat_id, f"✅ Command received: {query_data}")
-    return {"status": "ok"}
+def is_input_button(command: str) -> tuple:
+    """Check kare ki button ko extra input chahiye ya nahi"""
+    cmd_clean = command.replace("/", "").lower()
+    if cmd_clean in INPUT_BUTTONS:
+        return True, INPUT_BUTTONS[cmd_clean][1]
+    return False, ""
