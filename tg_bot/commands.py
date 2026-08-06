@@ -122,11 +122,11 @@ async def handle_command(chat_id, user_id, text):
             await send_message(chat_id, f"❌ News error: {str(e)[:100]}")
         return {"status": "ok"}
 
-       # ---- MANDI ----
-    if text.startswith("/mandi"):
-        raw_state = text.replace("/mandi", "").strip()
+    # ---- MANDI ----
+    if text.startswith("/mandi "):
+        raw_state = text.replace("/mandi ", "").strip()
         if not raw_state:
-            await send_message(chat_id, "❌ राज्य का नाम दें।\n\nउदाहरण:\n/mandi Punjab\n/mandi Haryana\n/mandi UP")
+            await send_message(chat_id, "❌ Please provide a state. Example: /mandi Punjab")
             return {"status": "ok"}
         
         state = _normalize_state(raw_state)
@@ -147,7 +147,7 @@ async def handle_command(chat_id, user_id, text):
 
                 records = data.get("records", [])
                 if not records:
-                    await send_message(chat_id, f"❌ {state} के लिए डेटा नहीं मिला\n\nTry करें:\n/mandi Punjab\n/mandi Haryana\n/mandi UP")
+                    await send_message(chat_id, f"❌ {state} ke liye data nahi mila\n\nTry karo:\n/mandi Punjab\n/mandi Haryana\n/mandi UP")
                     return {"status": "ok"}
 
                 mandi_text = f"🌾 Mandi Bhav — {state}\n\n"
@@ -167,6 +167,7 @@ async def handle_command(chat_id, user_id, text):
         else:
             await send_message(chat_id, "❌ Mandi API key missing")
         return {"status": "ok"}
+
     # ---- TAX ----
     if text.startswith("/tax "):
         try:
@@ -330,11 +331,11 @@ async def handle_command(chat_id, user_id, text):
             await send_message(chat_id, f"❌ Translate error: {str(e)[:100]}")
         return {"status": "ok"}
 
-       # ---- SEARCH ----
-    if text.startswith("/search"):
-        query = text.replace("/search", "").strip()
+    # ---- SEARCH ----
+    if text.startswith("/search "):
+        query = text.replace("/search ", "").strip()
         if not query:
-            await send_message(chat_id, "❌ Search query दें।\n\nउदाहरण: /search AI news")
+            await send_message(chat_id, "❌ Please provide a search query. Example: /search AI news")
             return {"status": "ok"}
         
         try:
@@ -344,11 +345,12 @@ async def handle_command(chat_id, user_id, text):
             for i, r in enumerate(results[:5], 1):
                 search_text += f"{i}. {r.get('title', 'No title')}\n   {r.get('url', '')}\n\n"
             if not results:
-                search_text += "कोई result नहीं मिला"
+                search_text += "No results found"
             await send_message(chat_id, search_text)
         except Exception as e:
             await send_message(chat_id, f"❌ Search error: {str(e)[:100]}")
         return {"status": "ok"}
+
     # ---- EMERGENCY ----
     if text.startswith("/emergency"):
         type_ = text.replace("/emergency", "").strip().lower()
