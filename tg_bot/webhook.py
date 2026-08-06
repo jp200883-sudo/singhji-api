@@ -8,8 +8,8 @@ from core.memory import _memory_save
 from core.rate_limit import _rate_check
 from core.scheduler import USER_PREFERENCES
 from tg_bot.helpers import send_message, handle_voice, handle_photo, set_http_client as set_helper_http_client
-from tg_bot.buttons import handle_button
 from tg_bot.commands import handle_command, set_http_client as set_cmd_http_client
+from tg_bot.callbacks import handle_callback  # ✅ NEW: Button click handler
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -37,7 +37,8 @@ async def telegram_webhook(request: Request):
             chat_id = callback["message"]["chat"]["id"]
             user_id = callback["from"]["id"]
             query_data = callback["data"]
-            return await handle_button(chat_id, user_id, query_data)
+            # ✅ NEW: Use handle_callback from callbacks.py
+            return await handle_callback(chat_id, user_id, query_data)
 
         # ---- MESSAGE ----
         if "message" not in data:
@@ -70,10 +71,18 @@ async def telegram_webhook(request: Request):
                 "translate": "/translate ",
                 "yojana": "/yojana ",
                 "tv": "/tv ",
+                # ✅ NEW: KYC + Agent pending inputs
+                "kyc_aadhaar": "",
+                "kyc_pan": "",
+                "kyc_address": "",
+                "kyc_gram_panchayat": "",
+                "agent_phone": "",
+                "withdraw_amount": "",
             }
             if pending in pending_map:
                 text = pending_map[pending] + text.strip()
-                # ---- Scheme Profile Wizard ----
+
+        # ---- Scheme Profile Wizard ----
         if text and not text.startswith("/"):
             from tg_bot.scheme_flow import handle_scheme_step
             if await handle_scheme_step(chat_id, user_id, text):
