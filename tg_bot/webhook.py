@@ -9,8 +9,7 @@ from core.rate_limit import _rate_check
 from core.scheduler import USER_PREFERENCES
 from tg_bot.helpers import send_message, handle_voice, handle_photo, set_http_client as set_helper_http_client
 from tg_bot.commands import handle_command, set_http_client as set_cmd_http_client
-from tg_bot.callbacks import handle_callback  # ✅ NEW: Button click handler
-
+from tg_bot.buttons import handle_button
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
@@ -37,9 +36,7 @@ async def telegram_webhook(request: Request):
             chat_id = callback["message"]["chat"]["id"]
             user_id = callback["from"]["id"]
             query_data = callback["data"]
-            # ✅ NEW: Use handle_callback from callbacks.py
-            return await handle_callback(chat_id, user_id, query_data)
-
+           return await handle_button(chat_id, user_id, query_data)
         # ---- MESSAGE ----
         if "message" not in data:
             return {"status": "ok"}
