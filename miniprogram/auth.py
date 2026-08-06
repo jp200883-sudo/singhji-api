@@ -1,6 +1,5 @@
-cd /app/miniprogram
 
-cat > auth.py << 'PYEOF'
+
 """
 Singh Ji AI Ultra v8.0 — Mini-Program Auth Module
 Developer: Singh Ji
@@ -151,4 +150,4 @@ async def get_current_developer(token: str = None):
         "email": payload.get("email"),
         "role": payload.get("role", "developer")
     }
-PYEOF
+
