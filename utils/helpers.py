@@ -85,6 +85,12 @@ MAIN_KEYBOARD = {
         [{"text": "🌾 Mandi Bhav", "callback_data": "mandi"}, {"text": "🥇 Gold Rate", "callback_data": "gold"}],
         [{"text": "⛽ Fuel Price", "callback_data": "fuel"}, {"text": "💰 Tax Calc", "callback_data": "tax"}],
         [{"text": "🔮 Horoscope", "callback_data": "horoscope"}, {"text": "💼 Rozgar/Jobs", "callback_data": "rozgar"}],
+        [{"text": "💱 Currency", "callback_data": "currency"}, {"text": "🔍 Search", "callback_data": "search"}],
+        [{"text": "🔤 Translate", "callback_data": "translate"}, {"text": "📋 Yojana", "callback_data": "yojana"}],
+        [{"text": "📺 SinghJi TV", "callback_data": "tv"}, {"text": "🚨 Emergency", "callback_data": "emergency"}],
+        [{"text": "💳 UPI Info", "callback_data": "upi"}, {"text": "🏛️ Govt Services", "callback_data": "govt"}],
+        [{"text": "🛡️ Guard Agent", "callback_data": "guard"}, {"text": "📱 Social Agent", "callback_data": "social"}],
+        [{"text": "🎤 Voice AI", "callback_data": "voice"}, {"text": "🌿 Plant Doctor", "callback_data": "plant"}],
         [{"text": "🤖 AI Chat", "callback_data": "ai_chat"}, {"text": "📊 System Status", "callback_data": "status"}],
         [{"text": "❓ Help / Commands", "callback_data": "help"}],
     ]
