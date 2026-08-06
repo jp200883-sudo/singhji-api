@@ -73,6 +73,11 @@ async def telegram_webhook(request: Request):
             }
             if pending in pending_map:
                 text = pending_map[pending] + text.strip()
+                # ---- Scheme Profile Wizard ----
+        if text and not text.startswith("/"):
+            from tg_bot.scheme_flow import handle_scheme_step
+            if await handle_scheme_step(chat_id, user_id, text):
+                return {"status": "ok"}
 
         # ---- Rate Limit ----
         if _rate_check(f"tg_user:{user_id}", 10, 60):
