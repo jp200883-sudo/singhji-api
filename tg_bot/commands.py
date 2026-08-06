@@ -7,8 +7,12 @@ from fastapi.concurrency import run_in_threadpool
 from core.config import (
     GROQ_API_KEY, GEMINI_API_KEY, CEREBRAS_API_KEY, 
     AVAILABLE_KEYS, OPENWEATHER_API_KEY, MANDI_API_KEY, 
-    MANDI_BASE_URL, ADMIN_USER_ID, SUPABASE_URL, SUPABASE_KEY
+    MANDI_BASE_URL, ADMIN_USER_ID
 )
+
+# Supabase config — direct env (not exported from core.config)
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 from core.memory import _memory_save, _memory_get
 from core.swarm import SMART_SWARM
 from core.scheduler import USER_PREFERENCES, MASTER_SCHEDULER
