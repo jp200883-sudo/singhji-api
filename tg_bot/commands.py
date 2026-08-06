@@ -331,9 +331,9 @@ async def handle_command(chat_id, user_id, text):
             await send_message(chat_id, f"❌ Translate error: {str(e)[:100]}")
         return {"status": "ok"}
 
-    # ---- SEARCH ----
-    if text.startswith("/search "):
-        query = text.replace("/search ", "").strip()
+       # ---- SEARCH ----
+    if text.startswith("/search"):
+        query = text.replace("/search", "").strip()
         if not query:
             await send_message(chat_id, "❌ Please provide a search query. Example: /search AI news")
             return {"status": "ok"}
@@ -349,6 +349,52 @@ async def handle_command(chat_id, user_id, text):
             await send_message(chat_id, search_text)
         except Exception as e:
             await send_message(chat_id, f"❌ Search error: {str(e)[:100]}")
+        return {"status": "ok"}
+
+    # ---- MANDI ----
+    if text.startswith("/mandi"):
+        raw_state = text.replace("/mandi", "").strip()
+        if not raw_state:
+            await send_message(chat_id, "❌ Please provide a state. Example: /mandi Punjab")
+            return {"status": "ok"}
+        
+        state = _normalize_state(raw_state)
+        if MANDI_API_KEY:
+            try:
+                params = {
+                    "api-key": MANDI_API_KEY, 
+                    "format": "json", 
+                    "limit": 10, 
+                    "filters[state.keyword]": state
+                }
+                resp = await HTTP_CLIENT.get(MANDI_BASE_URL, params=params, timeout=45)
+                data = resp.json()
+
+                if "error" in data:
+                    await send_message(chat_id, f"❌ Mandi API error: {data.get('error', 'Unknown')}")
+                    return {"status": "ok"}
+
+                records = data.get("records", [])
+                if not records:
+                    await send_message(chat_id, f"❌ {state} ke liye data nahi mila\n\nTry karo:\n/mandi Punjab\n/mandi Haryana\n/mandi UP")
+                    return {"status": "ok"}
+
+                mandi_text = f"🌾 Mandi Bhav — {state}\n\n"
+                for i, record in enumerate(records[:5], 1):
+                    commodity = record.get("commodity", "Unknown")
+                    modal = record.get("modal_price", "N/A")
+                    min_p = record.get("min_price", "N/A")
+                    max_p = record.get("max_price", "N/A")
+                    market = record.get("market", "N/A")
+                    district = record.get("district", "N/A")
+                    mandi_text += f"{i}. {commodity}\n"
+                    mandi_text += f"   ₹{modal}/q (₹{min_p}-₹{max_p})\n"
+                    mandi_text += f"   📍 {market}, {district}\n\n"
+                await send_message(chat_id, mandi_text)
+            except Exception as e:
+                await send_message(chat_id, f"❌ Mandi error: {str(e)[:100]}")
+        else:
+            await send_message(chat_id, "❌ Mandi API key missing")
         return {"status": "ok"}
 
     # ---- EMERGENCY ----
