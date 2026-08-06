@@ -10,7 +10,6 @@
 import os
 import sys
 import json
-import time
 import asyncio
 import logging
 import httpx
@@ -23,6 +22,89 @@ from apscheduler.events import EVENT_JOB_ERROR, EVENT_JOB_EXECUTED
 
 # ─── Logging ─────────────────────────────────────────────────────
 logger = logging.getLogger("SinghJi.Scheduler")
+# ─── आज का विचार — AI से Automatic Fetch ────────────────────────
+# Koi quote manually likhna nahi padta. Groq AI har din fresh Hindi
+# motivational quote generate karta hai. Fallback list sirf API
+# fail hone ke liye.
+
+_FALLBACK_VICHAR = [
+    "अपनी तकदीर के निर्माता तुम खुद हो।",
+    "सपने वो हैं जो नींद उड़ा दें।",
+    "मेहनत इतनी खामोशी से करो कि सफलता शोर मचा दे।",
+    "हर सुबह एक नई शुरुआत है।",
+    "डर के आगे ही जीत है।",
+]
+
+_VICHAR_CACHE: Dict[str, str] = {}  # date_str -> quote
+
+async def _fetch_fresh_vichar_from_ai() -> str:
+    """Groq AI se fresh Hindi motivational quote lao"""
+    try:
+        groq_key = os.getenv("GROQ_API_KEY", "")
+        if not groq_key:
+            return ""
+
+        today = datetime.now().strftime("%d %b %Y")
+        prompt = (
+            f"Aaj {today} hai. Ek shaktishaali, prernaadayak Hindi sukti (quote) do "
+            f"jo vyapaar, safalta, mehnat, ya jeevan par ho. "
+            f"Sirf quote do — koi intro, outro, ya explanation mat do. "
+            f"Maximum 150 characters. Hindi mein ho."
+        )
+
+        client = await _get_http_client()
+        resp = await client.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {groq_key}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": "llama-3.3-70b-versatile",
+                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": 200,
+                "temperature": 0.9,
+            },
+            timeout=15.0
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        quote = data.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+
+        # Clean up — remove quotes if AI wrapped them
+        quote = quote.strip('"').strip("'").strip()
+
+        if quote and len(quote) > 10:
+            logger.info(f"💫 Fresh vichar from AI: {quote[:60]}...")
+            return quote
+        return ""
+    except Exception as e:
+        logger.warning(f"AI vichar fetch fail: {e}")
+        return ""
+
+async def _get_aaj_ka_vichar() -> str:
+    """Har din fresh quote — pehle AI se try, fallback par hardcoded"""
+    today_str = datetime.now().strftime("%Y-%m-%d")
+
+    # Check cache
+    if today_str in _VICHAR_CACHE:
+        return _VICHAR_CACHE[today_str]
+
+    # Try AI first
+    fresh = await _fetch_fresh_vichar_from_ai()
+    if fresh:
+        _VICHAR_CACHE[today_str] = fresh
+        return fresh
+
+    # Fallback: date-based rotation from small list
+    day_of_year = datetime.now().timetuple().tm_yday
+    idx = day_of_year % len(_FALLBACK_VICHAR)
+    fallback = _FALLBACK_VICHAR[idx]
+    _VICHAR_CACHE[today_str] = fallback
+    logger.info(f"💫 Fallback vichar used: {fallback[:60]}...")
+    return fallback
+
+
 
 # ─── Config from core.config ─────────────────────────────────────
 try:
@@ -45,23 +127,6 @@ async def _get_http_client() -> httpx.AsyncClient:
     if _http_client is None or _http_client.is_closed:
         _http_client = httpx.AsyncClient(timeout=30.0)
     return _http_client
-
-# ─── Key-saving Cache (weather + mandi ke liye) ───────────────────
-_CACHE: Dict[str, tuple] = {}
-_CACHE_TTL_SECONDS = 1800  # 30 minute — isi beech dobara wahi city/state maango to cache se milega
-
-def _cache_get(key: str) -> Optional[str]:
-    entry = _CACHE.get(key)
-    if not entry:
-        return None
-    value, saved_at = entry
-    if time.time() - saved_at > _CACHE_TTL_SECONDS:
-        _CACHE.pop(key, None)
-        return None
-    return value
-
-def _cache_set(key: str, value: str) -> None:
-    _CACHE[key] = (value, time.time())
 
 # ─── Telegram Broadcast ──────────────────────────────────────────
 async def _send_telegram_message(chat_id: int, text: str) -> bool:
@@ -141,12 +206,7 @@ async def _fetch_news() -> str:
 
 
 async def _fetch_weather(city: str = "Kanpur") -> str:
-    """🌤️ Weather fetch karo (30 min cache — key bachane ke liye)"""
-    cache_key = f"weather:{city.lower()}"
-    cached = _cache_get(cache_key)
-    if cached:
-        return cached
-
+    """🌤️ Weather fetch karo"""
     if not OPENWEATHER_API_KEY:
         return f"🌤️ <b>मौसम — {city}</b>\n\n❌ Weather API key missing"
     try:
@@ -166,27 +226,20 @@ async def _fetch_weather(city: str = "Kanpur") -> str:
         wind = data["wind"]["speed"]
         desc = data["weather"][0]["description"].title()
 
-        result = (
+        return (
             f"🌤️ <b>मौसम — {city}</b>\n"
             f"🌡️ तापमान: {temp}°C (महसूस: {feels}°C)\n"
             f"💧 नमी: {humidity}%\n"
             f"🌬️ हवा: {wind} m/s\n"
             f"☁️ {desc}"
         )
-        _cache_set(cache_key, result)
-        return result
     except Exception as e:
         logger.error(f"Weather fetch fail: {e}")
         return f"🌤️ <b>मौसम — {city}</b>\n\n❌ त्रुटि: {str(e)[:80]}"
 
 
 async def _fetch_mandi(state: str = "Uttar Pradesh") -> str:
-    """🌾 Mandi rates fetch karo (30 min cache — key bachane ke liye)"""
-    cache_key = f"mandi:{state.lower()}"
-    cached = _cache_get(cache_key)
-    if cached:
-        return cached
-
+    """🌾 Mandi rates fetch karo"""
     if not MANDI_API_KEY:
         return "🌾 <b>मंडी भाव</b>\n\n❌ Mandi API key missing"
     try:
@@ -220,9 +273,7 @@ async def _fetch_mandi(state: str = "Uttar Pradesh") -> str:
                 f"   ₹{modal}/क्विंटल (₹{min_p}-₹{max_p})\n"
                 f"   📍 {market}, {district}"
             )
-        result = "\n".join(lines)
-        _cache_set(cache_key, result)
-        return result
+        return "\n".join(lines)
     except Exception as e:
         logger.error(f"Mandi fetch fail: {e}")
         return f"🌾 <b>मंडी भाव</b>\n\n❌ त्रुटि: {str(e)[:80]}"
@@ -239,6 +290,7 @@ async def _fetch_gold_silver(city: str = "delhi") -> str:
 
         lines = [f"🥇 <b>सोना-चाँदी — {cr.get('city', city.title())}</b>\n"]
 
+        # Gold rates
         g24 = cr.get("price_gram_24k", "N/A")
         g22 = cr.get("price_gram_22k", "N/A")
         g10_24 = cr.get("price_10g_24k", "N/A")
@@ -253,6 +305,7 @@ async def _fetch_gold_silver(city: str = "delhi") -> str:
         if g10_22 != "N/A":
             lines.append(f"🟡 22K सोना (10g): ₹{g10_22}")
 
+        # Try silver
         try:
             silver = cr.get("price_silver_1kg", "N/A")
             if silver != "N/A":
@@ -260,6 +313,7 @@ async def _fetch_gold_silver(city: str = "delhi") -> str:
         except:
             pass
 
+        # Try copper
         try:
             copper = cr.get("price_copper_1kg", "N/A")
             if copper != "N/A":
@@ -364,9 +418,11 @@ async def build_morning_digest(
     """🌅 सुबह 7 बजे का complete digest"""
 
     today = datetime.now().strftime("%d %b %Y, %A")
+
     header = f"🌅 <b>सिंह जी मॉर्निंग डाइजेस्ट</b> — {today}\n"
     header += "═" * 30 + "\n\n"
 
+    # Sab sections parallel mein fetch karo
     results = await asyncio.gather(
         _fetch_news(),
         _fetch_weather(weather_city),
@@ -385,6 +441,7 @@ async def build_morning_digest(
         else:
             sections.append(r)
 
+    # Combine with separators
     separator = "\n\n" + "─" * 25 + "\n\n"
     body = separator.join(sections)
 
@@ -395,6 +452,8 @@ async def build_morning_digest(
     )
 
     full_message = header + body + footer
+
+    # Telegram limit: 4096 chars
     if len(full_message) > 4000:
         full_message = full_message[:3990] + "\n\n... (truncated)"
 
@@ -442,7 +501,28 @@ async def build_evening_digest() -> str:
 #                    SCHEDULER JOBS
 # ═════════════════════════════════════════════════════════════════
 
+
+
+async def job_aaj_ka_vichar():
+    """💫 सुबह 6 बजे — सिर्फ़ आज का विचार"""
+    logger.info("💫 Aaj Ka Vichar started...")
+    try:
+        today = datetime.now().strftime("%d %b %Y, %A")
+        vichar = _get_aaj_ka_vichar()
+        message = (
+            f"💫 <b>आज का विचार</b> — {today}\n"
+            f"═" * 30 + "\n\n"
+            f"<i>\"{vichar}\"</i>\n\n"
+            f"🤖 <i>सिंह जी AI अल्ट्रा v8.3</i>\n"
+            f"🌅 पूरा डाइजेस्ट 7 बजे आएगा..."
+        )
+        result = await _broadcast_message(message)
+        logger.info(f"✅ Aaj Ka Vichar sent to {result['sent']}/{result['total']} users")
+    except Exception as e:
+        logger.error(f"❌ Aaj Ka Vichar failed: {e}")
+
 async def job_morning_digest():
+    """🌅 सुबह 7 बजे — सब कुछ"""
     logger.info("🌅 Morning Digest started...")
     try:
         message = await build_morning_digest()
@@ -453,6 +533,7 @@ async def job_morning_digest():
 
 
 async def job_evening_digest():
+    """🌆 शाम 6 बजे — News + Rozgar"""
     logger.info("🌆 Evening Digest started...")
     try:
         message = await build_evening_digest()
@@ -463,6 +544,7 @@ async def job_evening_digest():
 
 
 async def job_keep_alive():
+    """💓 Railway ko awake rakho"""
     app_url = os.getenv("APP_URL", "")
     if not app_url:
         logger.debug("APP_URL not set — skip keep-alive")
@@ -479,6 +561,7 @@ async def job_keep_alive():
 
 
 async def job_flood_watch():
+    """🌊 Flood alert check (placeholder — weather API se rainfall check kar sakte hain)"""
     logger.info("🌊 Flood Watch check...")
     # TODO: Add actual flood alert logic using weather/meteorological APIs
     pass
@@ -497,15 +580,28 @@ class UnifiedScheduler:
         )
 
     def setup_jobs(self):
+        """Sab jobs register karo"""
+        # 💫 Aaj Ka Vichar — roz subah 6 baje
+        self.scheduler.add_job(
+            job_aaj_ka_vichar,
+            CronTrigger(hour=6, minute=0),
+            id="aaj_ka_vichar",
+            name="💫 Aaj Ka Vichar @ 6AM",
+            replace_existing=True,
+            misfire_grace_time=1800  # 30 min grace
+        )
+
+        # 🌅 Morning Digest — roz subah 7 baje
         self.scheduler.add_job(
             job_morning_digest,
             CronTrigger(hour=7, minute=0),
             id="morning_digest",
             name="🌅 Morning Digest (News+Weather+Mandi+Gold+Fuel+Horoscope)",
             replace_existing=True,
-            misfire_grace_time=3600
+            misfire_grace_time=3600  # 1 hour grace period
         )
 
+        # 🌆 Evening Digest — roz shaam 6 baje
         self.scheduler.add_job(
             job_evening_digest,
             CronTrigger(hour=18, minute=0),
@@ -515,15 +611,17 @@ class UnifiedScheduler:
             misfire_grace_time=3600
         )
 
+        # 💓 Keep Alive — har 10 minute
         self.scheduler.add_job(
             job_keep_alive,
             "interval",
-            minutes=10,
+            minutes=30,
             id="keep_alive",
             name="💓 Railway Keep-Alive",
             replace_existing=True
         )
 
+        # 🌊 Flood Watch — har ghante
         self.scheduler.add_job(
             job_flood_watch,
             "interval",
@@ -576,28 +674,14 @@ class UnifiedScheduler:
 
 MASTER_SCHEDULER = UnifiedScheduler()
 
-
-# ─── Manual trigger helpers (for testing) ────────────────────────
-
-async def trigger_morning_digest_now():
-    logger.info("🧪 Manual trigger: Morning Digest")
-    await job_morning_digest()
-
-async def trigger_evening_digest_now():
-    logger.info("🧪 Manual trigger: Evening Digest")
-    await job_evening_digest()
-
-
-if __name__ == "__main__":
-    async def test():
-        await MASTER_SCHEDULER.start()
-        print("\nScheduler running. Press Ctrl+C to stop.\n")
-        await asyncio.sleep(2)
-        await trigger_morning_digest_now()
-        while True:
-            await asyncio.sleep(60)
-
-    try:
-        asyncio.run(test())
-    except KeyboardInterrupt:
-        print("\nStopped.")
+# ═════════════════════════════════════════════════════════════════
+#                    PRODUCTION — FULLY AUTOMATIC
+# ═════════════════════════════════════════════════════════════════
+# Koi manual trigger nahi chahiye.
+# Bas deploy karo — sab apne aap chalega:
+#   • 6:00 AM → 💫 आज का विचार
+#   • 7:00 AM → 🌅 Morning Digest (sab kuch)
+#   • 6:00 PM → 🌆 Evening Digest
+#   • Har 30 min → 💓 Keep Alive
+#   • Har ghante → 🌊 Flood Watch
+# ═════════════════════════════════════════════════════════════════
