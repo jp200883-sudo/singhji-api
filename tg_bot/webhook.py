@@ -31,12 +31,12 @@ async def telegram_webhook(request: Request):
         data = await request.json()
 
         # ---- CALLBACK QUERY (Button Press) ----
-        if "callback_query" in data:
+     if "callback_query" in data:
             callback = data["callback_query"]
             chat_id = callback["message"]["chat"]["id"]
             user_id = callback["from"]["id"]
             query_data = callback["data"]
-           return await handle_button(chat_id, user_id, query_data)
+            return await handle_button(chat_id, user_id, query_data)
         # ---- MESSAGE ----
         if "message" not in data:
             return {"status": "ok"}
