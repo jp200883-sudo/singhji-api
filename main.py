@@ -214,6 +214,8 @@ app.include_router(video_router, prefix="/api/video")
 app.include_router(social_router, prefix="/api/social")
 app.include_router(ai_router, prefix="/api/ai")
 app.include_router(telegram_router, prefix="/telegram")
+from miniprogram.portal import router as miniprogram_router
+app.include_router(miniprogram_router)
 
 # ==========================================
 # ROOT ENDPOINTS
