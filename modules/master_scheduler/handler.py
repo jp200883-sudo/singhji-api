@@ -1,372 +1,603 @@
+"""
+═══════════════════════════════════════════════════════════════════
+  🌅 सिंह जी AI अल्ट्रा v8.3 — UNIFIED MASTER SCHEDULER
+  फाइल: core/scheduler_unified.py
+  फीचर्स: Morning Digest (7 AM) + Evening Digest (6 PM) + 
+           Keep Alive + Flood Watch + All Modules Integrated
+═══════════════════════════════════════════════════════════════════
+"""
 
 import os
 import sys
+import json
+import time
 import asyncio
-import sqlite3
 import logging
-from datetime import datetime
+import httpx
+from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, List
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.events import EVENT_JOB_ERROR, EVENT_JOB_EXECUTED
-from telegram import Bot
-from telegram.error import TelegramError
 
-# ─── असली मॉड्यूल इम्पोर्ट — अपने प्रोजेक्ट की सही पाथ के हिसाब से जाँच लें ───
-from modules.news import singhji_news          # modules/news.py में मौजूद सिंगलटन
+# ─── Logging ─────────────────────────────────────────────────────
+logger = logging.getLogger("SinghJi.Scheduler")
 
-# TODO: अगर weather और rozgar मॉड्यूल का फ़ंक्शन नाम/पाथ अलग है तो यहाँ बदलें
+# ─── Config from core.config ─────────────────────────────────────
 try:
-    from modules.weather import get_weather_and_fuel   # expected: async def get_weather_and_fuel(city: str) -> dict
-except ImportError:
-    get_weather_and_fuel = None
-    logging.getLogger("SinghJiScheduler").warning(
-        "⚠️ modules.weather.get_weather_and_fuel नहीं मिला — weather digest fallback text इस्तेमाल होगा"
+    from core.config import (
+        OPENWEATHER_API_KEY, MANDI_API_KEY, MANDI_BASE_URL,
+        ADMIN_USER_ID, TELEGRAM_BOT_TOKEN
     )
-
-try:
-    from modules.rozgar import search_jobs              # expected: async def search_jobs(**filters) -> list[dict]
 except ImportError:
-    search_jobs = None
-    logging.getLogger("SinghJiScheduler").warning(
-        "⚠️ modules.rozgar.search_jobs नहीं मिला — rozgar digest fallback text इस्तेमाल होगा"
-    )
+    OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY", "")
+    MANDI_API_KEY = os.getenv("MANDI_API_KEY", "")
+    MANDI_BASE_URL = os.getenv("MANDI_BASE_URL", "https://api.data.gov.in/resource/9ef84268-d588-465a-a308-a864a43d0070")
+    ADMIN_USER_ID = os.getenv("ADMIN_USER_ID", "")
+    TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 
-# ─── Logging Setup ───────────────────────────────────────────
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
-    handlers=[
-        logging.StreamHandler(sys.stdout),
-        logging.FileHandler("scheduler.log", encoding="utf-8")
-    ]
-)
-logger = logging.getLogger("SinghJiScheduler")
+# ─── HTTP Client ─────────────────────────────────────────────────
+_http_client: Optional[httpx.AsyncClient] = None
 
-# ─── SQLite State DB ─────────────────────────────────────────
-DB_PATH = os.getenv("SCHEDULER_DB", "scheduler_state.db")
+async def _get_http_client() -> httpx.AsyncClient:
+    global _http_client
+    if _http_client is None or _http_client.is_closed:
+        _http_client = httpx.AsyncClient(timeout=30.0)
+    return _http_client
 
-def init_db():
-    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
-    c = conn.cursor()
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS scheduler_state (
-            job_name TEXT PRIMARY KEY,
-            last_run TEXT,
-            next_run TEXT,
-            status TEXT DEFAULT 'pending',
-            retry_count INTEGER DEFAULT 0,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    conn.commit()
-    conn.close()
+# ─── Key-saving Cache (weather + mandi ke liye) ───────────────────
+_CACHE: Dict[str, tuple] = {}
+_CACHE_TTL_SECONDS = 1800  # 30 minute — isi beech dobara wahi city/state maango to cache se milega
 
-def update_job_state(job_name: str, status: str, next_run: Optional[str] = None):
+def _cache_get(key: str) -> Optional[str]:
+    entry = _CACHE.get(key)
+    if not entry:
+        return None
+    value, saved_at = entry
+    if time.time() - saved_at > _CACHE_TTL_SECONDS:
+        _CACHE.pop(key, None)
+        return None
+    return value
+
+def _cache_set(key: str, value: str) -> None:
+    _CACHE[key] = (value, time.time())
+
+# ─── Telegram Broadcast ──────────────────────────────────────────
+async def _send_telegram_message(chat_id: int, text: str) -> bool:
+    """Single message sender with rate limit safety"""
+    if not TELEGRAM_BOT_TOKEN:
+        logger.warning("TELEGRAM_BOT_TOKEN missing — message skipped")
+        return False
     try:
-        conn = sqlite3.connect(DB_PATH, check_same_thread=False)
-        c = conn.cursor()
-        now = datetime.now().isoformat()
-        c.execute("""
-            INSERT INTO scheduler_state (job_name, last_run, status, next_run)
-            VALUES (?, ?, ?, ?)
-            ON CONFLICT(job_name) DO UPDATE SET
-                last_run=excluded.last_run,
-                status=excluded.status,
-                next_run=excluded.next_run,
-                retry_count=retry_count+1
-        """, (job_name, now, status, next_run))
-        conn.commit()
-        conn.close()
+        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+        client = await _get_http_client()
+        resp = await client.post(url, json={
+            "chat_id": chat_id,
+            "text": text,
+            "parse_mode": "HTML",
+            "disable_web_page_preview": True
+        })
+        data = resp.json()
+        if data.get("ok"):
+            return True
+        logger.warning(f"Telegram API error: {data.get('description')}")
+        return False
     except Exception as e:
-        logger.error(f"DB update fail for {job_name}: {e}")
+        logger.error(f"Telegram send fail: {e}")
+        return False
 
-# ─── Telegram Bot — असली इंस्टेंस ────────────────────────────
-_bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
-_bot: Optional[Bot] = Bot(token=_bot_token) if _bot_token else None
-if not _bot:
-    logger.warning("⚠️ TELEGRAM_BOT_TOKEN env var missing — broadcast disabled रहेगा")
-
-# TODO: अपने Supabase टेबल/कॉलम नाम के हिसाब से यह दो लाइन ठीक करें
-CHAT_ID_TABLE = "telegram_subscribers"
-CHAT_ID_COLUMN = "chat_id"
-
-async def get_active_chat_ids() -> List[int]:
-    """Supabase से broadcast के लिए active chat_id लिस्ट लाओ"""
+async def _get_subscriber_chat_ids() -> List[int]:
+    """Supabase से active subscribers लाओ"""
     try:
-        from core.supabase_client import get_supabase_client  # अपने असली helper से बदलें
+        from core.supabase_client import get_supabase_client
         sb = get_supabase_client()
-        resp = sb.table(CHAT_ID_TABLE).select(CHAT_ID_COLUMN).eq("active", True).execute()
-        return [row[CHAT_ID_COLUMN] for row in (resp.data or [])]
+        resp = sb.table("telegram_subscribers").select("chat_id").eq("active", True).execute()
+        return [row["chat_id"] for row in (resp.data or [])]
     except Exception as e:
-        logger.error(f"chat_id लिस्ट लाने में त्रुटि: {e}")
+        logger.error(f"Subscriber fetch fail: {e}")
+        # Fallback: admin ko bhejo
+        if ADMIN_USER_ID:
+            try:
+                return [int(ADMIN_USER_ID)]
+            except:
+                pass
         return []
 
-async def send_telegram_broadcast(message: str, chat_ids: Optional[List[int]] = None) -> bool:
-    """असली Telegram broadcast — हर chat_id को अलग से भेजता है ताकि एक फेल होने पर बाकी न रुकें"""
-    if not _bot:
-        logger.warning(f"[TELEGRAM DISABLED] Would send: {message[:80]}...")
-        return False
-
-    ids = chat_ids if chat_ids is not None else await get_active_chat_ids()
-    if not ids:
-        logger.warning("कोई active chat_id नहीं मिला — broadcast स्किप हुआ")
-        return False
+async def _broadcast_message(text: str) -> Dict[str, Any]:
+    """Sab subscribers ko message bhejo"""
+    chat_ids = await _get_subscriber_chat_ids()
+    if not chat_ids:
+        logger.warning("No subscribers found — broadcast skipped")
+        return {"sent": 0, "failed": 0, "total": 0}
 
     sent, failed = 0, 0
-    for cid in ids:
-        try:
-            await _bot.send_message(chat_id=cid, text=message, parse_mode="Markdown")
+    for cid in chat_ids:
+        if await _send_telegram_message(cid, text):
             sent += 1
-        except TelegramError as e:
+        else:
             failed += 1
-            logger.warning(f"chat_id {cid} को भेजने में त्रुटि: {e}")
-        await asyncio.sleep(0.05)  # Telegram rate-limit से बचने के लिए
+        await asyncio.sleep(0.1)  # Rate limit safety
 
-    logger.info(f"📤 Broadcast पूरा — भेजा: {sent}, फेल: {failed}")
-    return sent > 0
+    logger.info(f"📤 Broadcast complete — Sent: {sent}, Failed: {failed}")
+    return {"sent": sent, "failed": failed, "total": len(chat_ids)}
 
-# ─── News Aggregation — असली मॉड्यूल से ──────────────────────
-async def fetch_and_summarize_news(category: str = "all") -> str:
-    keywords = "" if category == "all" else category
-    result = await singhji_news.get_news(keywords=keywords, num=4, country="in", lang="hi")
-    if not result.articles:
-        return "📰 आज कोई ताज़ा खबर उपलब्ध नहीं है।"
-    lines = [f"📰 समाचार अपडेट ({result.source})"]
-    for a in result.articles[:4]:
-        title = a.get("title", "").strip()
-        if title:
-            lines.append(f"• {title}")
-    return "\n".join(lines)
 
-# ─── Weather + Fuel — असली मॉड्यूल से (उपलब्ध हो तो) ─────────
-async def fetch_weather_fuel(city: str = "Kanpur") -> str:
-    if get_weather_and_fuel is None:
-        return "🌤️ मौसम/ईंधन मॉड्यूल अभी जुड़ा नहीं है (TODO)"
+# ═════════════════════════════════════════════════════════════════
+#                    DATA FETCHERS (ALL MODULES)
+# ═════════════════════════════════════════════════════════════════
+
+async def _fetch_news() -> str:
+    """📰 News digest fetch karo"""
     try:
-        data = await get_weather_and_fuel(city)
-        return (
-            f"🌤️ {city}: {data.get('condition', '—')}, {data.get('temp_c', '—')}°C\n"
-            f"⛽ पेट्रोल: ₹{data.get('petrol', '—')} | डीज़ल: ₹{data.get('diesel', '—')}"
-        )
+        from modules.news.handler import get_news_digest_text
+        news_text = await get_news_digest_text(count=5, hindi_only=True)
+        if not news_text or news_text == "अभी कोई खबर उपलब्ध नहीं है।":
+            return "📰 <b>ताज़ा खबरें</b>\n\nअभी खबरें उपलब्ध नहीं हैं।"
+        return f"📰 <b>ताज़ा खबरें</b>\n\n{news_text}"
     except Exception as e:
-        logger.error(f"weather fetch fail: {e}")
-        return "🌤️ मौसम/ईंधन जानकारी अभी उपलब्ध नहीं"
+        logger.error(f"News fetch fail: {e}")
+        return "📰 <b>ताज़ा खबरें</b>\n\n❌ खबरें लाने में त्रुटि हुई।"
 
-# ─── Rozgar/Jobs — असली मॉड्यूल से (उपलब्ध हो तो) ────────────
-async def fetch_rozgar_updates() -> str:
-    if search_jobs is None:
-        return "💼 रोज़गार मॉड्यूल अभी जुड़ा नहीं है (TODO)"
+
+async def _fetch_weather(city: str = "Kanpur") -> str:
+    """🌤️ Weather fetch karo (30 min cache — key bachane ke liye)"""
+    cache_key = f"weather:{city.lower()}"
+    cached = _cache_get(cache_key)
+    if cached:
+        return cached
+
+    if not OPENWEATHER_API_KEY:
+        return f"🌤️ <b>मौसम — {city}</b>\n\n❌ Weather API key missing"
     try:
-        jobs = await search_jobs(country="in", limit=3)
-        if not jobs:
-            return "💼 आज कोई नई नौकरी लिस्टिंग नहीं मिली"
-        lines = ["💼 रोज़गार अपडेट"]
-        for j in jobs[:3]:
-            lines.append(f"• {j.get('title', 'नौकरी')} — {j.get('company', '')}")
+        client = await _get_http_client()
+        url = (
+            f"https://api.openweathermap.org/data/2.5/weather"
+            f"?q={city}&appid={OPENWEATHER_API_KEY}&units=metric"
+        )
+        resp = await client.get(url, timeout=15)
+        data = resp.json()
+        if resp.status_code != 200:
+            return f"🌤️ <b>मौसम — {city}</b>\n\n❌ शहर नहीं मिला"
+
+        temp = data["main"]["temp"]
+        feels = data["main"]["feels_like"]
+        humidity = data["main"]["humidity"]
+        wind = data["wind"]["speed"]
+        desc = data["weather"][0]["description"].title()
+
+        result = (
+            f"🌤️ <b>मौसम — {city}</b>\n"
+            f"🌡️ तापमान: {temp}°C (महसूस: {feels}°C)\n"
+            f"💧 नमी: {humidity}%\n"
+            f"🌬️ हवा: {wind} m/s\n"
+            f"☁️ {desc}"
+        )
+        _cache_set(cache_key, result)
+        return result
+    except Exception as e:
+        logger.error(f"Weather fetch fail: {e}")
+        return f"🌤️ <b>मौसम — {city}</b>\n\n❌ त्रुटि: {str(e)[:80]}"
+
+
+async def _fetch_mandi(state: str = "Uttar Pradesh") -> str:
+    """🌾 Mandi rates fetch karo (30 min cache — key bachane ke liye)"""
+    cache_key = f"mandi:{state.lower()}"
+    cached = _cache_get(cache_key)
+    if cached:
+        return cached
+
+    if not MANDI_API_KEY:
+        return "🌾 <b>मंडी भाव</b>\n\n❌ Mandi API key missing"
+    try:
+        client = await _get_http_client()
+        params = {
+            "api-key": MANDI_API_KEY,
+            "format": "json",
+            "limit": 10,
+            "filters[state.keyword]": state
+        }
+        resp = await client.get(MANDI_BASE_URL, params=params, timeout=45)
+        data = resp.json()
+
+        if "error" in data:
+            return f"🌾 <b>मंडी भाव — {state}</b>\n\n❌ API त्रुटि"
+
+        records = data.get("records", [])
+        if not records:
+            return f"🌾 <b>मंडी भाव — {state}</b>\n\n❌ कोई डेटा नहीं मिला"
+
+        lines = [f"🌾 <b>मंडी भाव — {state}</b>\n"]
+        for i, r in enumerate(records[:5], 1):
+            commodity = r.get("commodity", "Unknown")
+            modal = r.get("modal_price", "N/A")
+            min_p = r.get("min_price", "N/A")
+            max_p = r.get("max_price", "N/A")
+            market = r.get("market", "N/A")
+            district = r.get("district", "N/A")
+            lines.append(
+                f"{i}. {commodity}\n"
+                f"   ₹{modal}/क्विंटल (₹{min_p}-₹{max_p})\n"
+                f"   📍 {market}, {district}"
+            )
+        result = "\n".join(lines)
+        _cache_set(cache_key, result)
+        return result
+    except Exception as e:
+        logger.error(f"Mandi fetch fail: {e}")
+        return f"🌾 <b>मंडी भाव</b>\n\n❌ त्रुटि: {str(e)[:80]}"
+
+
+async def _fetch_gold_silver(city: str = "delhi") -> str:
+    """🥇 Gold + Silver + Copper rates"""
+    try:
+        from modules.goldrate.handler import gold_rate_city
+        resp = await gold_rate_city(city)
+        body = json.loads(bytes(resp.body))
+        d = body.get("data", {})
+        cr = d.get("city_rates", {})
+
+        lines = [f"🥇 <b>सोना-चाँदी — {cr.get('city', city.title())}</b>\n"]
+
+        g24 = cr.get("price_gram_24k", "N/A")
+        g22 = cr.get("price_gram_22k", "N/A")
+        g10_24 = cr.get("price_10g_24k", "N/A")
+        g10_22 = cr.get("price_10g_22k", "N/A")
+
+        if g24 != "N/A":
+            lines.append(f"🟡 24K सोना (1g): ₹{g24}")
+        if g22 != "N/A":
+            lines.append(f"🟡 22K सोना (1g): ₹{g22}")
+        if g10_24 != "N/A":
+            lines.append(f"🟡 24K सोना (10g): ₹{g10_24}")
+        if g10_22 != "N/A":
+            lines.append(f"🟡 22K सोना (10g): ₹{g10_22}")
+
+        try:
+            silver = cr.get("price_silver_1kg", "N/A")
+            if silver != "N/A":
+                lines.append(f"⚪ चाँदी (1kg): ₹{silver}")
+        except:
+            pass
+
+        try:
+            copper = cr.get("price_copper_1kg", "N/A")
+            if copper != "N/A":
+                lines.append(f"🟤 ताँबा (1kg): ₹{copper}")
+        except:
+            pass
+
+        updated = d.get("last_updated", "N/A")
+        lines.append(f"\n🕐 अपडेटेड: {updated}")
+
         return "\n".join(lines)
     except Exception as e:
-        logger.error(f"rozgar fetch fail: {e}")
-        return "💼 रोज़गार जानकारी अभी उपलब्ध नहीं"
+        logger.error(f"Gold fetch fail: {e}")
+        return "🥇 <b>सोना-चाँदी</b>\n\n❌ दरें लाने में त्रुटि हुई।"
 
-# ─── बाकी मॉड्यूल अभी placeholder हैं — जैसे-जैसे बनें, ऊपर जैसे wire करें ───
-async def fetch_govt_schemes() -> str:
-    """TODO: sarkari_yojana मॉड्यूल से असली डेटा जोड़ें"""
-    return "🏛️ सरकारी योजना अपडेट (मॉड्यूल जुड़ना बाकी है)"
 
-async def fetch_banking_updates() -> str:
-    """TODO: banking मॉड्यूल से असली डेटा जोड़ें"""
-    return "🏦 बैंकिंग साप्ताहिक अपडेट (मॉड्यूल जुड़ना बाकी है)"
+async def _fetch_fuel(city: str = "delhi") -> str:
+    """⛽ Fuel prices"""
+    try:
+        from modules.fuel.handler import fuel_price
+        resp = await fuel_price(city)
+        body = json.loads(bytes(resp.body))
+        d = body.get("data", {})
 
-async def generate_social_content() -> str:
-    """TODO: aavishkar/image_gen मॉड्यूल से असली कंटेंट जोड़ें"""
-    return "📱 सोशल मीडिया कंटेंट तैयार (मॉड्यूल जुड़ना बाकी है)"
+        petrol = d.get("petrol", "N/A")
+        diesel = d.get("diesel", "N/A")
+        updated = d.get("last_updated", "N/A")
+        city_name = d.get("city", city.title())
 
-async def fetch_tender_info() -> str:
-    """TODO: govt tender पोर्टल स्क्रैपर जोड़ें"""
-    return "📋 टेंडर अलर्ट (मॉड्यूल जुड़ना बाकी है)"
+        return (
+            f"⛽ <b>ईंधन भाव — {city_name}</b>\n"
+            f"🟢 पेट्रोल: ₹{petrol}/L\n"
+            f"⚫ डीज़ल: ₹{diesel}/L\n"
+            f"🕐 अपडेटेड: {updated}"
+        )
+    except Exception as e:
+        logger.error(f"Fuel fetch fail: {e}")
+        return "⛽ <b>ईंधन भाव</b>\n\n❌ भाव लाने में त्रुटि हुई।"
 
-# ═════════════════════════════════════════════════════════════
-#                    JOB HANDLERS
-# ═════════════════════════════════════════════════════════════
+
+async def _fetch_horoscope(rashi: str = "मेष") -> str:
+    """🔮 Horoscope"""
+    try:
+        from modules.horoscope.handler import get_horoscope
+        h = get_horoscope(rashi, "daily", "hi")
+
+        prediction = h.get("prediction", "")
+        lucky = h.get("lucky_number", "")
+        lucky_color = h.get("lucky_color", "")
+
+        lines = [f"🔮 <b>राशिफल — {rashi}</b>\n"]
+        if prediction:
+            lines.append(prediction[:300])
+        if lucky:
+            lines.append(f"\n🍀 लकी नंबर: {lucky}")
+        if lucky_color:
+            lines.append(f"🎨 लकी रंग: {lucky_color}")
+
+        return "\n".join(lines)
+    except Exception as e:
+        logger.error(f"Horoscope fetch fail: {e}")
+        return f"🔮 <b>राशिफल — {rashi}</b>\n\n❌ राशिफल लाने में त्रुटि हुई।"
+
+
+async def _fetch_rozgar() -> str:
+    """💼 Rozgar/Jobs update"""
+    try:
+        from modules.rozgar import handler as rozgar_module
+        result = rozgar_module._search_keyword("government", "")
+        result = rozgar_module._filter_by_country(result, "IN")
+
+        lines = ["💼 <b>रोज़गार अपडेट</b>\n"]
+        count = 0
+        for section, label in [("govt", "🏛️ सरकारी"), ("regional", "📍 क्षेत्रीय")]:
+            for entry in result.get(section, [])[:3]:
+                name = entry.get("name", "")
+                site = entry.get("site", "")
+                if name:
+                    lines.append(f"{label}: {name} — {site}")
+                    count += 1
+
+        if count == 0:
+            lines.append("आज कोई नई भर्ती नहीं मिली।")
+
+        return "\n".join(lines)
+    except Exception as e:
+        logger.error(f"Rozgar fetch fail: {e}")
+        return "💼 <b>रोज़गार अपडेट</b>\n\n❌ जानकारी लाने में त्रुटि हुई।"
+
+
+# ═════════════════════════════════════════════════════════════════
+#                    DIGEST BUILDERS
+# ═════════════════════════════════════════════════════════════════
+
+async def build_morning_digest(
+    weather_city: str = "Kanpur",
+    mandi_state: str = "Uttar Pradesh",
+    gold_city: str = "delhi",
+    fuel_city: str = "delhi",
+    rashi: str = "मेष"
+) -> str:
+    """🌅 सुबह 7 बजे का complete digest"""
+
+    today = datetime.now().strftime("%d %b %Y, %A")
+    header = f"🌅 <b>सिंह जी मॉर्निंग डाइजेस्ट</b> — {today}\n"
+    header += "═" * 30 + "\n\n"
+
+    results = await asyncio.gather(
+        _fetch_news(),
+        _fetch_weather(weather_city),
+        _fetch_gold_silver(gold_city),
+        _fetch_fuel(fuel_city),
+        _fetch_mandi(mandi_state),
+        _fetch_horoscope(rashi),
+        return_exceptions=True
+    )
+
+    sections = []
+    for i, r in enumerate(results):
+        if isinstance(r, Exception):
+            names = ["News", "Weather", "Gold/Silver", "Fuel", "Mandi", "Horoscope"]
+            sections.append(f"❌ {names[i]}: त्रुटि हुई")
+        else:
+            sections.append(r)
+
+    separator = "\n\n" + "─" * 25 + "\n\n"
+    body = separator.join(sections)
+
+    footer = (
+        "\n\n" + "═" * 30 + "\n"
+        "🤖 <i>सिंह जी AI अल्ट्रा v8.3</i>\n"
+        "💬 कमांड्स: /news /weather /mandi /gold /fuel /horoscope"
+    )
+
+    full_message = header + body + footer
+    if len(full_message) > 4000:
+        full_message = full_message[:3990] + "\n\n... (truncated)"
+
+    return full_message
+
+
+async def build_evening_digest() -> str:
+    """🌆 शाम 6 बजे का digest"""
+
+    today = datetime.now().strftime("%d %b %Y")
+    header = f"🌆 <b>सिंह जी इवनिंग डाइजेस्ट</b> — {today}\n"
+    header += "═" * 30 + "\n\n"
+
+    results = await asyncio.gather(
+        _fetch_news(),
+        _fetch_rozgar(),
+        return_exceptions=True
+    )
+
+    sections = []
+    for i, r in enumerate(results):
+        if isinstance(r, Exception):
+            names = ["News", "Rozgar"]
+            sections.append(f"❌ {names[i]}: त्रुटि हुई")
+        else:
+            sections.append(r)
+
+    separator = "\n\n" + "─" * 25 + "\n\n"
+    body = separator.join(sections)
+
+    footer = (
+        "\n\n" + "═" * 30 + "\n"
+        "🤖 <i>सिंह जी AI अल्ट्रा v8.3</i>\n"
+        "शुभ रात्रि! 🌙"
+    )
+
+    full_message = header + body + footer
+    if len(full_message) > 4000:
+        full_message = full_message[:3990] + "\n\n... (truncated)"
+
+    return full_message
+
+
+# ═════════════════════════════════════════════════════════════════
+#                    SCHEDULER JOBS
+# ═════════════════════════════════════════════════════════════════
 
 async def job_morning_digest():
-    logger.info("🌅 Running Morning Digest...")
+    logger.info("🌅 Morning Digest started...")
     try:
-        news = await fetch_and_summarize_news("all")
-        weather = await fetch_weather_fuel()
-        message = (
-            f"🌅 *Singh Ji Morning Digest* — {datetime.now().strftime('%d %b, %A')}\n\n"
-            f"{news}\n\n{weather}\n\n— Singh Ji AI Ultra"
-        )
-        ok = await send_telegram_broadcast(message)
-        update_job_state("morning_digest", "success" if ok else "no_recipients", "Tomorrow 7:00 AM")
-        logger.info("✅ Morning Digest sent" if ok else "⚠️ Morning Digest: कोई recipient नहीं")
+        message = await build_morning_digest()
+        result = await _broadcast_message(message)
+        logger.info(f"✅ Morning Digest sent to {result['sent']}/{result['total']} users")
     except Exception as e:
         logger.error(f"❌ Morning Digest failed: {e}")
-        update_job_state("morning_digest", "failed")
+
 
 async def job_evening_digest():
-    logger.info("🌆 Running Evening Digest...")
+    logger.info("🌆 Evening Digest started...")
     try:
-        news = await fetch_and_summarize_news("all")
-        rozgar = await fetch_rozgar_updates()
-        message = (
-            f"🌆 *Singh Ji Evening Digest* — {datetime.now().strftime('%d %b')}\n\n"
-            f"{news}\n\n{rozgar}\n\n— Singh Ji AI Ultra"
-        )
-        ok = await send_telegram_broadcast(message)
-        update_job_state("evening_digest", "success" if ok else "no_recipients", "Tomorrow 6:00 PM")
-        logger.info("✅ Evening Digest sent" if ok else "⚠️ Evening Digest: कोई recipient नहीं")
+        message = await build_evening_digest()
+        result = await _broadcast_message(message)
+        logger.info(f"✅ Evening Digest sent to {result['sent']}/{result['total']} users")
     except Exception as e:
         logger.error(f"❌ Evening Digest failed: {e}")
-        update_job_state("evening_digest", "failed")
 
-async def job_govt_schemes():
-    logger.info("🏛️ Running Govt Schemes Update...")
+
+async def job_keep_alive():
+    app_url = os.getenv("APP_URL", "")
+    if not app_url:
+        logger.debug("APP_URL not set — skip keep-alive")
+        return
     try:
-        content = await fetch_govt_schemes()
-        ok = await send_telegram_broadcast(f"🏛️ *Sarkari Yojana Update*\n\n{content}")
-        update_job_state("govt_schemes", "success" if ok else "no_recipients")
+        client = await _get_http_client()
+        resp = await client.get(f"{app_url}/ping", timeout=10)
+        if resp.status_code == 200:
+            logger.debug("💓 Keep-alive ping OK")
+        else:
+            logger.warning(f"Keep-alive ping returned {resp.status_code}")
     except Exception as e:
-        logger.error(f"❌ Govt Schemes failed: {e}")
-        update_job_state("govt_schemes", "failed")
+        logger.warning(f"Keep-alive ping failed: {e}")
 
-async def job_banking_weekly():
-    logger.info("🏦 Running Banking Update...")
-    try:
-        content = await fetch_banking_updates()
-        ok = await send_telegram_broadcast(f"🏦 *Banking Weekly Update*\n\n{content}")
-        update_job_state("banking_weekly", "success" if ok else "no_recipients")
-    except Exception as e:
-        logger.error(f"❌ Banking Update failed: {e}")
-        update_job_state("banking_weekly", "failed")
 
-async def job_social_media_promo():
-    logger.info("📱 Running Social Media Promo...")
-    try:
-        content = await generate_social_content()
-        ok = await send_telegram_broadcast(f"📱 *Social Media Content Ready*\n\n{content}")
-        update_job_state("social_promo", "success" if ok else "no_recipients")
-    except Exception as e:
-        logger.error(f"❌ Social Promo failed: {e}")
-        update_job_state("social_promo", "failed")
+async def job_flood_watch():
+    logger.info("🌊 Flood Watch check...")
+    # TODO: Add actual flood alert logic using weather/meteorological APIs
+    pass
 
-async def job_monthly_tenders():
-    logger.info("📋 Running Monthly Tenders...")
-    try:
-        content = await fetch_tender_info()
-        ok = await send_telegram_broadcast(f"📋 *Monthly Tender Alert*\n\n{content}")
-        update_job_state("monthly_tenders", "success" if ok else "no_recipients")
-    except Exception as e:
-        logger.error(f"❌ Tenders failed: {e}")
-        update_job_state("monthly_tenders", "failed")
 
-# ─── Railway Sleep Prevention ────────────────────────────────
-async def self_ping():
-    app_url = os.getenv("APP_URL", "https://your-railway-url.railway.app")
-    ping_url = f"{app_url}/health"
-    try:
-        async with __import__("httpx").AsyncClient(timeout=10) as client:
-            resp = await client.get(ping_url)
-            if resp.status_code == 200:
-                logger.debug("Self-ping OK")
-            else:
-                logger.warning(f"Self-ping returned {resp.status_code}")
-    except Exception as e:
-        logger.warning(f"Self-ping failed (Railway might be sleeping): {e}")
+# ═════════════════════════════════════════════════════════════════
+#                    SCHEDULER CLASS
+# ═════════════════════════════════════════════════════════════════
 
-def job_listener(event):
-    if event.exception:
-        logger.error(f"Job {event.job_id} crashed: {event.exception}")
-    else:
-        logger.info(f"Job {event.job_id} completed")
-
-# ═════════════════════════════════════════════════════════════
-#                    SCHEDULER SETUP
-# ═════════════════════════════════════════════════════════════
-
-class SinghJiMasterScheduler:
+class UnifiedScheduler:
     def __init__(self):
         self.scheduler = AsyncIOScheduler(timezone="Asia/Kolkata")
-        self.scheduler.add_listener(job_listener, EVENT_JOB_ERROR | EVENT_JOB_EXECUTED)
-        init_db()
+        self.scheduler.add_listener(
+            lambda e: logger.error(f"Job {e.job_id} crashed: {e.exception}") if e.exception else logger.info(f"Job {e.job_id} done"),
+            EVENT_JOB_ERROR | EVENT_JOB_EXECUTED
+        )
 
     def setup_jobs(self):
         self.scheduler.add_job(
-            job_morning_digest, CronTrigger(hour=7, minute=0),
-            id="morning_digest", name="Morning News + Weather + Fuel",
-            replace_existing=True, misfire_grace_time=3600
+            job_morning_digest,
+            CronTrigger(hour=7, minute=0),
+            id="morning_digest",
+            name="🌅 Morning Digest (News+Weather+Mandi+Gold+Fuel+Horoscope)",
+            replace_existing=True,
+            misfire_grace_time=3600
         )
+
         self.scheduler.add_job(
-            job_evening_digest, CronTrigger(hour=18, minute=0),
-            id="evening_digest", name="Evening News + Rozgar",
-            replace_existing=True, misfire_grace_time=3600
+            job_evening_digest,
+            CronTrigger(hour=18, minute=0),
+            id="evening_digest",
+            name="🌆 Evening Digest (News+Rozgar)",
+            replace_existing=True,
+            misfire_grace_time=3600
         )
+
         self.scheduler.add_job(
-            job_govt_schemes, CronTrigger(day_of_week="tue,fri", hour=15, minute=0),
-            id="govt_schemes", name="Govt Schemes Update", replace_existing=True
+            job_keep_alive,
+            "interval",
+            minutes=10,
+            id="keep_alive",
+            name="💓 Railway Keep-Alive",
+            replace_existing=True
         )
+
         self.scheduler.add_job(
-            job_banking_weekly, CronTrigger(day_of_week="mon", hour=11, minute=0),
-            id="banking_weekly", name="Banking Weekly Update", replace_existing=True
+            job_flood_watch,
+            "interval",
+            hours=1,
+            id="flood_watch",
+            name="🌊 Flood Watch",
+            replace_existing=True
         )
-        self.scheduler.add_job(
-            job_social_media_promo, CronTrigger(day_of_week="mon,wed,sat", hour=10, minute=0),
-            id="social_promo", name="Social Media Promo", replace_existing=True
-        )
-        self.scheduler.add_job(
-            job_monthly_tenders, CronTrigger(day=1, hour=9, minute=0),
-            id="monthly_tenders", name="Monthly Tender Alert", replace_existing=True
-        )
-        self.scheduler.add_job(
-            self_ping, "interval", minutes=10,
-            id="self_ping", name="Railway Sleep Prevention", replace_existing=True
-        )
-        logger.info("✅ All jobs registered successfully")
+
+        logger.info("✅ All 4 jobs registered successfully")
 
     def get_status(self) -> Dict[str, Any]:
         jobs = self.scheduler.get_jobs()
-        job_list = [{
-            "id": job.id, "name": job.name,
-            "next_run": str(job.next_run_time) if job.next_run_time else None,
-            "trigger": str(job.trigger)
-        } for job in jobs]
         return {
-            "scheduler_running": self.scheduler.running,
+            "running": self.scheduler.running,
             "total_jobs": len(jobs),
-            "jobs": job_list,
+            "jobs": [
+                {
+                    "id": j.id,
+                    "name": j.name,
+                    "next_run": str(j.next_run_time) if j.next_run_time else None,
+                    "trigger": str(j.trigger)
+                }
+                for j in jobs
+            ],
             "timezone": "Asia/Kolkata"
         }
 
     async def start(self):
         if self.scheduler.running:
-            logger.info("Scheduler पहले से चल रहा है")
+            logger.info("Scheduler already running")
             return
         self.setup_jobs()
         self.scheduler.start()
-        logger.info("🚀 Singh Ji Master Scheduler STARTED")
-        for job in self.get_status()["jobs"]:
-            logger.info(f"  ⏰ {job['name']} → Next: {job['next_run']}")
+        logger.info("🚀 Unified Scheduler STARTED")
+        for j in self.get_status()["jobs"]:
+            logger.info(f"  ⏰ {j['name']} → Next: {j['next_run']}")
 
     async def stop(self):
         if self.scheduler.running:
             self.scheduler.shutdown()
-        logger.info("🛑 Singh Ji Master Scheduler STOPPED")
+            if _http_client and not _http_client.is_closed:
+                await _http_client.aclose()
+            logger.info("🛑 Unified Scheduler STOPPED")
 
 
-# ═════════════════════════════════════════════════════════════
-#   सिंगलटन — main.py और schedule control रूट दोनों यहीं से import करें
-# ═════════════════════════════════════════════════════════════
-scheduler = SinghJiMasterScheduler()
+# ═════════════════════════════════════════════════════════════════
+#                    SINGLETON INSTANCE
+# ═════════════════════════════════════════════════════════════════
+
+MASTER_SCHEDULER = UnifiedScheduler()
+
+
+# ─── Manual trigger helpers (for testing) ────────────────────────
+
+async def trigger_morning_digest_now():
+    logger.info("🧪 Manual trigger: Morning Digest")
+    await job_morning_digest()
+
+async def trigger_evening_digest_now():
+    logger.info("🧪 Manual trigger: Evening Digest")
+    await job_evening_digest()
 
 
 if __name__ == "__main__":
-    async def test_run():
-        await scheduler.start()
-        logger.info("Scheduler 5 मिनट टेस्ट मोड में चल रहा है...")
-        await asyncio.sleep(300)
-        await scheduler.stop()
+    async def test():
+        await MASTER_SCHEDULER.start()
+        print("\nScheduler running. Press Ctrl+C to stop.\n")
+        await asyncio.sleep(2)
+        await trigger_morning_digest_now()
+        while True:
+            await asyncio.sleep(60)
 
-    asyncio.run(test_run())
+    try:
+        asyncio.run(test())
+    except KeyboardInterrupt:
+        print("\nStopped.")
