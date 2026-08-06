@@ -1,176 +1,161 @@
-# telegram/buttons.py
-import logging
-from datetime import datetime
-from core.config import AVAILABLE_KEYS
-from core.swarm import SMART_SWARM
-from core.scheduler import USER_PREFERENCES
-from tg_bot.helpers import send_message
-from modules.upi.handler import UPI_ID
-from modules.govt.handler import GOVT_DATA
+# tg_bot/buttons.py
+# Singh Ji AI Ultra — Telegram Inline Keyboard Buttons
 
-logger = logging.getLogger(__name__)
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 # ==========================================
-# BUTTONS THAT NEED USER INPUT
+# MAIN MENU (2-column grid)
 # ==========================================
-INPUT_BUTTONS = {
-    "weather": ("🌤️ Weather", "City batao! (jaise: Delhi, Mumbai, Kanpur)"),
-    "mandi": ("🌾 Mandi Bhav", "State batao! (jaise: UP, Punjab, Haryana)"),
-    "tax": ("💰 Tax Calc", "Annual income batao! (jaise: 500000)"),
-    "gold": ("🥇 Gold Rate", "City batao! (default: Delhi)"),
-    "fuel": ("⛽ Fuel Price", "City batao! (default: Delhi)"),
-    "horoscope": ("🔮 Horoscope", "Rashi batao! (jaise: मेष, सिंह, तुला)"),
-    "currency": ("💱 Currency", "Format: USD INR 100"),
-    "rozgar": ("💼 Rozgar", "Keyword + Country batao! (jaise: software IN)"),
-    "search": ("🔍 Search", "Kya search karna hai?"),
-    "translate": ("🔤 Translate", "Format: en Namaste kaise ho"),
-    "yojana": ("📋 Yojana", "Format: 30 100000 farmer"),
-    "tv": ("📺 SinghJi TV", "Category batao! (educational/news/health)"),
+MAIN_KEYBOARD = InlineKeyboardMarkup([
+    [InlineKeyboardButton("🌤️ Weather", callback_data="btn_weather"),
+     InlineKeyboardButton("📰 News", callback_data="btn_news")],
+
+    [InlineKeyboardButton("🌾 Mandi Bhav", callback_data="btn_mandi"),
+     InlineKeyboardButton("🥇 Gold Rate", callback_data="btn_gold")],
+
+    [InlineKeyboardButton("⛽ Fuel Price", callback_data="btn_fuel"),
+     InlineKeyboardButton("💰 Tax Calc", callback_data="btn_tax")],
+
+    [InlineKeyboardButton("🔮 Horoscope", callback_data="btn_horoscope"),
+     InlineKeyboardButton("💼 Rozgar/Jobs", callback_data="btn_rozgar")],
+
+    [InlineKeyboardButton("💱 Currency", callback_data="btn_currency"),
+     InlineKeyboardButton("🔍 Search", callback_data="btn_search")],
+
+    [InlineKeyboardButton("🔤 Translate", callback_data="btn_translate"),
+     InlineKeyboardButton("📋 Yojana", callback_data="btn_yojana")],
+
+    [InlineKeyboardButton("📺 SinghJi TV", callback_data="btn_tv"),
+     InlineKeyboardButton("🚨 Emergency", callback_data="btn_emergency")],
+
+    [InlineKeyboardButton("💳 UPI Info", callback_data="btn_upi"),
+     InlineKeyboardButton("🏛️ Govt Services", callback_data="btn_govt")],
+
+    [InlineKeyboardButton("🛡️ Guard Agent", callback_data="btn_guard"),
+     InlineKeyboardButton("📱 Social Agent", callback_data="btn_social")],
+
+    [InlineKeyboardButton("🎤 Voice AI", callback_data="btn_voice"),
+     InlineKeyboardButton("🌿 Plant Doctor", callback_data="btn_plant")],
+
+    [InlineKeyboardButton("🤖 AI Chat", callback_data="btn_ai"),
+     InlineKeyboardButton("📊 System Status", callback_data="btn_status")],
+
+    # ✅ NEW: KYC + Agent buttons
+    [InlineKeyboardButton("📋 KYC Portal", callback_data="btn_kyc"),
+     InlineKeyboardButton("🤝 Agent Program", callback_data="btn_agent")],
+
+    [InlineKeyboardButton("🏛️ Gram Panchayat", callback_data="btn_grampanchayat"),
+     InlineKeyboardButton("💸 Withdraw", callback_data="btn_withdraw")],
+
+    [InlineKeyboardButton("❓ Help / Commands", callback_data="btn_help")],
+])
+
+# ==========================================
+# GOVT SERVICES SUBMENU
+# ==========================================
+GOVT_KEYBOARD = InlineKeyboardMarkup([
+    [InlineKeyboardButton("🆔 Aadhaar Card", callback_data="govt_aadhaar"),
+     InlineKeyboardButton("💳 PAN Card", callback_data="govt_pan")],
+
+    [InlineKeyboardButton("🛂 Passport", callback_data="govt_passport"),
+     InlineKeyboardButton("🗳️ Voter ID", callback_data="govt_voter")],
+
+    [InlineKeyboardButton("🍚 Ration Card", callback_data="govt_ration"),
+     InlineKeyboardButton("🚗 Driving License", callback_data="govt_dl")],
+
+    [InlineKeyboardButton("🏥 Ayushman Bharat", callback_data="govt_ayushman"),
+     InlineKeyboardButton("🌾 PM Kisan", callback_data="govt_pmkisan")],
+
+    [InlineKeyboardButton("📋 KYC करें", callback_data="govt_kyc"),
+     InlineKeyboardButton("🤝 Agent बनें", callback_data="govt_agent")],
+
+    [InlineKeyboardButton("⬅️ Back to Menu", callback_data="btn_back")],
+])
+
+# ==========================================
+# KYC SUBMENU
+# ==========================================
+KYC_KEYBOARD = InlineKeyboardMarkup([
+    [InlineKeyboardButton("🚀 KYC शुरू करें", callback_data="kyc_start")],
+    [InlineKeyboardButton("📊 मेरा KYC स्टेटस", callback_data="kyc_status")],
+    [InlineKeyboardButton("❓ KYC क्या है?", callback_data="kyc_help")],
+    [InlineKeyboardButton("⬅️ वापस", callback_data="btn_back")],
+])
+
+# ==========================================
+# AGENT SUBMENU
+# ==========================================
+AGENT_KEYBOARD = InlineKeyboardMarkup([
+    [InlineKeyboardButton("✅ Agent बनें", callback_data="agent_register")],
+    [InlineKeyboardButton("📊 Agent Dashboard", callback_data="agent_dashboard")],
+    [InlineKeyboardButton("📎 मेरा Referral Link", callback_data="agent_referral")],
+    [InlineKeyboardButton("💸 पैसे निकालें", callback_data="agent_withdraw")],
+    [InlineKeyboardButton("⬅️ वापस", callback_data="btn_back")],
+])
+
+# ==========================================
+# GRAM PANCHAYAT SUBMENU
+# ==========================================
+GP_KEYBOARD = InlineKeyboardMarkup([
+    [InlineKeyboardButton("📜 जाति प्रमाण पत्र", callback_data="gp_caste")],
+    [InlineKeyboardButton("🏠 निवास प्रमाण पत्र", callback_data="gp_residence")],
+    [InlineKeyboardButton("💍 विवाह प्रमाण पत्र", callback_data="gp_marriage")],
+    [InlineKeyboardButton("🌾 किसान पंजीकरण", callback_data="gp_farmer")],
+    [InlineKeyboardButton("💧 पानी कनेक्शन", callback_data="gp_water")],
+    [InlineKeyboardButton("⚡ बिजली कनेक्शन", callback_data="gp_electricity")],
+    [InlineKeyboardButton("⬅️ वापस", callback_data="btn_back")],
+])
+
+# ==========================================  
+# GOVT SERVICE DETAILS (for callback handler)
+# ==========================================
+GOVT_SERVICES = {
+    "govt_aadhaar": {
+        "title": "🆔 Aadhaar Card",
+        "phone": "1947",
+        "website": "uidai.gov.in",
+        "info": "Aadhaar enrollment, update, and download services"
+    },
+    "govt_pan": {
+        "title": "💳 PAN Card",
+        "phone": "1800-180-1961",
+        "website": "incometaxindia.gov.in",
+        "info": "PAN application, correction, and status tracking"
+    },
+    "govt_passport": {
+        "title": "🛂 Passport",
+        "phone": "1800-258-1800",
+        "website": "passportindia.gov.in",
+        "info": "Passport application, renewal, and appointment booking"
+    },
+    "govt_voter": {
+        "title": "🗳️ Voter ID",
+        "phone": "1950",
+        "website": "nvsp.in",
+        "info": "Voter registration, correction, and EPIC download"
+    },
+    "govt_ration": {
+        "title": "🍚 Ration Card",
+        "phone": "1967",
+        "website": "nfsa.gov.in",
+        "info": "Ration card application and beneficiary status"
+    },
+    "govt_dl": {
+        "title": "🚗 Driving License",
+        "phone": "1800-180-2066",
+        "website": "parivahan.gov.in",
+        "info": "DL application, renewal, and test booking"
+    },
+    "govt_ayushman": {
+        "title": "🏥 Ayushman Bharat",
+        "phone": "14555",
+        "website": "pmjay.gov.in",
+        "info": "Health insurance card and hospital locator"
+    },
+    "govt_pmkisan": {
+        "title": "🌾 PM Kisan Samman Nidhi",
+        "phone": "155261",
+        "website": "pmkisan.gov.in",
+        "info": "Farmer registration and beneficiary status"
+    },
 }
-
-# ==========================================
-# INSTANT REPLY BUTTONS
-# ==========================================
-async def handle_button(chat_id, user_id, query_data):
-    # ---- INPUT BUTTONS ----
-    if query_data in INPUT_BUTTONS:
-        label, prompt = INPUT_BUTTONS[query_data]
-        USER_PREFERENCES.setdefault(user_id, {})["waiting_for"] = query_data
-        await send_message(chat_id, f"{label}\n\n{prompt}")
-        return {"status": "ok"}
-
-    # ---- STATUS ----
-    if query_data == "status":
-        status = SMART_SWARM.get_status()
-        api_count = sum(1 for v in AVAILABLE_KEYS.values() if v)
-        text = (
-            f"📊 Singh Ji AI Status\n\n"
-            f"🤖 Agents: {status['currently_loaded']}/330\n"
-            f"⚡ Active: {status['active_running']}\n"
-            f"😴 Idle: {status['idle']}\n"
-            f"🔌 APIs: {api_count}/{len(AVAILABLE_KEYS)}\n"
-            f"👥 Users: {len(USER_PREFERENCES)}\n"
-            f"⏰ {datetime.now().strftime('%H:%M:%S')}"
-        )
-        await send_message(chat_id, text)
-        return {"status": "ok"}
-
-    # ---- NEWS ----
-    if query_data == "news":
-        try:
-            import modules.news.handler as news_module
-            text = "📰 Latest News\n\n" + await news_module.get_news_digest_text(count=5)
-            await send_message(chat_id, text)
-        except Exception as e:
-            await send_message(chat_id, f"❌ News error: {str(e)[:100]}")
-        return {"status": "ok"}
-
-    # ---- EMERGENCY ----
-    if query_data == "emergency":
-        try:
-            from modules.emergency.handler import EMERGENCY_DATA
-            emg_text = "🚨 Emergency Numbers\n\n"
-            for k, v in EMERGENCY_DATA.items():
-                emg_text += f"{k.title()}: {v['number']}"
-                if v.get("alt"):
-                    emg_text += f" / {v['alt']}"
-                emg_text += "\n"
-            await send_message(chat_id, emg_text)
-        except Exception as e:
-            await send_message(chat_id, f"Emergency error: {str(e)[:100]}")
-        return {"status": "ok"}
-
-    # ---- UPI ----
-    if query_data == "upi":
-        upi_text = (
-            f"💳 UPI Info\n\n"
-            f"UPI ID: {UPI_ID}\n"
-            f"Apps: PhonePe, Google Pay, Paytm, BHIM, Amazon Pay, Cred\n"
-            f"Daily Limit: ₹1,00,000\n"
-            f"QR: upi://pay?pa={UPI_ID}&pn=SinghJiAI"
-        )
-        await send_message(chat_id, upi_text)
-        return {"status": "ok"}
-
-    # ---- HELP ----
-    if query_data == "help":
-        help_text = (
-            "📚 Singh Ji AI Commands\n\n"
-            "🌤️ /weather Delhi\n"
-            "📰 /news\n"
-            "🌾 /mandi UP\n"
-            "💰 /tax 500000\n"
-            "🥇 /gold Delhi\n"
-            "⛽ /fuel Delhi\n"
-            "🔮 /horoscope मेष\n"
-            "💱 /currency USD INR 100\n"
-            "🔍 /search AI news\n"
-            "🔤 /translate en Namaste\n"
-            "🤖 /ai question\n"
-            "📊 /status\n"
-        )
-        await send_message(chat_id, help_text)
-        return {"status": "ok"}
-
-    # ---- AI CHAT ----
-    if query_data == "ai_chat":
-        await send_message(chat_id, "🤖 AI Chat\n\nKuch bhi poochho! Main jawab dunga.")
-        return {"status": "ok"}
-
-    # ---- VOICE ----
-    if query_data == "voice":
-        await send_message(chat_id, "🎤 Voice AI\n\nVoice message bhejo! Main transcribe karunga.")
-        return {"status": "ok"}
-
-    # ---- PLANT DOCTOR ----
-    if query_data == "plant":
-        await send_message(chat_id, "🌿 Plant Doctor\n\nPlant ki photo bhejo! Disease detect karunga.")
-        return {"status": "ok"}
-
-    # ---- GOVT SCHEMES ----
-    if query_data == "govt":
-        govt_text = "🏛️ Govt Services\n\n"
-        for key, info in GOVT_DATA.items():
-            govt_text += f"📌 {info['title']}\n   ☎️ {info['helpline']}   🌐 {info['website']}\n\n"
-        await send_message(chat_id, govt_text)
-        return {"status": "ok"}
-
-    # ---- GUARD AGENT ----
-    if query_data == "guard":
-        try:
-            from modules.guard_agent.handler import singhji_guard
-            g = singhji_guard
-            guard_text = (
-                f"🛡️ Guard Agent\n\n"
-                f"📹 Cameras: {len(g.cameras_db)}\n"
-                f"🚨 Alerts: {len(g.alerts_db)}\n"
-                f"🔍 Detection: vehicle, human, sound, face, ANPR, fire, crowd"
-            )
-            await send_message(chat_id, guard_text)
-        except Exception as e:
-            await send_message(chat_id, f"🛡️ Guard Agent\n\nStatus: Loading...\n{str(e)[:80]}")
-        return {"status": "ok"}
-
-    # ---- SOCIAL AGENT ----
-    if query_data == "social":
-        try:
-            from modules.social_agent import core as social_core
-            s = social_core.SOCIAL_AGENT
-            if s:
-                cfg = s.get_stats()["platforms_configured"]
-                live = ", ".join(p for p, v in cfg.items() if v) or "none"
-                social_text = (
-                    f"📱 Social Agent\n\n"
-                    f"📤 Posts: {len(s.posted_history)}\n"
-                    f"🟢 Live: {live}"
-                )
-            else:
-                social_text = "📱 Social Agent\n\nStatus: Initializing..."
-            await send_message(chat_id, social_text)
-        except Exception as e:
-            await send_message(chat_id, f"📱 Social Agent\n\nStatus: {str(e)[:80]}")
-        return {"status": "ok"}
-
-    # ---- DEFAULT ----
-    await send_message(chat_id, f"✅ Command received: {query_data}")
-    return {"status": "ok"}
