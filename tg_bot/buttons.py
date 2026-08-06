@@ -134,10 +134,6 @@ async def handle_button(chat_id, user_id, query_data):
             govt_text += f"📌 {info['title']}\n   ☎️ {info['helpline']}   🌐 {info['website']}\n\n"
         await send_message(chat_id, govt_text)
         return {"status": "ok"}
-        if query_data == "yojana":
-        from tg_bot.scheme_flow import start_profile_builder
-        await start_profile_builder(chat_id, user_id)
-        return {"status": "ok"}
 
     # ---- GUARD AGENT ----
     if query_data == "guard":
