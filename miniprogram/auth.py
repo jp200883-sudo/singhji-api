@@ -1,7 +1,10 @@
+cd /app/miniprogram
+
+cat > auth.py << 'PYEOF'
 """
 Singh Ji AI Ultra v8.0 — Mini-Program Auth Module
 Developer: Singh Ji
-Version: 1.0.0
+Version: 1.1.0 (Fixed)
 """
 
 import os
@@ -11,20 +14,17 @@ import uuid
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 
-# JWT Config — hardcoded fallback nahi, sirf env variable se
 SECRET_KEY = os.getenv("JWT_SECRET_KEY")
 if not SECRET_KEY:
     raise RuntimeError(
         "JWT_SECRET_KEY env variable set nahi hai! "
-        "Railway par ek strong random string set karo, warna auth insecure rahega."
+        "Railway par ek strong random string set karo."
     )
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 1 din
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24
 
 
 class AuthManager:
-    """JWT Token management"""
-    
     @staticmethod
     def create_token(data: Dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
         to_encode = data.copy()
@@ -47,22 +47,23 @@ class AuthManager:
         return hashlib.sha256(password.encode()).hexdigest()
 
 
-class MiniAuth:
-    """Mini-Program authentication"""
+def hmac_compare(a: str, b: str) -> bool:
+    import hmac as _hmac
+    return _hmac.compare_digest(a or "", b or "")
 
+
+class MiniAuth:
     @staticmethod
     async def authenticate(email: str, password: str) -> Optional[Dict]:
-        """Supabase se developer record nikalkar password_hash match karo"""
         from .storage import storage
-
+        if not storage.is_connected():
+            raise RuntimeError("Database connection nahi hai!")
         record = storage.get_record("miniprogram_developers", "email", email)
         if not record:
             return None
-
         password_hash = AuthManager.hash_password(password)
         if not hmac_compare(record.get("password_hash", ""), password_hash):
             return None
-
         return {
             "id": record.get("id"),
             "email": record.get("email"),
@@ -71,41 +72,40 @@ class MiniAuth:
         }
 
 
-def hmac_compare(a: str, b: str) -> bool:
-    """Constant-time string comparison (timing-attack se bachne ke liye)"""
-    import hmac as _hmac
-    return _hmac.compare_digest(a or "", b or "")
-
-
 class DeveloperAuth:
-    """Developer authentication helper"""
-
     @staticmethod
-    async def register(email: str, password: str, name: str = "", supabase=None):
-        """Register new developer — Supabase mein save karo"""
+    async def register(email: str, password: str, full_name: str = "",
+                       company_name: str = "", phone: str = ""):
         from .storage import storage
-
+        if not storage.is_connected():
+            return {
+                "status": "error",
+                "message": "Database connection nahi hai! Server admin se contact karo."
+            }
         existing = storage.get_record("miniprogram_developers", "email", email)
         if existing:
             return {
                 "status": "error",
                 "message": "Ye email pehle se registered hai!"
             }
-
         dev_id = str(uuid.uuid4())
         record = storage.insert_record("miniprogram_developers", {
             "id": dev_id,
             "email": email,
             "password_hash": AuthManager.hash_password(password),
-            "full_name": name or "Developer"
+            "full_name": full_name or "Developer",
+            "company_name": company_name or None,
+            "phone": phone or None,
+            "is_active": True,
+            "is_verified": False,
+            "is_premium": False,
+            "created_at": datetime.utcnow().isoformat()
         })
-
         if not record:
             return {
                 "status": "error",
                 "message": "Registration fail ho gaya, dobara try karo."
             }
-
         return {
             "status": "success",
             "developer_id": dev_id,
@@ -115,11 +115,9 @@ class DeveloperAuth:
 
     @staticmethod
     async def login(email: str, password: str):
-        """Login developer — password asli verify hota hai ab"""
         developer = await MiniAuth.authenticate(email, password)
         if not developer:
             raise ValueError("Email ya password galat hai!")
-
         token = AuthManager.create_token({
             "sub": developer["id"],
             "email": developer["email"],
@@ -135,7 +133,6 @@ class DeveloperAuth:
     
     @staticmethod
     async def refresh_token(token: str):
-        """Refresh JWT token"""
         payload = AuthManager.verify_token(token)
         new_token = AuthManager.create_token({
             "sub": payload["sub"],
@@ -146,13 +143,12 @@ class DeveloperAuth:
 
 
 async def get_current_developer(token: str = None):
-    """Get current developer from token"""
     if not token:
         raise ValueError("Token required!")
-    
     payload = AuthManager.verify_token(token)
     return {
         "id": payload.get("sub"),
         "email": payload.get("email"),
         "role": payload.get("role", "developer")
     }
+PYEOF
