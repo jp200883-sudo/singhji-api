@@ -1,11 +1,3 @@
-python3 -c "
-portal_code = '''
-\"\"\"
-Singh Ji AI Ultra v8.0 — Mini-Program Portal API
-Developer: Singh Ji
-Version: 1.1.0 (Fixed)
-\"\"\"
-
 from fastapi import APIRouter, HTTPException, Form, Depends, Request
 from typing import Optional, Dict, Any
 import json
