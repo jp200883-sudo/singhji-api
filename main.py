@@ -16,8 +16,8 @@ from core.config import (
     RATE_LIMIT_GLOBAL, 
     RATE_LIMIT_STRICT, 
     APP_URL,
-    TELEGRAM_TOKEN,      # ✅ यह जोड़ें
-    ADMIN_USER_ID        # ✅ यह जोड़ें
+    TELEGRAM_TOKEN,    
+    ADMIN_USER_ID        
 )
 from core.database import SUPABASE_CLIENT
 from core.rate_limit import _init_rate_limit, _is_rate_limited
@@ -36,6 +36,8 @@ from api.payment import router as payment_router
 from api.video import router as video_router
 from api.social import router as social_router, set_http_client as set_social_http_client
 from api.ai import router as ai_router, set_http_client as set_ai_http_client
+from api.agent_payment import app as agent_payment_app
+
 
 # ==========================================
 # TELEGRAM WEBHOOK (tg_bot/ — replaces old telegram/ folder)
@@ -216,6 +218,7 @@ app.include_router(ai_router, prefix="/api/ai")
 app.include_router(telegram_router, prefix="/telegram")
 from miniprogram.portal import router as miniprogram_router
 app.include_router(miniprogram_router)
+app.mount("/api/agent", agent_payment_app)
 
 # ==========================================
 # ROOT ENDPOINTS
