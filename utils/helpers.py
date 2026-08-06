@@ -89,6 +89,8 @@ MAIN_KEYBOARD = {
         [{"text": "🔤 Translate", "callback_data": "translate"}, {"text": "📋 Yojana", "callback_data": "yojana"}],
         [{"text": "📺 SinghJi TV", "callback_data": "tv"}, {"text": "🚨 Emergency", "callback_data": "emergency"}],
         [{"text": "💳 UPI Info", "callback_data": "upi"}, {"text": "🏛️ Govt Services", "callback_data": "govt"}],
+        [{"text": "📋 KYC Portal", "callback_data": "kyc"}, {"text": "🤝 Agent Program", "callback_data": "agent"}],
+        [{"text": "🏛️ Gram Panchayat", "callback_data": "grampanchayat"}, {"text": "💸 Withdraw", "callback_data": "withdraw"}],
         [{"text": "🛡️ Guard Agent", "callback_data": "guard"}, {"text": "📱 Social Agent", "callback_data": "social"}],
         [{"text": "🎤 Voice AI", "callback_data": "voice"}, {"text": "🌿 Plant Doctor", "callback_data": "plant"}],
         [{"text": "🤖 AI Chat", "callback_data": "ai_chat"}, {"text": "📊 System Status", "callback_data": "status"}],
