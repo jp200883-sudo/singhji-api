@@ -1,4 +1,4 @@
-# core/scheduler.py (FINAL FIXED VERSION)
+# core/scheduler.py (FINAL FIXED VERSION — Mandi + Govt Schemes wired, 7 Aug 2026)
 import os
 import sqlite3
 import asyncio
@@ -10,7 +10,7 @@ from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 from apscheduler.events import EVENT_JOB_ERROR, EVENT_JOB_EXECUTED
 
-from core.config import MANDI_API_KEY, MANDI_BASE_URL, OPENWEATHER_API_KEY, APP_URL
+from core.config import DATAGOVINDIA_API_KEY, OPENWEATHER_API_KEY, APP_URL
 from core.database import SUPABASE_CLIENT
 from core.swarm import SMART_SWARM
 from utils.helpers import _normalize_state
@@ -146,12 +146,16 @@ class SinghJiMasterScheduler:
             return "Weather fetch failed"
 
     async def _fetch_mandi(self, state="Uttar Pradesh", limit=5):
-        if not MANDI_API_KEY:
+        # FIXED 7 Aug 2026: pehle MANDI_API_KEY/MANDI_BASE_URL (unset) pe depend tha,
+        # ab DATAGOVINDIA_API_KEY + resource_id use karta hai (api/mandi.py wale fix jaisa)
+        if not DATAGOVINDIA_API_KEY:
             return "Mandi API key missing"
         try:
             normalized = _normalize_state(state)
-            params = {"api-key": MANDI_API_KEY, "format": "json", "limit": limit, "filters[state.keyword]": normalized}
-            r = await self.http.get(MANDI_BASE_URL, params=params, timeout=45)
+            resource_id = "9ef84268-d588-465a-a308-a864a43d0070"  # Variety-wise Daily Market Prices
+            url = f"https://api.data.gov.in/resource/{resource_id}"
+            params = {"api-key": DATAGOVINDIA_API_KEY, "format": "json", "limit": limit, "filters[state.keyword]": normalized}
+            r = await self.http.get(url, params=params, timeout=45)
             data = r.json()
             if "error" in data:
                 return f"Mandi API error: {data.get('error', 'Unknown')}"
@@ -183,31 +187,42 @@ class SinghJiMasterScheduler:
     # ==============================================================
     async def _job_flood_watch(self):
         logger.info("🌊 Running Flood Watch...")
-        # TODO: यहाँ flood_watch मॉड्यूल लॉजिक डालें
+        # TODO: yahan flood_watch module logic dalein
         await self._broadcast_with_rate_limit("🌊 *Flood Watch Alert*\n\nआज किसी भी नदी/बांध पर कोई खतरा नहीं है।")
         self._update_state("flood_watch", "success")
 
     async def _job_govt_schemes(self):
         logger.info("🏛️ Running Govt Schemes Update...")
-        # TODO: यहाँ govt_schemes मॉड्यूल लॉजिक डालें
-        await self._broadcast_with_rate_limit("🏛️ *Sarkari Yojana Update*\n\nआज की मुख्य सरकारी योजनाएं:\n• प्रधानमंत्री आवास योजना (PMAY)")
+        # FIXED 7 Aug 2026: pehle sirf hardcoded static text bhejta tha,
+        # ab asli modules/govt_schemes/schemes.py se live data leta hai (fallback ke saath)
+        try:
+            import modules.govt_schemes.schemes as govt_schemes_module
+            schemes = govt_schemes_module.list_schemes()
+            lines = ["🏛️ *Sarkari Yojana Update*\n", "आज की मुख्य सरकारी योजनाएं:"]
+            for key in list(schemes)[:5]:
+                lines.append(f"• {key}")
+            msg = "\n".join(lines)
+        except Exception as e:
+            logger.warning(f"Govt schemes live fetch failed, using fallback: {e}")
+            msg = "🏛️ *Sarkari Yojana Update*\n\nआज की मुख्य सरकारी योजनाएं:\n• प्रधानमंत्री आवास योजना (PMAY)"
+        await self._broadcast_with_rate_limit(msg)
         self._update_state("govt_schemes", "success")
 
     async def _job_banking_weekly(self):
         logger.info("🏦 Running Banking Update...")
-        # TODO: यहाँ banking मॉड्यूल लॉजिक डालें
+        # TODO: yahan banking module logic dalein
         await self._broadcast_with_rate_limit("🏦 *Banking Weekly Update*\n\nसप्ताह का मुख्य बैंकिंग अपडेट:\n• होम लोन की ब्याज दरों में बढ़ोतरी")
         self._update_state("banking_weekly", "success")
 
     async def _job_social_media_promo(self):
         logger.info("📱 Running Social Media Promo...")
-        # TODO: यहाँ social मॉड्यूल लॉजिक डालें
+        # TODO: yahan social module logic dalein
         await self._broadcast_with_rate_limit("📱 *Social Media Content Ready*\n\nआज के लिए टॉप 3 ट्रेंडिंग टॉपिक्स:\n1. Tech News\n2. Bollywood")
         self._update_state("social_promo", "success")
 
     async def _job_monthly_tenders(self):
         logger.info("📋 Running Monthly Tenders...")
-        # TODO: यहाँ tender मॉड्यूल लॉजिक डालें
+        # TODO: yahan tender module logic dalein
         await self._broadcast_with_rate_limit("📋 *Monthly Tender Alert*\n\nइस महीने के मुख्य सरकारी टेंडर:\n• सड़क निर्माण (NHAI)")
         self._update_state("monthly_tenders", "success")
 
@@ -262,7 +277,7 @@ class SinghJiMasterScheduler:
             {"id": "morning_digest", "func": self._job_morning_digest, "trigger": CronTrigger(hour=7, minute=0), "name": "Morning Digest", "misfire_grace_time": 3600},
             {"id": "evening_digest", "func": self._job_evening_digest, "trigger": CronTrigger(hour=18, minute=0), "name": "Evening Digest", "misfire_grace_time": 3600},
             {"id": "self_ping", "func": self._self_ping, "trigger": IntervalTrigger(minutes=30), "name": "Keep Alive"},
-            
+
             # RESTORED 5 JOBS ADDED HERE
             {"id": "flood_watch", "func": self._job_flood_watch, "trigger": CronTrigger(hour=8, minute=0), "name": "Flood Watch"},
             {"id": "govt_schemes", "func": self._job_govt_schemes, "trigger": CronTrigger(day_of_week="tue,fri", hour=15, minute=0), "name": "Govt Schemes"},
