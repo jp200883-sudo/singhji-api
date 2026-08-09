@@ -99,13 +99,20 @@ class ResponseJudge:
         r"aapki seva mein", r"kya main aapki",
         r"as an ai", r"i am an ai", r"i don't have",
         r"i cannot", r"i'm unable to", r"i apologize",
+        r"i'm sorry", r"i regret", r"i am unable",
+        r"how can i help", r"how may i assist",
+        r"is there anything else", r"feel free to ask",
     ]
 
     NATURAL_WORDS = [
         "bhai", "yaar", "dost", "samajh", "pata", "chhod",
         "dekh", "sach", "matlab", "bas", "theek", "hoga",
         "kar le", "chal", "ruk", "sun", "arre", "abe",
-        "kya baat", "mast", "bindaas", "jhakaas", "bawaal"
+        "kya baat", "mast", "bindaas", "jhakaas", "bawaal",
+        "haina", "na", "toh", "hi", "hai", "tha", "thi",
+        "kya", "kaise", "kyun", "kab", "kahan", "kaun",
+        "arey", "han", "nahi", "haan", "hmm", "acha",
+        "thik", "sahi", "galat", "badiya", "bekar"
     ]
 
     @classmethod
@@ -123,12 +130,9 @@ class ResponseJudge:
             if word in text_lower:
                 score += 4
 
-        # Penalty for emojis / smileys
-        emoji_count = len(re.findall(
-            r"[😀-🙏🌀-🗿"
-            r"🚀-🛿🇠-🇿"
-            r"✂-➰Ⓜ-🉑]", text))
-        score -= emoji_count * 20
+        # Penalty for emojis / Unicode symbols
+        emoji_count = sum(1 for ch in text if ord(ch) > 127 and not (\u0900 <= ord(ch) <= \u097F))
+        score -= emoji_count * 10
 
         # Penalty for ASCII smileys
         smiley_count = len(re.findall(r'[:;]-?[)(DdPpSsOo@#$%^&*]', text))
@@ -139,7 +143,7 @@ class ResponseJudge:
             score -= 10
 
         # Bonus for Hinglish (Devanagari + ASCII mix)
-        dev_chars = len(re.findall(r'[ऀ-ॿ]', text))
+        dev_chars = len(re.findall(r'[\u0900-\u097F]', text))
         ascii_chars = len(re.findall(r'[a-zA-Z]', text))
         if dev_chars > 3 and ascii_chars > 3:
             score += 12  # Good Hinglish
@@ -182,12 +186,17 @@ def clean_response(text: str) -> str:
     if not text:
         return "Haan bhai, kuch toh bola lekin samajh nahi aaya. Dobara bol."
 
-    # Remove emojis
-    text = re.sub(
-        r"[😀-🙏🌀-🗿"
-        r"🚀-🛿🇠-🇿"
-        r"✂-➰Ⓜ-🉑]+",
-        "", text, flags=re.UNICODE)
+    # Remove emojis and non-Devanagari Unicode symbols
+    cleaned = []
+    for ch in text:
+        code = ord(ch)
+        # Keep ASCII, Devanagari, basic punctuation, whitespace
+        if code <= 127 or (0x0900 <= code <= 0x097F):
+            cleaned.append(ch)
+        elif ch in '.,!?;:'"()- \\n\t':
+            cleaned.append(ch)
+        # Skip everything else (emojis, symbols, etc.)
+    text = ''.join(cleaned)
 
     # Remove ASCII smileys
     text = re.sub(r'[:;]-?[)(DdPpSsOo@#$%^&*]', '', text)
@@ -208,8 +217,11 @@ def clean_response(text: str) -> str:
         (r"(?i)i\s+apologize\s*,?\s*", "arre koi baat nahi, "),
         (r"(?i)i\s+cannot\s*,?\s*", "main nahi kar sakta, "),
         (r"(?i)i'm\s+unable\s+to\s*,?\s*", "main nahi kar pa raha, "),
+        (r"(?i)i\s+am\s+unable\s+to\s*,?\s*", "main nahi kar pa raha, "),
         (r"(?i)how\s+can\s+i\s+assist\s+you\s*\??", "bata kya chahiye?"),
         (r"(?i)how\s+may\s+i\s+help\s+you\s*\??", "bata kya kaam hai?"),
+        (r"(?i)is\s+there\s+anything\s+else\s*\??", "aur kuch chahiye toh bata."),
+        (r"(?i)feel\s+free\s+to\s+ask\s*,?\s*", ""),
     ]
 
     for pattern, replacement in robotic_replacements:
@@ -241,6 +253,9 @@ class MultiAIBrain:
 
     async def _call_groq(self, prompt: str, system: str) -> Optional[ScoredResponse]:
         """Call Groq API (Llama 3.3 70B)."""
+        if not HTTP_CLIENT:
+            logger.warning("HTTP_CLIENT not set for Groq")
+            return None
         start = time.time()
         try:
             resp = await HTTP_CLIENT.post(
@@ -278,6 +293,9 @@ class MultiAIBrain:
 
     async def _call_gemini(self, prompt: str, system: str) -> Optional[ScoredResponse]:
         """Call Google Gemini 1.5 Flash."""
+        if not HTTP_CLIENT:
+            logger.warning("HTTP_CLIENT not set for Gemini")
+            return None
         start = time.time()
         try:
             url = (f"https://generativelanguage.googleapis.com/v1beta/"
@@ -312,7 +330,7 @@ class MultiAIBrain:
 
     async def _call_cerebras(self, prompt: str, system: str) -> Optional[ScoredResponse]:
         """Call Cerebras API."""
-        if not CEREBRAS_API_KEY:
+        if not HTTP_CLIENT or not CEREBRAS_API_KEY:
             return None
         start = time.time()
         try:
@@ -349,11 +367,10 @@ class MultiAIBrain:
     async def _call_huggingface(self, prompt: str, system: str) -> Optional[ScoredResponse]:
         """Call Hugging Face Inference API (fallback)."""
         hf_key = os.getenv("HUGGINGFACE_API_KEY", "")
-        if not hf_key:
+        if not HTTP_CLIENT or not hf_key:
             return None
         start = time.time()
         try:
-            # Using a good instruction-tuned model
             url = ("https://api-inference.huggingface.co/models/"
                    "mistralai/Mistral-7B-Instruct-v0.3")
             full_prompt = f"<s>[INST] {system}\n\nUser: {prompt} [/INST]"
@@ -386,7 +403,7 @@ class MultiAIBrain:
     async def _call_local(self, prompt: str, system: str) -> Optional[ScoredResponse]:
         """Call local AI server if configured."""
         local_url = os.getenv("LOCAL_AI_URL", "")
-        if not local_url:
+        if not HTTP_CLIENT or not local_url:
             return None
         start = time.time()
         try:
@@ -414,6 +431,13 @@ class MultiAIBrain:
         Call ALL available AI models concurrently.
         Pick the response with highest human-likeness score.
         """
+        if not HTTP_CLIENT:
+            return {
+                "status": "error",
+                "response": "Bhai HTTP client set nahi hai. Server restart kar.",
+                "source": "NO_HTTP_CLIENT"
+            }
+
         # Build system prompt with user context
         system = HUMAN_SYSTEM_PROMPT
 
@@ -445,10 +469,17 @@ class MultiAIBrain:
             }
 
         # Run all calls concurrently, with overall timeout
-        results = await asyncio.wait_for(
-            asyncio.gather(*tasks, return_exceptions=True),
-            timeout=self.max_total_time
-        )
+        try:
+            results = await asyncio.wait_for(
+                asyncio.gather(*tasks, return_exceptions=True),
+                timeout=self.max_total_time
+            )
+        except asyncio.TimeoutError:
+            return {
+                "status": "error",
+                "response": "Bhai sab AI services slow hain. Thodi der baad try kar.",
+                "source": "TIMEOUT"
+            }
 
         # Filter valid responses
         valid_responses: List[ScoredResponse] = []
@@ -476,7 +507,7 @@ class MultiAIBrain:
         # Log the competition
         logger.info("=== AI RESPONSE COMPETITION ===")
         for i, r in enumerate(valid_responses):
-            marker = "🏆" if i == 0 else "  "
+            marker = "[WIN]" if i == 0 else "[   ]"
             logger.info(f"{marker} [{r.source}] HumanScore={r.human_score:.1f} | "
                        f"Latency={r.latency:.2f}s | Len={len(r.text)} | "
                        f"Text: {r.text[:80]}...")
@@ -519,13 +550,33 @@ def get_brain() -> MultiAIBrain:
 
 
 # ═══════════════════════════════════════════════════════════════
+#  STANDALONE HELPER — Direct use without class
+# ═══════════════════════════════════════════════════════════════
+
+async def ask(prompt: str, user_id: str = "anonymous") -> str:
+    """Simple helper — just returns the best response text."""
+    brain = get_brain()
+    result = await brain.get_best_response(prompt, user_id)
+    if result.get("status") == "success":
+        return result.get("response", "")
+    return result.get("response", "Bhai kuch gadbad ho gayi.")
+
+
+# ═══════════════════════════════════════════════════════════════
 #  API ENDPOINTS
 # ═══════════════════════════════════════════════════════════════
 
 @router.post("/api/chat")
 async def ai_chat(request: Request):
     """Main chat endpoint — uses multi-model brain."""
-    data = await request.json()
+    try:
+        data = await request.json()
+    except Exception:
+        return JSONResponse(
+            status_code=400,
+            content={"status": "error", "response": "Bhai JSON body bhej."}
+        )
+
     prompt = data.get("prompt", "").strip()
     model = data.get("model", "auto")
     user_id = data.get("user_id", "anonymous")
@@ -541,11 +592,14 @@ async def ai_chat(request: Request):
     cache_key = None
     if not is_personal:
         cache_key = _cache_key("ai_chat", model, prompt[:120])
-        cached = await _cache_get(cache_key)
-        if cached:
-            cached["source"] = "CACHE"
-            cached["human_score"] = 99.0
-            return cached
+        try:
+            cached = await _cache_get(cache_key)
+            if cached:
+                cached["source"] = "CACHE"
+                cached["human_score"] = 99.0
+                return cached
+        except Exception as e:
+            logger.warning(f"Cache get failed: {e}")
 
     # Get best response from multi-model brain
     brain = get_brain()
@@ -561,7 +615,7 @@ async def ai_chat(request: Request):
     return result
 
 
-# ---- WHISPER (unchanged) ----
+# ---- WHISPER ----
 _whisper_model = None
 
 def _get_whisper_model():
@@ -592,7 +646,11 @@ def _transcribe_sync(audio_bytes: bytes, suffix: str, language=None):
 
 @router.post("/api/whisper/transcribe")
 async def whisper_transcribe(request: Request):
-    data = await request.json()
+    try:
+        data = await request.json()
+    except Exception:
+        return JSONResponse(status_code=400, content={"error": "Invalid JSON"})
+
     audio_b64 = data.get("audio_base64", "")
     language = data.get("language")
     if not audio_b64:
@@ -617,7 +675,7 @@ async def whisper_transcribe(request: Request):
         return {"error": str(e)}
 
 
-# ---- TTS (unchanged) ----
+# ---- TTS ----
 def _tts_sync(text: str, lang: str) -> bytes:
     from gtts import gTTS
     import io
@@ -630,7 +688,11 @@ def _tts_sync(text: str, lang: str) -> bytes:
 
 @router.post("/api/tts")
 async def text_to_speech(request: Request):
-    data = await request.json()
+    try:
+        data = await request.json()
+    except Exception:
+        return JSONResponse(status_code=400, content={"error": "Invalid JSON"})
+
     text = data.get("text", "")
     lang = data.get("lang", "hi")
     if not text:
