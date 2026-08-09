@@ -193,7 +193,7 @@ def clean_response(text: str) -> str:
         # Keep ASCII, Devanagari, basic punctuation, whitespace
         if code <= 127 or (0x0900 <= code <= 0x097F):
             cleaned.append(ch)
-        elif ch in '.,!?;:'"()- \\n\t':
+        elif ch in ".,!?;:'\"()- \n\t":
             cleaned.append(ch)
         # Skip everything else (emojis, symbols, etc.)
     text = ''.join(cleaned)
