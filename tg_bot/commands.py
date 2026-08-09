@@ -795,29 +795,52 @@ async def handle_command(chat_id, user_id, text):
         await send_message(chat_id, upi_text)
         return {"status": "ok"}
 
-    # ---- AI CHAT ----
+      # ---- AI CHAT ----
     if text.startswith("/ai "):
         prompt = text.replace("/ai ", "").strip()
         if not prompt:
             await send_message(chat_id, "❌ Please provide a question. Example: /ai India ka capital kya hai?")
             return {"status": "ok"}
 
-        if GROQ_API_KEY:
-            try:
-                from api.ai import _call_groq
-                await send_message(chat_id, "🤔 Thinking...")
-                ai_response = await _call_groq(prompt)
-                await send_message(chat_id, f"🤖 AI Response:\n\n{ai_response[:4000]}")
+        try:
+            from api.ai import get_brain
+            await send_message(chat_id, "🤔 Thinking...")
+            brain = get_brain()
+            result = await brain.get_best_response(prompt, str(user_id))
+
+            if result.get("status") == "success":
+                ai_response = result.get("response", "Bhai kuch gadbad ho gayi.")
+                source = result.get("source", "UNKNOWN")
+                human_score = result.get("human_score", 0)
+                latency = result.get("latency_sec", 0)
+
+                # Truncate if too long for Telegram
+                ai_response = ai_response[:4000]
+
+                reply_text = ai_response
+                await send_message(chat_id, reply_text)
+
+                # Save to memory with full metadata
                 await _memory_save(
                     f"telegram_chat:{user_id}:{int(datetime.now().timestamp())}",
-                    {"prompt": prompt, "response": ai_response}
+                    {
+                        "prompt": prompt,
+                        "response": ai_response,
+                        "source": source,
+                        "human_score": human_score,
+                        "latency_sec": latency,
+                        "all_scores": result.get("all_scores", {}),
+                        "all_sources": result.get("all_sources", [])
+                    }
                 )
-            except Exception as e:
-                await send_message(chat_id, f"❌ AI Error: {str(e)[:100]}")
-        else:
-            await send_message(chat_id, "❌ Groq API key missing")
-        return {"status": "ok"}
+            else:
+                error_msg = result.get("response", "Kuch gadbad ho gayi.")
+                await send_message(chat_id, f"❌ AI Error: {error_msg}")
 
+        except Exception as e:
+            logger.error(f"AI chat error: {e}")
+            await send_message(chat_id, f"❌ AI Error: {str(e)[:200]}")
+        return {"status": "ok"}
     # ---- BROADCAST (Admin only) ----
     if text.startswith("/broadcast "):
         if user_id != ADMIN_USER_ID:
