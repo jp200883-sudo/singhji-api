@@ -71,7 +71,7 @@ MODULES = {
     "gmail": {"needs_key": "GMAIL", "active": AVAILABLE_KEYS["GMAIL"]},
     "swarm": {"needs_key": None, "active": True},
     "telegram_bot": {"needs_key": "TELEGRAM", "active": AVAILABLE_KEYS["TELEGRAM"]},
-    "ai_chat": {"needs_key": "GROQ", "active": AVAILABLE_KEYS["GROQ"] or AVAILABLE_KEYS["GEMINI"]},
+    "ai_chat": {"needs_key": "MULTI_AI", "active": AVAILABLE_KEYS["GROQ"] or AVAILABLE_KEYS["GEMINI"] or AVAILABLE_KEYS["CEREBRAS"]},
     "bhashini": {"needs_key": "BHASHINI", "active": AVAILABLE_KEYS["BHASHINI"]},
     "supabase_memory": {"needs_key": "SUPABASE", "active": AVAILABLE_KEYS["SUPABASE"]},
     "whatsapp": {"needs_key": None, "active": True},
@@ -79,21 +79,22 @@ MODULES = {
 }
 
 # ---- MAIN KEYBOARD ----
+# NOTE: No emojis — clean text only for human-like feel
 MAIN_KEYBOARD = {
     "inline_keyboard": [
-        [{"text": "🌤️ Weather", "callback_data": "weather"}, {"text": "📰 News", "callback_data": "news"}],
-        [{"text": "🌾 Mandi Bhav", "callback_data": "mandi"}, {"text": "🥇 Gold Rate", "callback_data": "gold"}],
-        [{"text": "⛽ Fuel Price", "callback_data": "fuel"}, {"text": "💰 Tax Calc", "callback_data": "tax"}],
-        [{"text": "🔮 Horoscope", "callback_data": "horoscope"}, {"text": "💼 Rozgar/Jobs", "callback_data": "rozgar"}],
-        [{"text": "💱 Currency", "callback_data": "currency"}, {"text": "🔍 Search", "callback_data": "search"}],
-        [{"text": "🔤 Translate", "callback_data": "translate"}, {"text": "📋 Yojana", "callback_data": "yojana"}],
-        [{"text": "📺 SinghJi TV", "callback_data": "tv"}, {"text": "🚨 Emergency", "callback_data": "emergency"}],
-        [{"text": "💳 UPI Info", "callback_data": "upi"}, {"text": "🏛️ Govt Services", "callback_data": "govt"}],
-        [{"text": "📋 KYC Portal", "callback_data": "kyc"}, {"text": "🤝 Agent Program", "callback_data": "agent"}],
-        [{"text": "🏛️ Gram Panchayat", "callback_data": "grampanchayat"}, {"text": "💸 Withdraw", "callback_data": "withdraw"}],
-        [{"text": "🛡️ Guard Agent", "callback_data": "guard"}, {"text": "📱 Social Agent", "callback_data": "social"}],
-        [{"text": "🎤 Voice AI", "callback_data": "voice"}, {"text": "🌿 Plant Doctor", "callback_data": "plant"}],
-        [{"text": "🤖 AI Chat", "callback_data": "ai_chat"}, {"text": "📊 System Status", "callback_data": "status"}],
-        [{"text": "❓ Help / Commands", "callback_data": "help"}],
+        [{"text": "Weather", "callback_data": "weather"}, {"text": "News", "callback_data": "news"}],
+        [{"text": "Mandi Bhav", "callback_data": "mandi"}, {"text": "Gold Rate", "callback_data": "gold"}],
+        [{"text": "Fuel Price", "callback_data": "fuel"}, {"text": "Tax Calc", "callback_data": "tax"}],
+        [{"text": "Horoscope", "callback_data": "horoscope"}, {"text": "Rozgar/Jobs", "callback_data": "rozgar"}],
+        [{"text": "Currency", "callback_data": "currency"}, {"text": "Search", "callback_data": "search"}],
+        [{"text": "Translate", "callback_data": "translate"}, {"text": "Yojana", "callback_data": "yojana"}],
+        [{"text": "SinghJi TV", "callback_data": "tv"}, {"text": "Emergency", "callback_data": "emergency"}],
+        [{"text": "UPI Info", "callback_data": "upi"}, {"text": "Govt Services", "callback_data": "govt"}],
+        [{"text": "KYC Portal", "callback_data": "kyc"}, {"text": "Agent Program", "callback_data": "agent"}],
+        [{"text": "Gram Panchayat", "callback_data": "grampanchayat"}, {"text": "Withdraw", "callback_data": "withdraw"}],
+        [{"text": "Guard Agent", "callback_data": "guard"}, {"text": "Social Agent", "callback_data": "social"}],
+        [{"text": "Voice AI", "callback_data": "voice"}, {"text": "Plant Doctor", "callback_data": "plant"}],
+        [{"text": "AI Chat", "callback_data": "ai_chat"}, {"text": "System Status", "callback_data": "status"}],
+        [{"text": "Help / Commands", "callback_data": "help"}],
     ]
 }
