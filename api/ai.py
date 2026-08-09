@@ -131,7 +131,7 @@ class ResponseJudge:
                 score += 4
 
         # Penalty for emojis / Unicode symbols
-        emoji_count = sum(1 for ch in text if ord(ch) > 127 and not (\u0900 <= ord(ch) <= \u097F))
+        emoji_count = sum(1 for ch in text if ord(ch) > 127 and not (0x0900 <= ord(ch) <= 0x097F))
         score -= emoji_count * 10
 
         # Penalty for ASCII smileys
