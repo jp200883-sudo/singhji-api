@@ -1,28 +1,60 @@
 services:
   - type: web
-    name: singhji-agent-swarm
+    name: singhji-api
     runtime: docker
-    plan: standard
-    envVars:
-      - key: PYTHON_VERSION
-        value: 3.11
-      - key: UVICORN_WORKERS
-        value: 4
-      - key: MAX_AGENTS
-        value: 300
-      - key: MAX_STEPS
-        value: 4000
-      - key: CLAW_GROUPS
-        value: 11
-      - key: REDIS_URL
-        fromService:
-          name: singhji-redis
-          type: redis
-          property: connectionString
-    healthCheckPath: /health
-    autoDeploy: true
-
-  - type: redis
-    name: singhji-redis
+    repo: https://github.com/jp200883-sudo/singhji-api
     plan: free
-    ipAllowList: []
+    healthCheckPath: /
+    envVars:
+      - key: CEREBRAS_API_KEY
+        sync: false
+      - key: CF_ACCOUNT_ID
+        sync: false
+      - key: CF_API_TOKEN
+        sync: false
+      - key: CURRENTS_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: HUGGINGFACE_TOKEN
+        sync: false
+      - key: MAGIC_HOUR_API_KEY
+        sync: false
+      - key: MANDI_API_KEY
+        sync: false
+      - key: MONGO_URL
+        sync: false
+      - key: NEWSDATA_API_KEY
+        sync: false
+      - key: OPENWEATHER_API_KEY
+        sync: false
+      - key: PLANT_ID_API
+        sync: false
+      - key: PLANT_ID_URL
+        sync: false
+      - key: PYTHON_VERSION
+        sync: false
+      - key: RAPIDAPI_KEY
+        sync: false
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: TAVILY_API_KEY
+        sync: false
+      - key: TAVILY_URL
+        sync: false
+      - key: TELEGRAM_TOKEN
+        sync: false
+      - key: TWILIO_SID
+        sync: false
+      - key: TWILIO_TOKEN
+        sync: false
+      - key: TZ
+        sync: false
