@@ -16,20 +16,46 @@ from utils.helpers import _normalize_state
 
 logger = logging.getLogger(__name__)
 
-USER_PREFERENCES = {}
+# ==============================================================
+#  GLOBALS (needed by main.py)
+# ==============================================================
 MASTER_SCHEDULER = None
+USER_PREFERENCES = {}
 
 # ==============================================================
 #  COMMODITY API CONFIG
 # ==============================================================
 GOLD_API_KEY = os.getenv("GOLD_API_KEY", "")
 SILVER_API_KEY = os.getenv("SILVER_API_KEY", "")
-# Free APIs — no key needed
-COPPER_API_URL = "https://api.metals.live/v1/spot"
-IRON_API_URL = "https://api.metals.live/v1/spot"
-ALUMINIUM_API_URL = "https://api.metals.live/v1/spot"
-FUEL_API_URL = "https://daily-petrol-diesel-lpg-cng-fuel-prices-in-india.p.rapidapi.com/v1/fuel-prices/today"
 
+# ==============================================================
+#  USER PREFERENCES LOADER (needed by main.py)
+# ==============================================================
+def _load_user_preferences_sync() -> Dict[int, Any]:
+    """Load user preferences from Supabase"""
+    loaded: Dict[int, Any] = {}
+    if not SUPABASE_CLIENT:
+        logger.warning("Supabase not connected")
+        return loaded
+    try:
+        resp = SUPABASE_CLIENT.table("user_memory").select("*").execute()
+        for row in (resp.data or []):
+            key = row.get("key", "")
+            if not key.startswith("user_pref:"):
+                continue
+            try:
+                uid = int(key.split(":", 1)[1])
+            except (IndexError, ValueError):
+                continue
+            loaded[uid] = row.get("value") or {"language": "hi", "location": None}
+        logger.info(f"Loaded {len(loaded)} subscribers from Supabase")
+    except Exception as e:
+        logger.error(f"User preferences reload failed: {e}")
+    return loaded
+
+# ==============================================================
+#  SCHEDULER CLASS
+# ==============================================================
 class SinghJiMasterScheduler:
     def __init__(self, http_client, telegram_send_func, api_keys, modules, user_preferences, admin_user_id=0):
         self.http = http_client
@@ -87,9 +113,6 @@ class SinghJiMasterScheduler:
             logger.info(f"Job {event.job_id} completed successfully")
             self._update_state(event.job_id, "success")
 
-    # ==============================================================
-    #  BROADCAST
-    # ==============================================================
     async def _broadcast_with_rate_limit(self, message, parse_mode="Markdown"):
         if not self.users:
             logger.warning("No users to broadcast to")
@@ -113,9 +136,7 @@ class SinghJiMasterScheduler:
     #  FETCH FUNCTIONS — ALL COMMODITIES
     # ==============================================================
     async def _fetch_gold(self):
-        """Gold rate fetch — free API fallback"""
         try:
-            # Try free API first
             url = "https://www.goldapi.io/api/XAU/INR"
             headers = {"x-access-token": GOLD_API_KEY} if GOLD_API_KEY else {}
             r = await self.http.get(url, headers=headers, timeout=10)
@@ -132,11 +153,9 @@ class SinghJiMasterScheduler:
                 )
         except Exception as e:
             logger.warning(f"Gold API failed: {e}")
-        # Fallback: static with timestamp
-        return f"🥇 *Gold Rate (Kanpur)*\n\n24K (1g): ₹7,650\n22K (1g): ₹7,015\n\n⚠️ Live API failed — static rate shown"
+        return f"🥇 *Gold Rate (Kanpur)*\n\n24K (1g): ₹7,650\n22K (1g): ₹7,015\n\n⚠️ Live API failed"
 
     async def _fetch_silver(self):
-        """Silver rate fetch"""
         try:
             url = "https://www.goldapi.io/api/XAG/INR"
             headers = {"x-access-token": SILVER_API_KEY} if SILVER_API_KEY else {}
@@ -153,65 +172,46 @@ class SinghJiMasterScheduler:
                 )
         except Exception as e:
             logger.warning(f"Silver API failed: {e}")
-        return f"🥈 *Silver Rate (Kanpur)*\n\n1g: ₹92.50\n10g: ₹925\n1kg: ₹92,500\n\n⚠️ Live API failed — static rate shown"
+        return f"🥈 *Silver Rate (Kanpur)*\n\n1g: ₹92.50\n10g: ₹925\n1kg: ₹92,500\n\n⚠️ Live API failed"
 
     async def _fetch_copper(self):
-        """Copper rate fetch"""
         try:
-            # Using metals.live free API
             url = "https://api.metals.live/v1/spot"
             r = await self.http.get(url, timeout=10)
             if r.status_code == 200:
                 data = r.json()
                 copper = data.get("copper", 0)
-                return (
-                    f"🔶 *Copper Rate*\n\n"
-                    f"Spot: ${copper:.4f}/lb\n"
-                    f"Updated: {datetime.now().strftime('%H:%M')}"
-                )
+                return f"🔶 *Copper Rate*\n\nSpot: ${copper:.4f}/lb\nUpdated: {datetime.now().strftime('%H:%M')}"
         except Exception as e:
             logger.warning(f"Copper API failed: {e}")
-        return f"🔶 *Copper Rate*\n\nSpot: $4.15/lb\n\n⚠️ Live API failed — static rate shown"
+        return f"🔶 *Copper Rate*\n\nSpot: $4.15/lb\n\n⚠️ Live API failed"
 
     async def _fetch_iron(self):
-        """Iron/Steel rate fetch"""
         try:
-            # Using steel price index
             url = "https://api.metals.live/v1/spot"
             r = await self.http.get(url, timeout=10)
             if r.status_code == 200:
                 data = r.json()
                 iron = data.get("iron", 0)
-                return (
-                    f"⚫ *Iron/Steel Rate*\n\n"
-                    f"Spot: ${iron:.2f}/tonne\n"
-                    f"Updated: {datetime.now().strftime('%H:%M')}"
-                )
+                return f"⚫ *Iron/Steel Rate*\n\nSpot: ${iron:.2f}/tonne\nUpdated: {datetime.now().strftime('%H:%M')}"
         except Exception as e:
             logger.warning(f"Iron API failed: {e}")
-        return f"⚫ *Iron/Steel Rate*\n\nTMT Bars (10mm): ₹58,500/tonne\nMS Plates: ₹52,000/tonne\n\n⚠️ Live API failed — static rate shown"
+        return f"⚫ *Iron/Steel Rate*\n\nTMT Bars (10mm): ₹58,500/tonne\nMS Plates: ₹52,000/tonne\n\n⚠️ Live API failed"
 
     async def _fetch_aluminium(self):
-        """Aluminium rate fetch"""
         try:
             url = "https://api.metals.live/v1/spot"
             r = await self.http.get(url, timeout=10)
             if r.status_code == 200:
                 data = r.json()
                 aluminium = data.get("aluminium", 0)
-                return (
-                    f"🔷 *Aluminium Rate*\n\n"
-                    f"Spot: ${aluminium:.4f}/lb\n"
-                    f"Updated: {datetime.now().strftime('%H:%M')}"
-                )
+                return f"🔷 *Aluminium Rate*\n\nSpot: ${aluminium:.4f}/lb\nUpdated: {datetime.now().strftime('%H:%M')}"
         except Exception as e:
             logger.warning(f"Aluminium API failed: {e}")
-        return f"🔷 *Aluminium Rate*\n\nSpot: $1.05/lb\n\n⚠️ Live API failed — static rate shown"
+        return f"🔷 *Aluminium Rate*\n\nSpot: $1.05/lb\n\n⚠️ Live API failed"
 
     async def _fetch_fuel(self):
-        """Petrol + Diesel + CNG rates"""
         try:
-            # Using Indian fuel price API
             url = "https://daily-petrol-diesel-lpg-cng-fuel-prices-in-india.p.rapidapi.com/v1/fuel-prices/today"
             headers = {
                 "X-RapidAPI-Key": os.getenv("RAPIDAPI_KEY", ""),
@@ -238,7 +238,7 @@ class SinghJiMasterScheduler:
             f"🛢️ Petrol: ₹96.50/L\n"
             f"🛢️ Diesel: ₹89.75/L\n"
             f"🔥 CNG: ₹82.00/kg\n"
-            f"\n⚠️ Live API failed — static rate shown"
+            f"\n⚠️ Live API failed"
         )
 
     async def _fetch_news(self, count=5):
@@ -309,7 +309,6 @@ class SinghJiMasterScheduler:
     #  JOBS
     # ==============================================================
     async def _job_morning_digest_555(self):
-        """5:55 AM — News + Weather + Mandi"""
         logger.info("Morning Digest (5:55 AM) starting...")
         news = await self._fetch_news(5)
         weather = await self._fetch_weather("Delhi")
@@ -327,7 +326,6 @@ class SinghJiMasterScheduler:
         logger.info("Morning Digest (5:55 AM) completed")
 
     async def _job_commodity_digest_655(self):
-        """6:55 AM — Gold + Silver + Copper + Iron + Aluminium + Fuel"""
         logger.info("Commodity Digest (6:55 AM) starting...")
         gold = await self._fetch_gold()
         silver = await self._fetch_silver()
@@ -351,7 +349,6 @@ class SinghJiMasterScheduler:
         logger.info("Commodity Digest (6:55 AM) completed")
 
     async def _job_evening_digest(self):
-        """6:00 PM — News + Rozgar"""
         logger.info("Evening Digest (6:00 PM) starting...")
         news = await self._fetch_news(5)
         msg = (
@@ -365,7 +362,6 @@ class SinghJiMasterScheduler:
         logger.info("Evening Digest (6:00 PM) completed")
 
     async def _self_ping(self):
-        """Keep Render awake — every 15 minutes"""
         if not APP_URL:
             return
         try:
@@ -382,7 +378,6 @@ class SinghJiMasterScheduler:
     # ==============================================================
     def setup(self):
         jobs = [
-            # 5:55 AM — Morning Digest (News + Weather + Mandi)
             {
                 "id": "morning_digest_555",
                 "func": self._job_morning_digest_555,
@@ -390,7 +385,6 @@ class SinghJiMasterScheduler:
                 "name": "Morning Digest (5:55 AM)",
                 "misfire_grace_time": 3600
             },
-            # 6:55 AM — Commodity Digest (Gold + Silver + Copper + Iron + Aluminium + Fuel)
             {
                 "id": "commodity_digest_655",
                 "func": self._job_commodity_digest_655,
@@ -398,7 +392,6 @@ class SinghJiMasterScheduler:
                 "name": "Commodity Digest (6:55 AM)",
                 "misfire_grace_time": 3600
             },
-            # 6:00 PM — Evening Digest (News)
             {
                 "id": "evening_digest",
                 "func": self._job_evening_digest,
@@ -406,7 +399,6 @@ class SinghJiMasterScheduler:
                 "name": "Evening Digest (6:00 PM)",
                 "misfire_grace_time": 3600
             },
-            # Self-ping every 15 minutes (Render keep-alive)
             {
                 "id": "self_ping",
                 "func": self._self_ping,
