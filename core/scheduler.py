@@ -16,23 +16,13 @@ from utils.helpers import _normalize_state
 
 logger = logging.getLogger(__name__)
 
-# ==============================================================
-#  GLOBALS (needed by main.py)
-# ==============================================================
 MASTER_SCHEDULER = None
 USER_PREFERENCES = {}
 
-# ==============================================================
-#  COMMODITY API CONFIG
-# ==============================================================
 GOLD_API_KEY = os.getenv("GOLD_API_KEY", "")
 SILVER_API_KEY = os.getenv("SILVER_API_KEY", "")
 
-# ==============================================================
-#  USER PREFERENCES LOADER (needed by main.py)
-# ==============================================================
 def _load_user_preferences_sync() -> Dict[int, Any]:
-    """Load user preferences from Supabase"""
     loaded: Dict[int, Any] = {}
     if not SUPABASE_CLIENT:
         logger.warning("Supabase not connected")
@@ -53,9 +43,6 @@ def _load_user_preferences_sync() -> Dict[int, Any]:
         logger.error(f"User preferences reload failed: {e}")
     return loaded
 
-# ==============================================================
-#  SCHEDULER CLASS
-# ==============================================================
 class SinghJiMasterScheduler:
     def __init__(self, http_client, telegram_send_func, api_keys, modules, user_preferences, admin_user_id=0):
         self.http = http_client
@@ -133,7 +120,7 @@ class SinghJiMasterScheduler:
         logger.info(f"Broadcast sent to {success_count}/{len(user_ids)} users")
 
     # ==============================================================
-    #  FETCH FUNCTIONS — ALL COMMODITIES
+    #  FETCH FUNCTIONS
     # ==============================================================
     async def _fetch_gold(self):
         try:
@@ -361,7 +348,11 @@ class SinghJiMasterScheduler:
         self._update_state("evening_digest", "success", "Tomorrow 06:00 PM")
         logger.info("Evening Digest (6:00 PM) completed")
 
+    # ==============================================================
+    #  KEEP ALIVE — 10 MIN BEFORE SCHEDULE
+    # ==============================================================
     async def _self_ping(self):
+        """Keep Render awake — every 10 min (before 5:55 AM & 6:55 AM)"""
         if not APP_URL:
             return
         try:
@@ -373,11 +364,24 @@ class SinghJiMasterScheduler:
         except Exception as e:
             logger.warning(f"Self-ping failed: {e}")
 
+    async def _pre_morning_ping(self):
+        """Extra ping at 5:45 AM — 10 min before Morning Digest"""
+        logger.info("Pre-morning ping at 5:45 AM...")
+        await self._self_ping()
+        logger.info("Pre-morning ping done — server awake for 5:55 AM digest")
+
+    async def _pre_commodity_ping(self):
+        """Extra ping at 6:45 AM — 10 min before Commodity Digest"""
+        logger.info("Pre-commodity ping at 6:45 AM...")
+        await self._self_ping()
+        logger.info("Pre-commodity ping done — server awake for 6:55 AM digest")
+
     # ==============================================================
-    #  SETUP ALL JOBS
+    #  SETUP ALL JOBS — v9.1
     # ==============================================================
     def setup(self):
         jobs = [
+            # === MAIN DIGESTS ===
             {
                 "id": "morning_digest_555",
                 "func": self._job_morning_digest_555,
@@ -399,12 +403,27 @@ class SinghJiMasterScheduler:
                 "name": "Evening Digest (6:00 PM)",
                 "misfire_grace_time": 3600
             },
+            # === KEEP ALIVE — 10 MIN BEFORE SCHEDULE ===
             {
                 "id": "self_ping",
                 "func": self._self_ping,
-                "trigger": IntervalTrigger(minutes=15),
-                "name": "Keep Alive (15 min)",
+                "trigger": IntervalTrigger(minutes=10),  # ← 10 min (was 15)
+                "name": "Keep Alive (10 min)",
                 "misfire_grace_time": 60
+            },
+            {
+                "id": "pre_morning_ping",
+                "func": self._pre_morning_ping,
+                "trigger": CronTrigger(hour=5, minute=45),  # ← 10 min before 5:55
+                "name": "Pre-Morning Ping (5:45 AM)",
+                "misfire_grace_time": 300
+            },
+            {
+                "id": "pre_commodity_ping",
+                "func": self._pre_commodity_ping,
+                "trigger": CronTrigger(hour=6, minute=45),  # ← 10 min before 6:55
+                "name": "Pre-Commodity Ping (6:45 AM)",
+                "misfire_grace_time": 300
             },
         ]
         for job_config in jobs:
@@ -421,14 +440,14 @@ class SinghJiMasterScheduler:
     async def start(self):
         self.setup()
         self.scheduler.start()
-        logger.info("✅ Master Scheduler v9.0 STARTED")
+        logger.info("✅ Master Scheduler v9.1 STARTED")
         for job in self.scheduler.get_jobs():
             nxt = str(job.next_run_time) if job.next_run_time else "N/A"
             logger.info(f"   📌 {job.name} -> {nxt}")
 
     async def stop(self):
         self.scheduler.shutdown()
-        logger.info("🛑 Master Scheduler v9.0 STOPPED")
+        logger.info("🛑 Master Scheduler v9.1 STOPPED")
 
     def get_status(self):
         jobs = []
