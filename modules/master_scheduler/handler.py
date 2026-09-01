@@ -1,25 +1,21 @@
-"""
-Singh Ji AI Ultra v9.0 — UNIFIED MASTER SCHEDULER
-File: core/scheduler.py
-Features: Aaj Ka Vichar (6AM) + Morning Digest (7AM) + Evening Digest (6PM) + Keep Alive + Flood Watch
-"""
 
 import os
 import json
 import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
 
 import httpx
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.date import DateTrigger
 from apscheduler.events import EVENT_JOB_ERROR, EVENT_JOB_EXECUTED
 
 logger = logging.getLogger("SinghJi.Scheduler")
 
 # ═════════════════════════════════════════════════════════════════
-# SAFE CONFIG IMPORTS — Kabhi error nahi aayega
+# SAFE CONFIG IMPORTS
 # ═════════════════════════════════════════════════════════════════
 
 try:
@@ -35,7 +31,6 @@ except ImportError:
     TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
     APP_URL = os.getenv("APP_URL", "")
 
-# Extra safe fallback for any missing config vars
 DATAGOVINDIA_API_KEY = os.getenv("DATAGOVINDIA_API_KEY", "")
 
 # ═════════════════════════════════════════════════════════════════
@@ -52,7 +47,53 @@ async def _get_http_client() -> httpx.AsyncClient:
 
 
 # ═════════════════════════════════════════════════════════════════
-# AAJ KA VICHAR — Fresh AI Quote Daily
+# SMART PING SYSTEM — 5 MIN BEFORE EACH SCHEDULED JOB
+# ═════════════════════════════════════════════════════════════════
+
+async def _smart_ping():
+    """Ping ONLY when called — no automatic interval"""
+    if not APP_URL:
+        logger.debug("APP_URL not set — skip smart ping")
+        return
+    try:
+        client = await _get_http_client()
+        resp = await client.get(f"{APP_URL}/ping", timeout=10)
+        if resp.status_code == 200:
+            logger.info(f"Smart Ping OK — {datetime.now().strftime('%H:%M:%S')}")
+        else:
+            logger.warning(f"Smart Ping returned {resp.status_code}")
+    except Exception as e:
+        logger.warning(f"Smart Ping failed: {e}")
+
+def _schedule_smart_ping(scheduler: AsyncIOScheduler, target_hour: int, target_minute: int, job_name: str):
+    """
+    Schedule a ping exactly 5 minutes before the target job
+    Example: target 6:00 AM → ping at 5:55 AM
+    """
+    ping_minute = target_minute - 5
+    ping_hour = target_hour
+    if ping_minute < 0:
+        ping_minute += 60
+        ping_hour -= 1
+        if ping_hour < 0:
+            ping_hour += 24
+    
+    ping_time = f"{ping_hour:02d}:{ping_minute:02d}"
+    job_id = f"smart_ping_{job_name}"
+    
+    scheduler.add_job(
+        _smart_ping,
+        CronTrigger(hour=ping_hour, minute=ping_minute),
+        id=job_id,
+        name=f"Smart Ping {ping_time} for {job_name}",
+        replace_existing=True,
+        misfire_grace_time=300
+    )
+    logger.info(f"Smart Ping scheduled: {ping_time} → {job_name} ({target_hour:02d}:{target_minute:02d})")
+
+
+# ═════════════════════════════════════════════════════════════════
+# AAJ KA VICHAR
 # ═════════════════════════════════════════════════════════════════
 
 _FALLBACK_VICHAR = [
@@ -87,11 +128,11 @@ async def _fetch_fresh_vichar_from_ai() -> str:
         data = resp.json()
         quote = data.get("choices", [{}])[0].get("message", {}).get("content", "").strip().strip('"').strip("'")
         if quote and len(quote) > 10:
-            logger.info(f"Fresh vichar from AI: {quote[:60]}...")
+            logger.info(f"Fresh vichar: {quote[:60]}...")
             return quote
         return ""
     except Exception as e:
-        logger.warning(f"AI vichar fetch fail: {e}")
+        logger.warning(f"AI vichar fail: {e}")
         return ""
 
 async def _get_aaj_ka_vichar() -> str:
@@ -144,7 +185,7 @@ async def _get_subscriber_chat_ids() -> List[int]:
 async def _broadcast_message(text: str) -> Dict[str, Any]:
     chat_ids = await _get_subscriber_chat_ids()
     if not chat_ids:
-        logger.warning("No subscribers found")
+        logger.warning("No subscribers")
         return {"sent": 0, "failed": 0, "total": 0}
     sent, failed = 0, 0
     for cid in chat_ids:
@@ -153,7 +194,7 @@ async def _broadcast_message(text: str) -> Dict[str, Any]:
         else:
             failed += 1
         await asyncio.sleep(0.1)
-    logger.info(f"Broadcast complete — Sent: {sent}, Failed: {failed}")
+    logger.info(f"Broadcast: Sent {sent}, Failed {failed}")
     return {"sent": sent, "failed": failed, "total": len(chat_ids)}
 
 
@@ -174,7 +215,7 @@ async def _fetch_news() -> str:
 
 async def _fetch_weather(city: str = "Kanpur") -> str:
     if not OPENWEATHER_API_KEY:
-        return f"MAUSAM — {city}\n\nWeather API key missing."
+        return f"MAUSAM — {city}\n\nAPI key missing."
     try:
         client = await _get_http_client()
         url = f"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={OPENWEATHER_API_KEY}&units=metric"
@@ -189,12 +230,12 @@ async def _fetch_weather(city: str = "Kanpur") -> str:
         desc = data["weather"][0]["description"].title()
         return f"MAUSAM — {city}\nTapman: {temp}C (Mehsoos: {feels}C)\nNami: {humidity}%\nHawa: {wind} m/s\n{desc}"
     except Exception as e:
-        logger.error(f"Weather fetch fail: {e}")
+        logger.error(f"Weather fail: {e}")
         return f"MAUSAM — {city}\n\nTruti hui."
 
 async def _fetch_mandi(state: str = "Uttar Pradesh") -> str:
     if not MANDI_API_KEY:
-        return "MANDI BHAV\n\nMandi API key missing."
+        return "MANDI BHAV\n\nAPI key missing."
     try:
         client = await _get_http_client()
         params = {"api-key": MANDI_API_KEY, "format": "json", "limit": 10, "filters[state.keyword]": state}
@@ -204,7 +245,7 @@ async def _fetch_mandi(state: str = "Uttar Pradesh") -> str:
             return f"MANDI BHAV — {state}\n\nAPI truti."
         records = data.get("records", [])
         if not records:
-            return f"MANDI BHAV — {state}\n\nKoi data nahi mila."
+            return f"MANDI BHAV — {state}\n\nKoi data nahi."
         lines = [f"MANDI BHAV — {state}"]
         for i, r in enumerate(records[:5], 1):
             commodity = r.get("commodity", "Unknown")
@@ -216,7 +257,7 @@ async def _fetch_mandi(state: str = "Uttar Pradesh") -> str:
             lines.append(f"{i}. {commodity} — Rs{modal}/quintal (Rs{min_p}-Rs{max_p}) | {market}, {district}")
         return "\n".join(lines)
     except Exception as e:
-        logger.error(f"Mandi fetch fail: {e}")
+        logger.error(f"Mandi fail: {e}")
         return "MANDI BHAV\n\nTruti hui."
 
 async def _fetch_gold_silver(city: str = "delhi") -> str:
@@ -243,8 +284,8 @@ async def _fetch_gold_silver(city: str = "delhi") -> str:
         lines.append(f"Updated: {updated}")
         return "\n".join(lines)
     except Exception as e:
-        logger.error(f"Gold fetch fail: {e}")
-        return "SONA-CHAANDI\n\nDaren lane mein truti hui."
+        logger.error(f"Gold fail: {e}")
+        return "SONA-CHAANDI\n\nTruti hui."
 
 async def _fetch_fuel(city: str = "delhi") -> str:
     try:
@@ -258,8 +299,8 @@ async def _fetch_fuel(city: str = "delhi") -> str:
         city_name = d.get("city", city.title())
         return f"INDHAN BHAV — {city_name}\nPetrol: Rs{petrol}/L\nDiesel: Rs{diesel}/L\nUpdated: {updated}"
     except Exception as e:
-        logger.error(f"Fuel fetch fail: {e}")
-        return "INDHAN BHAV\n\nBhav lane mein truti hui."
+        logger.error(f"Fuel fail: {e}")
+        return "INDHAN BHAV\n\nTruti hui."
 
 async def _fetch_horoscope(rashi: str = "Mesh") -> str:
     try:
@@ -277,8 +318,8 @@ async def _fetch_horoscope(rashi: str = "Mesh") -> str:
             lines.append(f"Lucky Rang: {lucky_color}")
         return "\n".join(lines)
     except Exception as e:
-        logger.error(f"Horoscope fetch fail: {e}")
-        return f"RASHIFAL — {rashi}\n\nRashifal lane mein truti hui."
+        logger.error(f"Horoscope fail: {e}")
+        return f"RASHIFAL — {rashi}\n\nTruti hui."
 
 async def _fetch_rozgar() -> str:
     try:
@@ -295,11 +336,11 @@ async def _fetch_rozgar() -> str:
                     lines.append(f"{label}: {name} — {site}")
                     count += 1
         if count == 0:
-            lines.append("Aaj koi nayi bharti nahi mili.")
+            lines.append("Aaj koi nayi bharti nahi.")
         return "\n".join(lines)
     except Exception as e:
-        logger.error(f"Rozgar fetch fail: {e}")
-        return "ROZGAR UPDATE\n\nJankari lane mein truti hui."
+        logger.error(f"Rozgar fail: {e}")
+        return "ROZGAR UPDATE\n\nTruti hui."
 
 
 # ═════════════════════════════════════════════════════════════════
@@ -321,15 +362,15 @@ async def build_morning_digest(
         return_exceptions=True
     )
     sections = []
+    names = ["News", "Weather", "Gold/Silver", "Fuel", "Mandi", "Horoscope"]
     for i, r in enumerate(results):
         if isinstance(r, Exception):
-            names = ["News", "Weather", "Gold/Silver", "Fuel", "Mandi", "Horoscope"]
             sections.append(f"{names[i]}: Truti hui")
         else:
             sections.append(r)
     separator = "\n\n" + "-" * 25 + "\n\n"
     body = separator.join(sections)
-    footer = "\n\n" + "=" * 30 + "\nSingh Ji AI Ultra v9.0\nCommands: /news /weather /mandi /gold /fuel /horoscope"
+    footer = "\n\n" + "=" * 30 + "\nSingh Ji AI Ultra v11.0\nCommands: /news /weather /mandi /gold /fuel /horoscope"
     full = header + body + footer
     return full[:3990] + "\n\n... (truncated)" if len(full) > 4000 else full
 
@@ -338,15 +379,15 @@ async def build_evening_digest() -> str:
     header = f"Singh Ji Evening Digest — {today}\n" + "=" * 30 + "\n\n"
     results = await asyncio.gather(_fetch_news(), _fetch_rozgar(), return_exceptions=True)
     sections = []
+    names = ["News", "Rozgar"]
     for i, r in enumerate(results):
         if isinstance(r, Exception):
-            names = ["News", "Rozgar"]
             sections.append(f"{names[i]}: Truti hui")
         else:
             sections.append(r)
     separator = "\n\n" + "-" * 25 + "\n\n"
     body = separator.join(sections)
-    footer = "\n\n" + "=" * 30 + "\nSingh Ji AI Ultra v9.0\nShubh Ratri!"
+    footer = "\n\n" + "=" * 30 + "\nSingh Ji AI Ultra v11.0\nShubh Ratri!"
     full = header + body + footer
     return full[:3990] + "\n\n... (truncated)" if len(full) > 4000 else full
 
@@ -356,58 +397,49 @@ async def build_evening_digest() -> str:
 # ═════════════════════════════════════════════════════════════════
 
 async def job_aaj_ka_vichar():
-    logger.info("Aaj Ka Vichar started...")
+    logger.info("=== Aaj Ka Vichar START ===")
     try:
         today = datetime.now().strftime("%d %b %Y, %A")
         vichar = await _get_aaj_ka_vichar()
-        message = f"Aaj Ka Vichar — {today}\n" + "=" * 30 + f"\n\n\"{vichar}\"\n\nSingh Ji AI Ultra v9.0\nPoora Digest 7 baje aayega..."
+        message = f"Aaj Ka Vichar — {today}\n" + "=" * 30 + f"\n\n\"{vichar}\"\n\nSingh Ji AI Ultra v11.0\nPoora Digest 7 baje aayega..."
         result = await _broadcast_message(message)
-        logger.info(f"Aaj Ka Vichar sent to {result['sent']}/{result['total']} users")
+        logger.info(f"Aaj Ka Vichar: {result['sent']}/{result['total']} users")
     except Exception as e:
         logger.error(f"Aaj Ka Vichar failed: {e}")
 
 async def job_morning_digest():
-    logger.info("Morning Digest started...")
+    logger.info("=== Morning Digest START ===")
     try:
         message = await build_morning_digest()
         result = await _broadcast_message(message)
-        logger.info(f"Morning Digest sent to {result['sent']}/{result['total']} users")
+        logger.info(f"Morning Digest: {result['sent']}/{result['total']} users")
     except Exception as e:
         logger.error(f"Morning Digest failed: {e}")
 
 async def job_evening_digest():
-    logger.info("Evening Digest started...")
+    logger.info("=== Evening Digest START ===")
     try:
         message = await build_evening_digest()
         result = await _broadcast_message(message)
-        logger.info(f"Evening Digest sent to {result['sent']}/{result['total']} users")
+        logger.info(f"Evening Digest: {result['sent']}/{result['total']} users")
     except Exception as e:
         logger.error(f"Evening Digest failed: {e}")
 
-async def job_keep_alive():
-    if not APP_URL:
-        logger.debug("APP_URL not set — skip keep-alive")
-        return
-    try:
-        client = await _get_http_client()
-        resp = await client.get(f"{APP_URL}/ping", timeout=10)
-        if resp.status_code == 200:
-            logger.debug("Keep-alive ping OK")
-        else:
-            logger.warning(f"Keep-alive ping returned {resp.status_code}")
-    except Exception as e:
-        logger.warning(f"Keep-alive ping failed: {e}")
-
 async def job_flood_watch():
-    logger.info("Flood Watch check...")
+    logger.info("=== Flood Watch START ===")
+    # TODO: Implement actual flood monitoring
     pass
 
 
 # ═════════════════════════════════════════════════════════════════
-# SCHEDULER CLASS
+# SMART PING SCHEDULER CLASS
 # ═════════════════════════════════════════════════════════════════
 
-class UnifiedScheduler:
+class SmartPingScheduler:
+    """
+    Smart Ping v11.0 — NO interval keep-alive
+    Only pings 5 minutes BEFORE each scheduled job
+    """
     def __init__(self):
         self.scheduler = AsyncIOScheduler(timezone="Asia/Kolkata")
         self.scheduler.add_listener(
@@ -415,21 +447,83 @@ class UnifiedScheduler:
             EVENT_JOB_ERROR | EVENT_JOB_EXECUTED
         )
 
+    def setup_smart_pings(self):
+        """
+        Schedule smart pings for ALL jobs
+        Each ping runs exactly 5 minutes before the target job
+        """
+        # Aaj Ka Vichar at 6:00 AM → Ping at 5:55 AM
+        _schedule_smart_ping(self.scheduler, 6, 0, "aaj_ka_vichar")
+        
+        # Morning Digest at 7:00 AM → Ping at 6:55 AM
+        _schedule_smart_ping(self.scheduler, 7, 0, "morning_digest")
+        
+        # Evening Digest at 6:00 PM → Ping at 5:55 PM
+        _schedule_smart_ping(self.scheduler, 18, 0, "evening_digest")
+        
+        # Flood Watch every hour — NO smart ping (too frequent)
+        # If you want smart ping for hourly jobs, tell me
+        
+        logger.info("Smart Pings scheduled for all digest jobs")
+
     def setup_jobs(self):
-        self.scheduler.add_job(job_aaj_ka_vichar, CronTrigger(hour=6, minute=0), id="aaj_ka_vichar", name="Aaj Ka Vichar 6AM", replace_existing=True, misfire_grace_time=1800)
-        self.scheduler.add_job(job_morning_digest, CronTrigger(hour=7, minute=0), id="morning_digest", name="Morning Digest 7AM", replace_existing=True, misfire_grace_time=3600)
-        self.scheduler.add_job(job_evening_digest, CronTrigger(hour=18, minute=0), id="evening_digest", name="Evening Digest 6PM", replace_existing=True, misfire_grace_time=3600)
-        self.scheduler.add_job(job_keep_alive, "interval", minutes=30, id="keep_alive", name="Keep-Alive 30min", replace_existing=True)
-        self.scheduler.add_job(job_flood_watch, "interval", hours=1, id="flood_watch", name="Flood Watch 1hr", replace_existing=True)
-        logger.info("All 5 jobs registered")
+        # Main digest jobs
+        self.scheduler.add_job(
+            job_aaj_ka_vichar, 
+            CronTrigger(hour=6, minute=0), 
+            id="aaj_ka_vichar", 
+            name="Aaj Ka Vichar 6AM", 
+            replace_existing=True, 
+            misfire_grace_time=1800
+        )
+        self.scheduler.add_job(
+            job_morning_digest, 
+            CronTrigger(hour=7, minute=0), 
+            id="morning_digest", 
+            name="Morning Digest 7AM", 
+            replace_existing=True, 
+            misfire_grace_time=3600
+        )
+        self.scheduler.add_job(
+            job_evening_digest, 
+            CronTrigger(hour=18, minute=0), 
+            id="evening_digest", 
+            name="Evening Digest 6PM", 
+            replace_existing=True, 
+            misfire_grace_time=3600
+        )
+        
+        # Flood Watch — hourly, no smart ping needed (too frequent)
+        self.scheduler.add_job(
+            job_flood_watch, 
+            "interval", 
+            hours=1, 
+            id="flood_watch", 
+            name="Flood Watch 1hr", 
+            replace_existing=True
+        )
+        
+        # Setup smart pings for digest jobs
+        self.setup_smart_pings()
+        
+        logger.info("All jobs registered (NO keep-alive interval)")
 
     def get_status(self) -> Dict[str, Any]:
         jobs = self.scheduler.get_jobs()
         return {
             "running": self.scheduler.running,
             "total_jobs": len(jobs),
-            "jobs": [{"id": j.id, "name": j.name, "next_run": str(j.next_run_time) if j.next_run_time else None} for j in jobs],
-            "timezone": "Asia/Kolkata"
+            "jobs": [
+                {
+                    "id": j.id, 
+                    "name": j.name, 
+                    "next_run": str(j.next_run_time) if j.next_run_time else None
+                } 
+                for j in jobs
+            ],
+            "timezone": "Asia/Kolkata",
+            "smart_ping_enabled": True,
+            "keep_alive_removed": True
         }
 
     async def start(self):
@@ -438,7 +532,10 @@ class UnifiedScheduler:
             return
         self.setup_jobs()
         self.scheduler.start()
-        logger.info("Unified Scheduler STARTED")
+        logger.info("=" * 50)
+        logger.info("SMART PING SCHEDULER v11.0 STARTED")
+        logger.info("Keep Alive REMOVED — only 5-min-before pings")
+        logger.info("=" * 50)
         for j in self.get_status()["jobs"]:
             logger.info(f"  {j['name']} -> Next: {j['next_run']}")
 
@@ -447,18 +544,17 @@ class UnifiedScheduler:
             self.scheduler.shutdown()
             if _http_client and not _http_client.is_closed:
                 await _http_client.aclose()
-            logger.info("Unified Scheduler STOPPED")
+            logger.info("Smart Ping Scheduler STOPPED")
 
 
 # ═════════════════════════════════════════════════════════════════
-# SINGLETON
+# SINGLETON + BACKWARD COMPATIBILITY
 # ═════════════════════════════════════════════════════════════════
 
-MASTER_SCHEDULER = UnifiedScheduler()
+MASTER_SCHEDULER = SmartPingScheduler()
 USER_PREFERENCES: Dict[int, Dict[str, Any]] = {}
 
 def _load_user_preferences_sync():
-    """Sync load on startup — can be called from non-async context"""
     global USER_PREFERENCES
     try:
         from core.supabase_client import get_supabase_client
@@ -468,11 +564,11 @@ def _load_user_preferences_sync():
             chat_id = row.get("chat_id")
             if chat_id:
                 USER_PREFERENCES[int(chat_id)] = row
-        logger.info(f"Loaded {len(USER_PREFERENCES)} user preferences")
+        logger.info(f"Loaded {len(USER_PREFERENCES)} preferences")
     except Exception as e:
-        logger.warning(f"Could not load user preferences: {e}")
+        logger.warning(f"Preferences load fail: {e}")
         USER_PREFERENCES = {}
 
-class SinghJiMasterScheduler(UnifiedScheduler):
-    """Alias for backward compatibility"""
-    pass
+# Backward compatibility aliases
+UnifiedScheduler = SmartPingScheduler
+SinghJiMasterScheduler = SmartPingScheduler
