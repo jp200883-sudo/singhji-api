@@ -117,58 +117,47 @@ class ResponseJudge:
 
     @classmethod
     def score(cls, text: str, latency: float) -> float:
-        score = 60.0  # Base score
+        score = 60.0
         text_lower = text.lower()
 
-        # Penalty for robotic phrases
         for pattern in cls.ROBOTIC_PATTERNS:
             if re.search(pattern, text_lower):
                 score -= 15
 
-        # Bonus for natural words
         for word in cls.NATURAL_WORDS:
             if word in text_lower:
                 score += 4
 
-        # Penalty for emojis / Unicode symbols
         emoji_count = sum(1 for ch in text if ord(ch) > 127 and not (0x0900 <= ord(ch) <= 0x097F))
         score -= emoji_count * 10
 
-        # Penalty for ASCII smileys
         smiley_count = len(re.findall(r'[:;]-?[)(DdPpSsOo@#$%^&*]', text))
         score -= smiley_count * 15
 
-        # Penalty for excessive punctuation
         if text.count('!') > 2 or text.count('?') > 3:
             score -= 10
 
-        # Bonus for Hinglish (Devanagari + ASCII mix)
         dev_chars = len(re.findall(r'[\u0900-\u097F]', text))
         ascii_chars = len(re.findall(r'[a-zA-Z]', text))
         if dev_chars > 3 and ascii_chars > 3:
-            score += 12  # Good Hinglish
+            score += 12
 
-        # Penalty for too short or too long
         words = text.split()
         if len(words) < 3:
             score -= 25
         elif len(words) > 80:
             score -= 15
         elif 10 <= len(words) <= 40:
-            score += 8  # Sweet spot
+            score += 8
 
-        # Penalty for code blocks (unless asked)
         if "```" in text:
             score -= 10
 
-        # Penalty for numbered lists / bullets
         if re.search(r'^(\d+[.\)]|[-•*])\s', text, re.MULTILINE):
             score -= 8
 
-        # Penalty for high latency
         score -= latency * 1.5
 
-        # Penalty for repetitive text
         if len(words) > 5:
             unique_ratio = len(set(w.lower() for w in words)) / len(words)
             if unique_ratio < 0.5:
@@ -178,30 +167,24 @@ class ResponseJudge:
 
 
 # ═══════════════════════════════════════════════════════════════
-#  RESPONSE CLEANER — Emoji, robotic text hatao
+#  RESPONSE CLEANER
 # ═══════════════════════════════════════════════════════════════
 
 def clean_response(text: str) -> str:
-    """Remove all robot-like stuff from response."""
     if not text:
         return "Haan bhai, kuch toh bola lekin samajh nahi aaya. Dobara bol."
 
-    # Remove emojis and non-Devanagari Unicode symbols
     cleaned = []
     for ch in text:
         code = ord(ch)
-        # Keep ASCII, Devanagari, basic punctuation, whitespace
         if code <= 127 or (0x0900 <= code <= 0x097F):
             cleaned.append(ch)
         elif ch in ".,!?;:'\"()- \n\t":
             cleaned.append(ch)
-        # Skip everything else (emojis, symbols, etc.)
     text = ''.join(cleaned)
 
-    # Remove ASCII smileys
     text = re.sub(r'[:;]-?[)(DdPpSsOo@#$%^&*]', '', text)
 
-    # Remove robotic phrases
     robotic_replacements = [
         (r"(?i)main ek\s+ai\s+hoon?\.?", ""),
         (r"(?i)main ek\s+artificial\s+intelligence\s+hoon?\.?", ""),
@@ -227,13 +210,8 @@ def clean_response(text: str) -> str:
     for pattern, replacement in robotic_replacements:
         text = re.sub(pattern, replacement, text)
 
-    # Remove markdown headers
     text = re.sub(r'^#{1,6}\s+', '', text, flags=re.MULTILINE)
-
-    # Remove horizontal rules
     text = re.sub(r'^[=-]{3,}$', '', text, flags=re.MULTILINE)
-
-    # Clean up extra whitespace
     text = re.sub(r'\n{3,}', '\n\n', text)
     text = re.sub(r'\s{2,}', ' ', text)
 
@@ -248,11 +226,10 @@ class MultiAIBrain:
     """Calls multiple AI services and returns the best human-like response."""
 
     def __init__(self):
-        self.timeout = 25  # seconds per call
-        self.max_total_time = 18  # seconds total wait
+        self.timeout = 25
+        self.max_total_time = 18
 
     async def _call_groq(self, prompt: str, system: str) -> Optional[ScoredResponse]:
-        """Call Groq API (Llama 3.3 70B)."""
         if not HTTP_CLIENT:
             logger.warning("HTTP_CLIENT not set for Groq")
             return None
@@ -292,9 +269,7 @@ class MultiAIBrain:
             return None
 
     async def _call_gemini(self, prompt: str, system: str) -> Optional[ScoredResponse]:
-        """Call Google Gemini 1.5 Flash."""
         if not HTTP_CLIENT:
-            logger.warning("HTTP_CLIENT not set for Gemini")
             return None
         start = time.time()
         try:
@@ -329,7 +304,6 @@ class MultiAIBrain:
             return None
 
     async def _call_cerebras(self, prompt: str, system: str) -> Optional[ScoredResponse]:
-        """Call Cerebras API."""
         if not HTTP_CLIENT or not CEREBRAS_API_KEY:
             return None
         start = time.time()
@@ -365,7 +339,6 @@ class MultiAIBrain:
             return None
 
     async def _call_huggingface(self, prompt: str, system: str) -> Optional[ScoredResponse]:
-        """Call Hugging Face Inference API (fallback)."""
         hf_key = os.getenv("HUGGINGFACE_API_KEY", "")
         if not HTTP_CLIENT or not hf_key:
             return None
@@ -401,7 +374,6 @@ class MultiAIBrain:
             return None
 
     async def _call_local(self, prompt: str, system: str) -> Optional[ScoredResponse]:
-        """Call local AI server if configured."""
         local_url = os.getenv("LOCAL_AI_URL", "")
         if not HTTP_CLIENT or not local_url:
             return None
@@ -427,10 +399,6 @@ class MultiAIBrain:
             return None
 
     async def get_best_response(self, prompt: str, user_id: str = "anonymous") -> Dict:
-        """
-        Call ALL available AI models concurrently.
-        Pick the response with highest human-likeness score.
-        """
         if not HTTP_CLIENT:
             return {
                 "status": "error",
@@ -438,10 +406,8 @@ class MultiAIBrain:
                 "source": "NO_HTTP_CLIENT"
             }
 
-        # Build system prompt with user context
         system = HUMAN_SYSTEM_PROMPT
 
-        # Prepare all API calls
         tasks = []
         sources = []
 
@@ -468,7 +434,6 @@ class MultiAIBrain:
                 "source": "NONE"
             }
 
-        # Run all calls concurrently, with overall timeout
         try:
             results = await asyncio.wait_for(
                 asyncio.gather(*tasks, return_exceptions=True),
@@ -481,7 +446,6 @@ class MultiAIBrain:
                 "source": "TIMEOUT"
             }
 
-        # Filter valid responses
         valid_responses: List[ScoredResponse] = []
         for i, result in enumerate(results):
             if isinstance(result, Exception):
@@ -498,13 +462,11 @@ class MultiAIBrain:
                 "source": "ALL_FAILED"
             }
 
-        # Sort by human-likeness score (highest first)
         valid_responses.sort(key=lambda r: r.human_score, reverse=True)
 
         best = valid_responses[0]
-        runners_up = valid_responses[1:3]  # Next 2 best
+        runners_up = valid_responses[1:3]
 
-        # Log the competition
         logger.info("=== AI RESPONSE COMPETITION ===")
         for i, r in enumerate(valid_responses):
             marker = "[WIN]" if i == 0 else "[   ]"
@@ -512,7 +474,6 @@ class MultiAIBrain:
                        f"Latency={r.latency:.2f}s | Len={len(r.text)} | "
                        f"Text: {r.text[:80]}...")
 
-        # Save to memory
         try:
             await _memory_save(
                 f"chat:{user_id}:{int(time.time())}",
@@ -554,7 +515,6 @@ def get_brain() -> MultiAIBrain:
 # ═══════════════════════════════════════════════════════════════
 
 async def ask(prompt: str, user_id: str = "anonymous") -> str:
-    """Simple helper — just returns the best response text."""
     brain = get_brain()
     result = await brain.get_best_response(prompt, user_id)
     if result.get("status") == "success":
@@ -563,12 +523,49 @@ async def ask(prompt: str, user_id: str = "anonymous") -> str:
 
 
 # ═══════════════════════════════════════════════════════════════
+#  MODULE-LEVEL WRAPPERS
+#  (tg_bot/helpers.py se import hote hain)
+# ═══════════════════════════════════════════════════════════════
+
+async def _call_groq(prompt: str, system: str = None) -> str:
+    """Standalone Groq call — purana naam support."""
+    brain = get_brain()
+    if system is None:
+        system = HUMAN_SYSTEM_PROMPT
+    result = await brain._call_groq(prompt, system)
+    if result is None:
+        raise RuntimeError("Groq call failed")
+    return result.text
+
+
+async def _call_gemini(prompt: str, system: str = None) -> str:
+    """Standalone Gemini call."""
+    brain = get_brain()
+    if system is None:
+        system = HUMAN_SYSTEM_PROMPT
+    result = await brain._call_gemini(prompt, system)
+    if result is None:
+        raise RuntimeError("Gemini call failed")
+    return result.text
+
+
+async def _call_cerebras(prompt: str, system: str = None) -> str:
+    """Standalone Cerebras call."""
+    brain = get_brain()
+    if system is None:
+        system = HUMAN_SYSTEM_PROMPT
+    result = await brain._call_cerebras(prompt, system)
+    if result is None:
+        raise RuntimeError("Cerebras call failed")
+    return result.text
+
+
+# ═══════════════════════════════════════════════════════════════
 #  API ENDPOINTS
 # ═══════════════════════════════════════════════════════════════
 
 @router.post("/api/chat")
 async def ai_chat(request: Request):
-    """Main chat endpoint — uses multi-model brain."""
     try:
         data = await request.json()
     except Exception:
@@ -584,11 +581,9 @@ async def ai_chat(request: Request):
     if not prompt:
         return {"status": "error", "response": "Bhai kuch toh likh pehle."}
 
-    # Check for personal/sensitive info
     personal_kw = ["password", "otp", "secret", "aadhar", "pan", "bank", "cvv", "pin", "upi"]
     is_personal = any(kw in prompt.lower() for kw in personal_kw)
 
-    # Try cache first (only for non-personal)
     cache_key = None
     if not is_personal:
         cache_key = _cache_key("ai_chat", model, prompt[:120])
@@ -601,11 +596,9 @@ async def ai_chat(request: Request):
         except Exception as e:
             logger.warning(f"Cache get failed: {e}")
 
-    # Get best response from multi-model brain
     brain = get_brain()
     result = await brain.get_best_response(prompt, user_id)
 
-    # Cache if successful and not personal
     if result.get("status") == "success" and not is_personal and cache_key:
         try:
             await _cache_set(cache_key, result, ttl=3600)
@@ -623,7 +616,7 @@ def _get_whisper_model():
     if _whisper_model is None:
         try:
             from faster_whisper import WhisperModel
-            model_size = os.getenv("WHISPER_MODEL_SIZE", "base")
+            model_size = os.getenv("WHISPER_MODEL_SIZE", "small")
             logger.info(f"Loading Whisper ({model_size})...")
             _whisper_model = WhisperModel(model_size, device="cpu", compute_type="int8")
             logger.info("Whisper loaded")
@@ -632,15 +625,31 @@ def _get_whisper_model():
             return None
     return _whisper_model
 
+
 def _transcribe_sync(audio_bytes: bytes, suffix: str, language=None):
+    """Improved Whisper transcription with better accuracy for Hindi/Hinglish."""
     model = _get_whisper_model()
     if model is None:
         return None
     with tempfile.NamedTemporaryFile(suffix=suffix, delete=True) as tmp:
         tmp.write(audio_bytes)
         tmp.flush()
-        segments, info = model.transcribe(tmp.name, language=language)
+
+        # Better settings for Indian accent + Hinglish
+        segments, info = model.transcribe(
+            tmp.name,
+            language=language,
+            beam_size=5,
+            vad_filter=True,
+            vad_parameters=dict(min_silence_duration_ms=500),
+            initial_prompt=(
+                "Hindi, English, Hinglish. Indian accent. "
+                "Common words: kal, aaj, mandi, bhav, meeting, tomorrow, weather."
+            ),
+            condition_on_previous_text=False,
+        )
         transcript = " ".join(seg.text.strip() for seg in segments)
+
     return transcript, info.language, info.language_probability
 
 
