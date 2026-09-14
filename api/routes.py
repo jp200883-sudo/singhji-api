@@ -8,7 +8,17 @@ from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.concurrency import run_in_threadpool
 
-from core.config import AVAILABLE_KEYS, OPENWEATHER_API_KEY, PLANT_ID_API, GROQ_API_KEY, GEMINI_API_KEY, CEREBRAS_API_KEY
+from core.config import (
+    AVAILABLE_KEYS,
+    OPENWEATHER_API_KEY,
+    PLANT_ID_API,
+    GROQ_API_KEY,
+    GEMINI_API_KEY,
+    CEREBRAS_API_KEY,
+    BHASHINI_API_KEY,
+    BHASHINI_USER_ID,
+    BHASHINI_PIPELINE_ID,
+)
 from core.database import SUPABASE_CLIENT
 from core.cache import _cache_key, _cache_get, _cache_set
 from core.memory import _memory_save, _memory_get
@@ -50,7 +60,12 @@ async def api_status():
 
 @router.get("/api/check")
 async def api_check():
-    from core.config import OPENWEATHER_API_KEY, GROQ_API_KEY, GEMINI_API_KEY, TELEGRAM_TOKEN, SUPABASE_URL, SUPABASE_SERVICE_KEY, FACEBOOK_ACCESS_TOKEN, FACEBOOK_PAGE_ID, YOUTUBE_API_KEY, CURRENTS_API_KEY, NEWSDATA_API_KEY, TAVILY_API_KEY
+    from core.config import (
+        OPENWEATHER_API_KEY, GROQ_API_KEY, GEMINI_API_KEY, TELEGRAM_TOKEN,
+        SUPABASE_URL, SUPABASE_SERVICE_KEY, FACEBOOK_ACCESS_TOKEN,
+        FACEBOOK_PAGE_ID, YOUTUBE_API_KEY, CURRENTS_API_KEY,
+        NEWSDATA_API_KEY, TAVILY_API_KEY,
+    )
 
     tests = {
         "OPENWEATHER": (f"https://api.openweathermap.org/data/2.5/weather?q=Delhi&appid={OPENWEATHER_API_KEY or ''}", {}, "GET"),
@@ -187,4 +202,195 @@ async def plant_identify(request: Request):
         }
     except Exception as e:
         logger.error(f"Plant identification error: {e}")
+        return {"error": str(e)}
+
+# ==========================================
+# BHASHINI — ASR / TRANSLATE / TTS
+# ==========================================
+BHASHINI_URL = "https://dhruva-api.bhashini.gov.in/services/inference/pipeline"
+
+def _bhashini_headers():
+    """
+    ULCA-style headers. Agar aap Dhruva key use kar rahe ho to
+    neeche wala 'DHruva' block uncomment karo.
+    """
+    # ULCA (userID + ulcaApiKey)
+    return {
+        "userID": BHASHINI_USER_ID,
+        "ulcaApiKey": BHASHINI_API_KEY,
+        "Content-Type": "application/json",
+    }
+    # Dhruva (sirf ek Authorization header)
+    # return {
+    #     "Authorization": BHASHINI_API_KEY,
+    #     "Content-Type": "application/json",
+    # }
+
+
+@router.get("/api/bhashini/status")
+async def bhashini_status():
+    return {
+        "configured": bool(BHASHINI_API_KEY and BHASHINI_USER_ID),
+        "user_id_set": bool(BHASHINI_USER_ID),
+        "api_key_set": bool(BHASHINI_API_KEY),
+        "pipeline_id_set": bool(BHASHINI_PIPELINE_ID),
+    }
+
+
+@router.post("/api/bhashini/translate")
+async def bhashini_translate(request: Request):
+    if not (BHASHINI_API_KEY and BHASHINI_USER_ID):
+        return JSONResponse(
+            status_code=400,
+            content={"error": "BHASHINI_API_KEY / BHASHINI_USER_ID missing"}
+        )
+
+    data = await request.json()
+    text = (data.get("text") or "").strip()
+    source = data.get("source", "en")
+    target = data.get("target", "hi")
+
+    if not text:
+        return {"error": "text required"}
+
+    payload = {
+        "pipelineTasks": [
+            {
+                "taskType": "translation",
+                "config": {
+                    "language": {
+                        "sourceLanguage": source,
+                        "targetLanguage": target,
+                    }
+                },
+            }
+        ],
+        "inputData": {
+            "input": [{"source": text}],
+        },
+    }
+    if BHASHINI_PIPELINE_ID:
+        payload["pipelineTasks"][0]["config"]["serviceId"] = BHASHINI_PIPELINE_ID
+
+    try:
+        resp = await HTTP_CLIENT.post(
+            BHASHINI_URL,
+            headers=_bhashini_headers(),
+            json=payload,
+            timeout=45,
+        )
+        body = resp.json()
+        if resp.status_code != 200:
+            return JSONResponse(status_code=resp.status_code, content=body)
+
+        out = (
+            body.get("pipelineResponse", [{}])[0]
+            .get("output", [{}])[0]
+            .get("target")
+        )
+        return {
+            "status": "success",
+            "source_lang": source,
+            "target_lang": target,
+            "input": text,
+            "output": out,
+            "source": "BHASHINI_LIVE",
+        }
+    except Exception as e:
+        logger.error(f"Bhashini translate error: {e}")
+        return {"error": str(e)}
+
+
+@router.post("/api/bhashini/asr")
+async def bhashini_asr(request: Request):
+    """Speech → Text via Bhashini (base64 audio)."""
+    if not (BHASHINI_API_KEY and BHASHINI_USER_ID):
+        return {"error": "BHASHINI credentials missing"}
+
+    data = await request.json()
+    audio_b64 = data.get("audio_base64", "")
+    lang = data.get("language", "hi")
+
+    if not audio_b64:
+        return {"error": "audio_base64 required"}
+    if _b64_too_big(audio_b64):
+        return JSONResponse(status_code=413, content={"error": "Audio too large"})
+
+    payload = {
+        "pipelineTasks": [
+            {
+                "taskType": "asr",
+                "config": {
+                    "language": {"sourceLanguage": lang},
+                    "audioFormat": "wav",
+                    "samplingRate": 16000,
+                },
+            }
+        ],
+        "inputData": {"audio": [{"audioContent": audio_b64}]},
+    }
+    if BHASHINI_PIPELINE_ID:
+        payload["pipelineTasks"][0]["config"]["serviceId"] = BHASHINI_PIPELINE_ID
+
+    try:
+        resp = await HTTP_CLIENT.post(
+            BHASHINI_URL, headers=_bhashini_headers(), json=payload, timeout=60
+        )
+        body = resp.json()
+        text = (
+            body.get("pipelineResponse", [{}])[0]
+            .get("output", [{}])[0]
+            .get("source")
+        )
+        return {"status": "success", "text": text, "lang": lang}
+    except Exception as e:
+        logger.error(f"Bhashini ASR error: {e}")
+        return {"error": str(e)}
+
+
+@router.post("/api/bhashini/tts")
+async def bhashini_tts(request: Request):
+    """Text → Speech via Bhashini."""
+    if not (BHASHINI_API_KEY and BHASHINI_USER_ID):
+        return {"error": "BHASHINI credentials missing"}
+
+    data = await request.json()
+    text = (data.get("text") or "").strip()
+    lang = data.get("language", "hi")
+    gender = data.get("gender", "female")
+
+    if not text:
+        return {"error": "text required"}
+
+    payload = {
+        "pipelineTasks": [
+            {
+                "taskType": "tts",
+                "config": {
+                    "language": {"sourceLanguage": lang},
+                    "gender": gender,
+                    "samplingRate": 8000,
+                },
+            }
+        ],
+        "inputData": {"input": [{"source": text}]},
+    }
+    if BHASHINI_PIPELINE_ID:
+        payload["pipelineTasks"][0]["config"]["serviceId"] = BHASHINI_PIPELINE_ID
+
+    try:
+        resp = await HTTP_CLIENT.post(
+            BHASHINI_URL, headers=_bhashini_headers(), json=payload, timeout=60
+        )
+        body = resp.json()
+        audio_b64 = (
+            body.get("pipelineResponse", [{}])[0]
+            .get("audio", [{}])[0]
+            .get("audioContent")
+        )
+        if not audio_b64:
+            return {"error": "No audio returned", "raw": body}
+        return {"status": "success", "audio_base64": audio_b64, "format": "wav"}
+    except Exception as e:
+        logger.error(f"Bhashini TTS error: {e}")
         return {"error": str(e)}
