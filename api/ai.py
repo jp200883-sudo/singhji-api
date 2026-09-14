@@ -683,7 +683,34 @@ async def whisper_transcribe(request: Request):
         logger.error(f"Whisper error: {e}")
         return {"error": str(e)}
 
+# ═══════════════════════════════════════════════════════
+# Groq कॉल (पुराना नाम — helpers.py इसी को माँग रहा है)
+# ═══════════════════════════════════════════════════════
+async def _call_groq(prompt: str, model: str = "llama-3.3-70b-versatile", **kwargs):
+    import httpx
+    from core.config import GROQ_API_KEY
 
+    if not GROQ_API_KEY:
+        raise RuntimeError("GROQ_API_KEY missing")
+
+    # अगर prompt सिर्फ string है तो messages में बदल दो
+    if isinstance(prompt, str):
+        messages = [{"role": "user", "content": prompt}]
+    else:
+        messages = prompt
+
+    async with httpx.AsyncClient(timeout=60) as c:
+        r = await c.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {GROQ_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            json={"model": model, "messages": messages, **kwargs},
+        )
+        r.raise_for_status()
+        data = r.json()
+        return data["choices"][0]["message"]["content"]
 # ---- TTS ----
 def _tts_sync(text: str, lang: str) -> bytes:
     from gtts import gTTS
