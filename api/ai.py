@@ -29,13 +29,14 @@ logger = logging.getLogger(__name__)
 
 HTTP_CLIENT = None
 
+
 def set_http_client(client):
     global HTTP_CLIENT
     HTTP_CLIENT = client
 
 
 # ═══════════════════════════════════════════════════════════════
-#  SYSTEM PROMPT — Bilkul Human, Bilkul Desi Dost
+#  SYSTEM PROMPT — बिल्कुल इंसान, बिल्कुल देसी दोस्त
 # ═══════════════════════════════════════════════════════════════
 
 HUMAN_SYSTEM_PROMPT = """Tu ek asli Indian dost hai. Tu bilkul normal insaan ki tarah baat karta hai.
@@ -75,7 +76,7 @@ EXAMPLES:
 
 
 # ═══════════════════════════════════════════════════════════════
-#  RESPONSE JUDGE — Kaunsa jawab sabse human-like hai
+#  RESPONSE JUDGE
 # ═══════════════════════════════════════════════════════════════
 
 @dataclass
@@ -88,7 +89,7 @@ class ScoredResponse:
 
 
 class ResponseJudge:
-    """Scores how human-like a response is. Higher = more human."""
+    """कितना इंसान जैसा जवाब है — ज़्यादा = बेहतर।"""
 
     ROBOTIC_PATTERNS = [
         r"main ek\s+ai\b", r"main ek\s+artificial",
@@ -112,7 +113,7 @@ class ResponseJudge:
         "haina", "na", "toh", "hi", "hai", "tha", "thi",
         "kya", "kaise", "kyun", "kab", "kahan", "kaun",
         "arey", "han", "nahi", "haan", "hmm", "acha",
-        "thik", "sahi", "galat", "badiya", "bekar"
+        "thik", "sahi", "galat", "badiya", "bekar",
     ]
 
     @classmethod
@@ -128,7 +129,10 @@ class ResponseJudge:
             if word in text_lower:
                 score += 4
 
-        emoji_count = sum(1 for ch in text if ord(ch) > 127 and not (0x0900 <= ord(ch) <= 0x097F))
+        emoji_count = sum(
+            1 for ch in text
+            if ord(ch) > 127 and not (0x0900 <= ord(ch) <= 0x097F)
+        )
         score -= emoji_count * 10
 
         smiley_count = len(re.findall(r'[:;]-?[)(DdPpSsOo@#$%^&*]', text))
@@ -223,15 +227,14 @@ def clean_response(text: str) -> str:
 # ═══════════════════════════════════════════════════════════════
 
 class MultiAIBrain:
-    """Calls multiple AI services and returns the best human-like response."""
+    """कई AI सर्विसेज़ को कॉल करता है, सबसे इंसान-जैसा जवाब चुनता है।"""
 
     def __init__(self):
         self.timeout = 25
         self.max_total_time = 18
 
     async def _call_groq(self, prompt: str, system: str) -> Optional[ScoredResponse]:
-        if not HTTP_CLIENT:
-            logger.warning("HTTP_CLIENT not set for Groq")
+        if not HTTP_CLIENT or not GROQ_API_KEY:
             return None
         start = time.time()
         try:
@@ -239,28 +242,27 @@ class MultiAIBrain:
                 "https://api.groq.com/openai/v1/chat/completions",
                 headers={
                     "Authorization": f"Bearer {GROQ_API_KEY}",
-                    "Content-Type": "application/json"
+                    "Content-Type": "application/json",
                 },
                 json={
                     "model": "llama-3.3-70b-versatile",
                     "messages": [
                         {"role": "system", "content": system},
-                        {"role": "user", "content": prompt}
+                        {"role": "user", "content": prompt},
                     ],
                     "temperature": 0.75,
                     "max_tokens": 400,
                     "top_p": 0.92,
                     "frequency_penalty": 0.3,
-                    "presence_penalty": 0.2
+                    "presence_penalty": 0.2,
                 },
-                timeout=self.timeout
+                timeout=self.timeout,
             )
             result = resp.json()
             if "choices" not in result:
                 logger.warning(f"Groq error: {result}")
                 return None
-            text = result["choices"][0]["message"]["content"]
-            text = clean_response(text)
+            text = clean_response(result["choices"][0]["message"]["content"])
             latency = time.time() - start
             human_score = ResponseJudge.score(text, latency)
             return ScoredResponse("groq", text, latency, human_score=human_score)
@@ -269,29 +271,33 @@ class MultiAIBrain:
             return None
 
     async def _call_gemini(self, prompt: str, system: str) -> Optional[ScoredResponse]:
-        if not HTTP_CLIENT:
+        if not HTTP_CLIENT or not GEMINI_API_KEY:
             return None
         start = time.time()
         try:
-            url = (f"https://generativelanguage.googleapis.com/v1beta/"
-                   f"models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}")
+            url = (
+                f"https://generativelanguage.googleapis.com/v1beta/"
+                f"models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+            )
             resp = await HTTP_CLIENT.post(
                 url,
                 json={
                     "contents": [{
                         "parts": [{
-                            "text": f"{system}\n\nUser ne bola: {prompt}\n\n"
-                                    f"Jawab do bilkul natural Hinglish mein. "
-                                    f"Koi emoji mat daal. 2-4 lines mein jawab do."
+                            "text": (
+                                f"{system}\n\nUser ne bola: {prompt}\n\n"
+                                f"Jawab do bilkul natural Hinglish mein. "
+                                f"Koi emoji mat daal. 2-4 lines mein jawab do."
+                            )
                         }]
                     }],
                     "generationConfig": {
                         "temperature": 0.75,
                         "maxOutputTokens": 400,
-                        "topP": 0.92
-                    }
+                        "topP": 0.92,
+                    },
                 },
-                timeout=self.timeout
+                timeout=self.timeout,
             )
             result = resp.json()
             text = result["candidates"][0]["content"]["parts"][0]["text"]
@@ -312,25 +318,24 @@ class MultiAIBrain:
                 "https://api.cerebras.ai/v1/chat/completions",
                 headers={
                     "Authorization": f"Bearer {CEREBRAS_API_KEY}",
-                    "Content-Type": "application/json"
+                    "Content-Type": "application/json",
                 },
                 json={
                     "model": "llama-3.1-70b",
                     "messages": [
                         {"role": "system", "content": system},
-                        {"role": "user", "content": prompt}
+                        {"role": "user", "content": prompt},
                     ],
                     "temperature": 0.75,
                     "max_tokens": 400,
-                    "top_p": 0.92
+                    "top_p": 0.92,
                 },
-                timeout=self.timeout
+                timeout=self.timeout,
             )
             result = resp.json()
             if "choices" not in result:
                 return None
-            text = result["choices"][0]["message"]["content"]
-            text = clean_response(text)
+            text = clean_response(result["choices"][0]["message"]["content"])
             latency = time.time() - start
             human_score = ResponseJudge.score(text, latency)
             return ScoredResponse("cerebras", text, latency, human_score=human_score)
@@ -339,13 +344,15 @@ class MultiAIBrain:
             return None
 
     async def _call_huggingface(self, prompt: str, system: str) -> Optional[ScoredResponse]:
-        hf_key = os.getenv("HUGGINGFACE_API_KEY", "")
+        hf_key = os.getenv("HUGGINGFACE_API_KEY", "") or os.getenv("HUGGINGFACE_TOKEN", "")
         if not HTTP_CLIENT or not hf_key:
             return None
         start = time.time()
         try:
-            url = ("https://api-inference.huggingface.co/models/"
-                   "mistralai/Mistral-7B-Instruct-v0.3")
+            url = (
+                "https://api-inference.huggingface.co/models/"
+                "mistralai/Mistral-7B-Instruct-v0.3"
+            )
             full_prompt = f"<s>[INST] {system}\n\nUser: {prompt} [/INST]"
             resp = await HTTP_CLIENT.post(
                 url,
@@ -356,15 +363,14 @@ class MultiAIBrain:
                         "max_new_tokens": 400,
                         "temperature": 0.75,
                         "return_full_text": False,
-                        "top_p": 0.92
-                    }
+                        "top_p": 0.92,
+                    },
                 },
-                timeout=self.timeout
+                timeout=self.timeout,
             )
             result = resp.json()
-            if isinstance(result, list) and len(result) > 0:
-                text = result[0].get("generated_text", "")
-                text = clean_response(text)
+            if isinstance(result, list) and result:
+                text = clean_response(result[0].get("generated_text", ""))
                 latency = time.time() - start
                 human_score = ResponseJudge.score(text, latency)
                 return ScoredResponse("huggingface", text, latency, human_score=human_score)
@@ -384,13 +390,12 @@ class MultiAIBrain:
                 json={
                     "prompt": f"{system}\n\nUser: {prompt}\n\nJawab:",
                     "max_tokens": 400,
-                    "temperature": 0.75
+                    "temperature": 0.75,
                 },
-                timeout=self.timeout
+                timeout=self.timeout,
             )
             result = resp.json()
-            text = result.get("response", result.get("text", ""))
-            text = clean_response(text)
+            text = clean_response(result.get("response", result.get("text", "")))
             latency = time.time() - start
             human_score = ResponseJudge.score(text, latency)
             return ScoredResponse("local", text, latency, human_score=human_score)
@@ -403,11 +408,10 @@ class MultiAIBrain:
             return {
                 "status": "error",
                 "response": "Bhai HTTP client set nahi hai. Server restart kar.",
-                "source": "NO_HTTP_CLIENT"
+                "source": "NO_HTTP_CLIENT",
             }
 
         system = HUMAN_SYSTEM_PROMPT
-
         tasks = []
         sources = []
 
@@ -420,7 +424,7 @@ class MultiAIBrain:
         if CEREBRAS_API_KEY:
             tasks.append(self._call_cerebras(prompt, system))
             sources.append("cerebras")
-        if os.getenv("HUGGINGFACE_API_KEY"):
+        if os.getenv("HUGGINGFACE_API_KEY") or os.getenv("HUGGINGFACE_TOKEN"):
             tasks.append(self._call_huggingface(prompt, system))
             sources.append("huggingface")
         if os.getenv("LOCAL_AI_URL"):
@@ -431,19 +435,19 @@ class MultiAIBrain:
             return {
                 "status": "error",
                 "response": "Bhai koi AI service available nahi hai. API keys check kar.",
-                "source": "NONE"
+                "source": "NONE",
             }
 
         try:
             results = await asyncio.wait_for(
                 asyncio.gather(*tasks, return_exceptions=True),
-                timeout=self.max_total_time
+                timeout=self.max_total_time,
             )
         except asyncio.TimeoutError:
             return {
                 "status": "error",
                 "response": "Bhai sab AI services slow hain. Thodi der baad try kar.",
-                "source": "TIMEOUT"
+                "source": "TIMEOUT",
             }
 
         valid_responses: List[ScoredResponse] = []
@@ -459,20 +463,21 @@ class MultiAIBrain:
             return {
                 "status": "error",
                 "response": "Bhai sab AI services down hain. Thodi der baad try kar.",
-                "source": "ALL_FAILED"
+                "source": "ALL_FAILED",
             }
 
         valid_responses.sort(key=lambda r: r.human_score, reverse=True)
-
         best = valid_responses[0]
         runners_up = valid_responses[1:3]
 
         logger.info("=== AI RESPONSE COMPETITION ===")
         for i, r in enumerate(valid_responses):
             marker = "[WIN]" if i == 0 else "[   ]"
-            logger.info(f"{marker} [{r.source}] HumanScore={r.human_score:.1f} | "
-                       f"Latency={r.latency:.2f}s | Len={len(r.text)} | "
-                       f"Text: {r.text[:80]}...")
+            logger.info(
+                f"{marker} [{r.source}] HumanScore={r.human_score:.1f} | "
+                f"Latency={r.latency:.2f}s | Len={len(r.text)} | "
+                f"Text: {r.text[:80]}..."
+            )
 
         try:
             await _memory_save(
@@ -482,8 +487,8 @@ class MultiAIBrain:
                     "response": best.text,
                     "winner": best.source,
                     "all_scores": {r.source: r.human_score for r in valid_responses},
-                    "runners_up": [r.text for r in runners_up]
-                }
+                    "runners_up": [r.text for r in runners_up],
+                },
             )
         except Exception as e:
             logger.warning(f"Memory save failed: {e}")
@@ -496,12 +501,13 @@ class MultiAIBrain:
             "human_score": round(best.human_score, 1),
             "latency_sec": round(best.latency, 2),
             "all_sources": [r.source for r in valid_responses],
-            "all_scores": {r.source: round(r.human_score, 1) for r in valid_responses}
+            "all_scores": {r.source: round(r.human_score, 1) for r in valid_responses},
         }
 
 
 # Singleton
-_brain_instance = None
+_brain_instance: Optional[MultiAIBrain] = None
+
 
 def get_brain() -> MultiAIBrain:
     global _brain_instance
@@ -511,10 +517,11 @@ def get_brain() -> MultiAIBrain:
 
 
 # ═══════════════════════════════════════════════════════════════
-#  STANDALONE HELPER — Direct use without class
+#  STANDALONE HELPERS (tg_bot/helpers.py इन्हें इस्तेमाल करता है)
 # ═══════════════════════════════════════════════════════════════
 
 async def ask(prompt: str, user_id: str = "anonymous") -> str:
+    """सीधा सवाल पूछो, सीधा जवाब लो।"""
     brain = get_brain()
     result = await brain.get_best_response(prompt, user_id)
     if result.get("status") == "success":
@@ -522,46 +529,168 @@ async def ask(prompt: str, user_id: str = "anonymous") -> str:
     return result.get("response", "Bhai kuch gadbad ho gayi.")
 
 
-# ═══════════════════════════════════════════════════════════════
-#  MODULE-LEVEL WRAPPERS
-#  (tg_bot/helpers.py se import hote hain)
-# ═══════════════════════════════════════════════════════════════
-
-async def _call_groq(prompt: str, system: str = None) -> str:
-    """Standalone Groq call — purana naam support."""
+async def _call_groq(*args, **kwargs) -> str:
+    """
+    लचीला Groq wrapper — helpers.py के पुराने कॉल के लिए।
+    prompt (str) या messages (list) — दोनों चलेंगे।
+    """
     brain = get_brain()
-    if system is None:
-        system = HUMAN_SYSTEM_PROMPT
-    result = await brain._call_groq(prompt, system)
+
+    # args से prompt निकालो
+    prompt = None
+    if args:
+        prompt = args[0]
+
+    # kwargs से भी देखो
+    if prompt is None:
+        for k in ("prompt", "text", "query", "message", "content"):
+            if k in kwargs:
+                prompt = kwargs.pop(k)
+                break
+
+    system = kwargs.pop("system", None) or HUMAN_SYSTEM_PROMPT
+
+    # अगर messages list है तो system वाला हटाकर user content निकालो
+    if isinstance(prompt, list):
+        user_parts = [
+            m.get("content", "") for m in prompt
+            if isinstance(m, dict) and m.get("role") in (None, "user")
+        ]
+        sys_parts = [
+            m.get("content", "") for m in prompt
+            if isinstance(m, dict) and m.get("role") == "system"
+        ]
+        if sys_parts:
+            system = sys_parts[0]
+        prompt = " ".join(user_parts)
+
+    if not prompt:
+        raise ValueError("_call_groq: prompt नहीं मिला")
+
+    result = await brain._call_groq(str(prompt), system)
     if result is None:
         raise RuntimeError("Groq call failed")
     return result.text
 
 
-async def _call_gemini(prompt: str, system: str = None) -> str:
-    """Standalone Gemini call."""
+async def _call_gemini(*args, **kwargs) -> str:
     brain = get_brain()
-    if system is None:
-        system = HUMAN_SYSTEM_PROMPT
-    result = await brain._call_gemini(prompt, system)
+    prompt = None
+    if args:
+        prompt = args[0]
+    if prompt is None:
+        for k in ("prompt", "text", "query", "message", "content"):
+            if k in kwargs:
+                prompt = kwargs.pop(k)
+                break
+    system = kwargs.pop("system", None) or HUMAN_SYSTEM_PROMPT
+    if isinstance(prompt, list):
+        prompt = " ".join(
+            m.get("content", "") for m in prompt
+            if isinstance(m, dict) and m.get("role") in (None, "user")
+        )
+    if not prompt:
+        raise ValueError("_call_gemini: prompt नहीं मिला")
+    result = await brain._call_gemini(str(prompt), system)
     if result is None:
         raise RuntimeError("Gemini call failed")
     return result.text
 
 
-async def _call_cerebras(prompt: str, system: str = None) -> str:
-    """Standalone Cerebras call."""
+async def _call_cerebras(*args, **kwargs) -> str:
     brain = get_brain()
-    if system is None:
-        system = HUMAN_SYSTEM_PROMPT
-    result = await brain._call_cerebras(prompt, system)
+    prompt = None
+    if args:
+        prompt = args[0]
+    if prompt is None:
+        for k in ("prompt", "text", "query", "message", "content"):
+            if k in kwargs:
+                prompt = kwargs.pop(k)
+                break
+    system = kwargs.pop("system", None) or HUMAN_SYSTEM_PROMPT
+    if isinstance(prompt, list):
+        prompt = " ".join(
+            m.get("content", "") for m in prompt
+            if isinstance(m, dict) and m.get("role") in (None, "user")
+        )
+    if not prompt:
+        raise ValueError("_call_cerebras: prompt नहीं मिला")
+    result = await brain._call_cerebras(str(prompt), system)
     if result is None:
         raise RuntimeError("Cerebras call failed")
     return result.text
 
 
 # ═══════════════════════════════════════════════════════════════
-#  API ENDPOINTS
+#  WHISPER (voice → text)
+#  बंद करना हो तो Render में WHISPER_ENABLED=false सेट कर दो
+# ═══════════════════════════════════════════════════════════════
+
+WHISPER_ENABLED = os.getenv("WHISPER_ENABLED", "true").lower() == "true"
+_whisper_model = None
+
+
+def _get_whisper_model():
+    global _whisper_model
+    if not WHISPER_ENABLED:
+        return None
+    if _whisper_model is None:
+        try:
+            from faster_whisper import WhisperModel
+            model_size = os.getenv("WHISPER_MODEL_SIZE", "small")
+            logger.info(f"Loading Whisper ({model_size})...")
+            _whisper_model = WhisperModel(
+                model_size, device="cpu", compute_type="int8"
+            )
+            logger.info("Whisper loaded")
+        except Exception as e:
+            logger.error(f"Whisper load failed: {e}")
+            return None
+    return _whisper_model
+
+
+def _transcribe_sync(audio_bytes: bytes, suffix: str, language=None):
+    model = _get_whisper_model()
+    if model is None:
+        return None
+
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=True) as tmp:
+        tmp.write(audio_bytes)
+        tmp.flush()
+
+        segments, info = model.transcribe(
+            tmp.name,
+            language=language,
+            beam_size=5,
+            vad_filter=True,
+            vad_parameters=dict(min_silence_duration_ms=500),
+            initial_prompt=(
+                "Hindi, English, Hinglish. Indian accent. "
+                "Common words: kal, aaj, mandi, bhav, meeting, tomorrow, weather."
+            ),
+            condition_on_previous_text=False,
+        )
+        transcript = " ".join(seg.text.strip() for seg in segments)
+
+    return transcript, info.language, info.language_probability
+
+
+# ═══════════════════════════════════════════════════════════════
+#  TTS (text → voice)
+# ═══════════════════════════════════════════════════════════════
+
+def _tts_sync(text: str, lang: str) -> bytes:
+    from gtts import gTTS
+    import io
+    tts = gTTS(text=text, lang=lang, slow=False)
+    mp3_fp = io.BytesIO()
+    tts.write_to_fp(mp3_fp)
+    mp3_fp.seek(0)
+    return mp3_fp.read()
+
+
+# ═══════════════════════════════════════════════════════════════
+#  API ROUTES
 # ═══════════════════════════════════════════════════════════════
 
 @router.post("/api/chat")
@@ -571,17 +700,20 @@ async def ai_chat(request: Request):
     except Exception:
         return JSONResponse(
             status_code=400,
-            content={"status": "error", "response": "Bhai JSON body bhej."}
+            content={"status": "error", "response": "Bhai JSON body bhej."},
         )
 
-    prompt = data.get("prompt", "").strip()
+    prompt = (data.get("prompt") or "").strip()
     model = data.get("model", "auto")
     user_id = data.get("user_id", "anonymous")
 
     if not prompt:
         return {"status": "error", "response": "Bhai kuch toh likh pehle."}
 
-    personal_kw = ["password", "otp", "secret", "aadhar", "pan", "bank", "cvv", "pin", "upi"]
+    personal_kw = [
+        "password", "otp", "secret", "aadhar", "pan",
+        "bank", "cvv", "pin", "upi",
+    ]
     is_personal = any(kw in prompt.lower() for kw in personal_kw)
 
     cache_key = None
@@ -608,64 +740,30 @@ async def ai_chat(request: Request):
     return result
 
 
-# ---- WHISPER ----
-_whisper_model = None
-
-def _get_whisper_model():
-    global _whisper_model
-    if _whisper_model is None:
-        try:
-            from faster_whisper import WhisperModel
-            model_size = os.getenv("WHISPER_MODEL_SIZE", "small")
-            logger.info(f"Loading Whisper ({model_size})...")
-            _whisper_model = WhisperModel(model_size, device="cpu", compute_type="int8")
-            logger.info("Whisper loaded")
-        except Exception as e:
-            logger.error(f"Whisper load failed: {e}")
-            return None
-    return _whisper_model
-
-
-def _transcribe_sync(audio_bytes: bytes, suffix: str, language=None):
-    """Improved Whisper transcription with better accuracy for Hindi/Hinglish."""
-    model = _get_whisper_model()
-    if model is None:
-        return None
-    with tempfile.NamedTemporaryFile(suffix=suffix, delete=True) as tmp:
-        tmp.write(audio_bytes)
-        tmp.flush()
-
-        # Better settings for Indian accent + Hinglish
-        segments, info = model.transcribe(
-            tmp.name,
-            language=language,
-            beam_size=5,
-            vad_filter=True,
-            vad_parameters=dict(min_silence_duration_ms=500),
-            initial_prompt=(
-                "Hindi, English, Hinglish. Indian accent. "
-                "Common words: kal, aaj, mandi, bhav, meeting, tomorrow, weather."
-            ),
-            condition_on_previous_text=False,
-        )
-        transcript = " ".join(seg.text.strip() for seg in segments)
-
-    return transcript, info.language, info.language_probability
-
-
 @router.post("/api/whisper/transcribe")
 async def whisper_transcribe(request: Request):
+    if not WHISPER_ENABLED:
+        return {
+            "error": "Voice feature disabled",
+            "hint": "WHISPER_ENABLED=true करके चालू कर सकते हो",
+        }
+
     try:
         data = await request.json()
     except Exception:
         return JSONResponse(status_code=400, content={"error": "Invalid JSON"})
 
     audio_b64 = data.get("audio_base64", "")
-    language = data.get("language")
+    language = data.get("language")  # None = auto, या "hi", "en"
+
     if not audio_b64:
         return {"error": "audio_base64 required"}
     if _b64_too_big(audio_b64):
-        return JSONResponse(status_code=413, content={"error": "Audio too large (max 10MB)"})
+        return JSONResponse(
+            status_code=413,
+            content={"error": "Audio too large (max 10MB)"},
+        )
+
     try:
         audio_bytes = base64.b64decode(audio_b64)
         out = await run_in_threadpool(_transcribe_sync, audio_bytes, ".wav", language)
@@ -677,49 +775,11 @@ async def whisper_transcribe(request: Request):
             "transcript": transcript,
             "detected_language": detected_lang,
             "language_probability": round(lang_prob, 3),
-            "source": "WHISPER_LOCAL"
+            "source": "WHISPER_LOCAL",
         }
     except Exception as e:
         logger.error(f"Whisper error: {e}")
         return {"error": str(e)}
-
-# ═══════════════════════════════════════════════════════
-# Groq कॉल (पुराना नाम — helpers.py इसी को माँग रहा है)
-# ═══════════════════════════════════════════════════════
-async def _call_groq(prompt: str, model: str = "llama-3.3-70b-versatile", **kwargs):
-    import httpx
-    from core.config import GROQ_API_KEY
-
-    if not GROQ_API_KEY:
-        raise RuntimeError("GROQ_API_KEY missing")
-
-    # अगर prompt सिर्फ string है तो messages में बदल दो
-    if isinstance(prompt, str):
-        messages = [{"role": "user", "content": prompt}]
-    else:
-        messages = prompt
-
-    async with httpx.AsyncClient(timeout=60) as c:
-        r = await c.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {GROQ_API_KEY}",
-                "Content-Type": "application/json",
-            },
-            json={"model": model, "messages": messages, **kwargs},
-        )
-        r.raise_for_status()
-        data = r.json()
-        return data["choices"][0]["message"]["content"]
-# ---- TTS ----
-def _tts_sync(text: str, lang: str) -> bytes:
-    from gtts import gTTS
-    import io
-    tts = gTTS(text=text, lang=lang, slow=False)
-    mp3_fp = io.BytesIO()
-    tts.write_to_fp(mp3_fp)
-    mp3_fp.seek(0)
-    return mp3_fp.read()
 
 
 @router.post("/api/tts")
@@ -731,12 +791,19 @@ async def text_to_speech(request: Request):
 
     text = data.get("text", "")
     lang = data.get("lang", "hi")
+
     if not text:
         return {"error": "text required"}
+
     try:
         audio_bytes = await run_in_threadpool(_tts_sync, text, lang)
         audio_b64 = base64.b64encode(audio_bytes).decode("utf-8")
-        return {"status": "success", "audio_base64": audio_b64, "lang": lang, "source": "GTTS_LIVE"}
+        return {
+            "status": "success",
+            "audio_base64": audio_b64,
+            "lang": lang,
+            "source": "GTTS_LIVE",
+        }
     except Exception as e:
         logger.error(f"TTS error: {e}")
         return {"error": str(e)}
