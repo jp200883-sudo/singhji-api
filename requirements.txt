@@ -139,5 +139,5 @@ faster-whisper==1.2.1
 playwright==1.48.0
 opencv-python-headless==4.10.0.84
 
-# ─── SETUPTOOLS (razorpay के लिए ज़रूरी — pkg_resources) ───
-+ setuptools==81.0.0
+# ─── SETUPTOOLS (razorpay के pkg_resources के लिए ज़रूरी) ───
+setuptools==81.0.0
