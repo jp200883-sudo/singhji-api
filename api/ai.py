@@ -1,8 +1,8 @@
 # api/ai.py
 """
-Singh Ji AI Ultra — Multi-Model AI Brain v9.0
-Human-like responses, no emojis, no robotic tone.
-Uses Groq + Gemini + Cerebras + HuggingFace, picks the BEST response.
+Singh Ji AI Ultra — Multi-Model AI Brain v9.1
+Fix: Groq ने llama-3.3-70b-versatile हटा दिया (16 Aug 2026).
+अब model env से configurable + model_not_found पर automatic fallback।
 """
 
 import os
@@ -36,6 +36,31 @@ def set_http_client(client):
 
 
 # ═══════════════════════════════════════════════════════════════
+#  MODEL LISTS — env override possible, comma-separated
+#  Groq: llama-3.3-70b-versatile बंद (16 Aug 2026) → gpt-oss-120b primary
+#  Cerebras: qwen-3.8-27b live (Oct 2026)
+# ═══════════════════════════════════════════════════════════════
+
+def _model_list(env_name: str, default: str) -> List[str]:
+    raw = os.getenv(env_name, default)
+    return [m.strip() for m in raw.split(",") if m.strip()]
+
+
+GROQ_MODELS = _model_list(
+    "GROQ_MODEL",
+    "openai/gpt-oss-120b,qwen/qwen3.6-27b,qwen/qwen3-32b",
+)
+GEMINI_MODELS = _model_list(
+    "GEMINI_MODEL",
+    "gemini-2.5-flash,gemini-2.0-flash",
+)
+CEREBRAS_MODELS = _model_list(
+    "CEREBRAS_MODEL",
+    "qwen-3.8-27b,gpt-oss-120b,llama-4-scout-17b-16e-instruct",
+)
+
+
+# ═══════════════════════════════════════════════════════════════
 #  SYSTEM PROMPT — बिल्कुल इंसान, बिल्कुल देसी दोस्त
 # ═══════════════════════════════════════════════════════════════
 
@@ -60,16 +85,16 @@ RULES — Inhe todne pe penalty:
 
 EXAMPLES:
 - User: "Kya haal hai?"
-  Jawab: "Bas bhai chill hai. Tu bata kya chal raha hai?"
+  Jawab: "Bas bhai chill hai. app bataey kya chal raha hai?"
 
 - User: "Mera server crash ho gaya"
   Jawab: "Arre yaar, kya error aa raha hai? Logs check kiye? Bata main dekhun."
 
 - User: "AI kya hai?"
-  Jawab: "Bhai AI matlab aisa computer jo seekh sakta hai. Jaise tu phone pe face unlock karta hai, woh bhi AI hi hai."
+  Jawab: "Bhai AI matlab aisa computer jo seekh sakta hai. Jaise tum phone pe face unlock karta hai, woh bhi AI hi hai."
 
 - User: "Tum kaam nahi kar rahe"
-  Jawab: "Haan yaar thoda system slow chal raha hai. Dobara try kar, ab theek ho jayega."
+  Jawab: "Haan yaar thoda system slow chal raha hai. Dobara try karo, ab theek ho jayega."
 
 - User: "Mujhe gussa aa raha hai"
   Jawab: "Chhod na yaar, gussa se kuch nahi hoga. Thoda paani pi, fresh ho jaa."""
@@ -223,7 +248,9 @@ def clean_response(text: str) -> str:
 
 
 # ═══════════════════════════════════════════════════════════════
-#  MULTI-MODEL AI BRAIN
+#  MULTI-MODEL AI BRAIN v9.1
+#  - model env से configurable
+#  - model_not_found → अगले model पर automatic fallback
 # ═══════════════════════════════════════════════════════════════
 
 class MultiAIBrain:
@@ -233,115 +260,144 @@ class MultiAIBrain:
         self.timeout = 25
         self.max_total_time = 18
 
+    @staticmethod
+    def _is_model_gone(result: dict) -> bool:
+        """Response में model_not_found error है क्या?"""
+        err = result.get("error", {}) if isinstance(result, dict) else {}
+        code = str(err.get("code", ""))
+        msg = str(err.get("message", "")).lower()
+        return code == "model_not_found" or "does not exist" in msg or "not found" in msg
+
     async def _call_groq(self, prompt: str, system: str) -> Optional[ScoredResponse]:
         if not HTTP_CLIENT or not GROQ_API_KEY:
             return None
         start = time.time()
-        try:
-            resp = await HTTP_CLIENT.post(
-                "https://api.groq.com/openai/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {GROQ_API_KEY}",
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "model": "llama-3.3-70b-versatile",
-                    "messages": [
-                        {"role": "system", "content": system},
-                        {"role": "user", "content": prompt},
-                    ],
-                    "temperature": 0.75,
-                    "max_tokens": 400,
-                    "top_p": 0.92,
-                    "frequency_penalty": 0.3,
-                    "presence_penalty": 0.2,
-                },
-                timeout=self.timeout,
-            )
-            result = resp.json()
-            if "choices" not in result:
-                logger.warning(f"Groq error: {result}")
-                return None
-            text = clean_response(result["choices"][0]["message"]["content"])
-            latency = time.time() - start
-            human_score = ResponseJudge.score(text, latency)
-            return ScoredResponse("groq", text, latency, human_score=human_score)
-        except Exception as e:
-            logger.warning(f"Groq failed: {e}")
-            return None
+        last_err = ""
+        for model in GROQ_MODELS:
+            try:
+                resp = await HTTP_CLIENT.post(
+                    "https://api.groq.com/openai/v1/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {GROQ_API_KEY}",
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "model": model,
+                        "messages": [
+                            {"role": "system", "content": system},
+                            {"role": "user", "content": prompt},
+                        ],
+                        "temperature": 0.75,
+                        "top_p": 0.92,
+                        "max_completion_tokens": 400,
+                    },
+                    timeout=self.timeout,
+                )
+                result = resp.json()
+                if "choices" not in result:
+                    last_err = str(result)[:150]
+                    if self._is_model_gone(result):
+                        logger.warning(f"Groq model {model} गायब, अगले पर जा रहा हूँ")
+                        continue
+                    logger.warning(f"Groq error ({model}): {last_err}")
+                    break
+                text = clean_response(result["choices"][0]["message"]["content"])
+                latency = time.time() - start
+                human_score = ResponseJudge.score(text, latency)
+                return ScoredResponse(f"groq/{model}", text, latency, human_score=human_score)
+            except Exception as e:
+                logger.warning(f"Groq ({model}) failed: {e}")
+                break
+        return None
 
     async def _call_gemini(self, prompt: str, system: str) -> Optional[ScoredResponse]:
         if not HTTP_CLIENT or not GEMINI_API_KEY:
             return None
         start = time.time()
-        try:
-            url = (
-                f"https://generativelanguage.googleapis.com/v1beta/"
-                f"models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
-            )
-            resp = await HTTP_CLIENT.post(
-                url,
-                json={
-                    "contents": [{
-                        "parts": [{
-                            "text": (
-                                f"{system}\n\nUser ne bola: {prompt}\n\n"
-                                f"Jawab do bilkul natural Hinglish mein. "
-                                f"Koi emoji mat daal. 2-4 lines mein jawab do."
-                            )
-                        }]
-                    }],
-                    "generationConfig": {
-                        "temperature": 0.75,
-                        "maxOutputTokens": 400,
-                        "topP": 0.92,
+        for model in GEMINI_MODELS:
+            try:
+                url = (
+                    f"https://generativelanguage.googleapis.com/v1beta/"
+                    f"models/{model}:generateContent?key={GEMINI_API_KEY}"
+                )
+                resp = await HTTP_CLIENT.post(
+                    url,
+                    json={
+                        "contents": [{
+                            "parts": [{
+                                "text": (
+                                    f"{system}\n\nUser ne bola: {prompt}\n\n"
+                                    f"Jawab do bilkul natural Hinglish mein. "
+                                    f"Koi emoji mat daal. 2-4 lines mein jawab do."
+                                )
+                            }]
+                        }],
+                        "generationConfig": {
+                            "temperature": 0.75,
+                            "maxOutputTokens": 400,
+                            "topP": 0.92,
+                        },
                     },
-                },
-                timeout=self.timeout,
-            )
-            result = resp.json()
-            text = result["candidates"][0]["content"]["parts"][0]["text"]
-            text = clean_response(text)
-            latency = time.time() - start
-            human_score = ResponseJudge.score(text, latency)
-            return ScoredResponse("gemini", text, latency, human_score=human_score)
-        except Exception as e:
-            logger.warning(f"Gemini failed: {e}")
-            return None
+                    timeout=self.timeout,
+                )
+                result = resp.json()
+                if "candidates" not in result:
+                    logger.warning(f"Gemini error ({model}): {str(result)[:150]}")
+                    if self._is_model_gone(result):
+                        continue
+                    break
+                text = result["candidates"][0]["content"]["parts"][0]["text"]
+                text = clean_response(text)
+                latency = time.time() - start
+                human_score = ResponseJudge.score(text, latency)
+                return ScoredResponse(f"gemini/{model}", text, latency, human_score=human_score)
+            except Exception as e:
+                logger.warning(f"Gemini ({model}) failed: {e}")
+                break
+        return None
 
     async def _call_cerebras(self, prompt: str, system: str) -> Optional[ScoredResponse]:
         if not HTTP_CLIENT or not CEREBRAS_API_KEY:
             return None
         start = time.time()
-        try:
-            resp = await HTTP_CLIENT.post(
-                "https://api.cerebras.ai/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {CEREBRAS_API_KEY}",
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "model": "llama-3.1-70b",
+        for model in CEREBRAS_MODELS:
+            try:
+                payload = {
+                    "model": model,
                     "messages": [
                         {"role": "system", "content": system},
                         {"role": "user", "content": prompt},
                     ],
                     "temperature": 0.75,
-                    "max_tokens": 400,
                     "top_p": 0.92,
-                },
-                timeout=self.timeout,
-            )
-            result = resp.json()
-            if "choices" not in result:
-                return None
-            text = clean_response(result["choices"][0]["message"]["content"])
-            latency = time.time() - start
-            human_score = ResponseJudge.score(text, latency)
-            return ScoredResponse("cerebras", text, latency, human_score=human_score)
-        except Exception as e:
-            logger.warning(f"Cerebras failed: {e}")
-            return None
+                    "max_completion_tokens": 400,
+                }
+                # qwen-3.8 reasoning default high = बहुत slow; low पर रखो
+                if model.startswith("qwen-3.8"):
+                    payload["reasoning_effort"] = "low"
+                resp = await HTTP_CLIENT.post(
+                    "https://api.cerebras.ai/v1/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {CEREBRAS_API_KEY}",
+                        "Content-Type": "application/json",
+                    },
+                    json=payload,
+                    timeout=self.timeout,
+                )
+                result = resp.json()
+                if "choices" not in result:
+                    logger.warning(f"Cerebras error ({model}): {str(result)[:150]}")
+                    if self._is_model_gone(result):
+                        continue
+                    break
+                text = clean_response(result["choices"][0]["message"]["content"])
+                latency = time.time() - start
+                human_score = ResponseJudge.score(text, latency)
+                return ScoredResponse(f"cerebras/{model}", text, latency, human_score=human_score)
+            except Exception as e:
+                logger.warning(f"Cerebras ({model}) failed: {e}")
+                break
+        return None
 
     async def _call_huggingface(self, prompt: str, system: str) -> Optional[ScoredResponse]:
         hf_key = os.getenv("HUGGINGFACE_API_KEY", "") or os.getenv("HUGGINGFACE_TOKEN", "")
@@ -529,28 +585,15 @@ async def ask(prompt: str, user_id: str = "anonymous") -> str:
     return result.get("response", "Bhai kuch gadbad ho gayi.")
 
 
-async def _call_groq(*args, **kwargs) -> str:
-    """
-    लचीला Groq wrapper — helpers.py के पुराने कॉल के लिए।
-    prompt (str) या messages (list) — दोनों चलेंगे।
-    """
-    brain = get_brain()
-
-    # args से prompt निकालो
-    prompt = None
-    if args:
-        prompt = args[0]
-
-    # kwargs से भी देखो
+def _extract_prompt(args, kwargs):
+    """helpers.py के पुराने कॉल से prompt निकालो।"""
+    prompt = args[0] if args else None
     if prompt is None:
         for k in ("prompt", "text", "query", "message", "content"):
             if k in kwargs:
                 prompt = kwargs.pop(k)
                 break
-
     system = kwargs.pop("system", None) or HUMAN_SYSTEM_PROMPT
-
-    # अगर messages list है तो system वाला हटाकर user content निकालो
     if isinstance(prompt, list):
         user_parts = [
             m.get("content", "") for m in prompt
@@ -563,10 +606,14 @@ async def _call_groq(*args, **kwargs) -> str:
         if sys_parts:
             system = sys_parts[0]
         prompt = " ".join(user_parts)
+    return prompt, system
 
+
+async def _call_groq(*args, **kwargs) -> str:
+    brain = get_brain()
+    prompt, system = _extract_prompt(args, kwargs)
     if not prompt:
         raise ValueError("_call_groq: prompt नहीं मिला")
-
     result = await brain._call_groq(str(prompt), system)
     if result is None:
         raise RuntimeError("Groq call failed")
@@ -575,20 +622,7 @@ async def _call_groq(*args, **kwargs) -> str:
 
 async def _call_gemini(*args, **kwargs) -> str:
     brain = get_brain()
-    prompt = None
-    if args:
-        prompt = args[0]
-    if prompt is None:
-        for k in ("prompt", "text", "query", "message", "content"):
-            if k in kwargs:
-                prompt = kwargs.pop(k)
-                break
-    system = kwargs.pop("system", None) or HUMAN_SYSTEM_PROMPT
-    if isinstance(prompt, list):
-        prompt = " ".join(
-            m.get("content", "") for m in prompt
-            if isinstance(m, dict) and m.get("role") in (None, "user")
-        )
+    prompt, system = _extract_prompt(args, kwargs)
     if not prompt:
         raise ValueError("_call_gemini: prompt नहीं मिला")
     result = await brain._call_gemini(str(prompt), system)
@@ -599,20 +633,7 @@ async def _call_gemini(*args, **kwargs) -> str:
 
 async def _call_cerebras(*args, **kwargs) -> str:
     brain = get_brain()
-    prompt = None
-    if args:
-        prompt = args[0]
-    if prompt is None:
-        for k in ("prompt", "text", "query", "message", "content"):
-            if k in kwargs:
-                prompt = kwargs.pop(k)
-                break
-    system = kwargs.pop("system", None) or HUMAN_SYSTEM_PROMPT
-    if isinstance(prompt, list):
-        prompt = " ".join(
-            m.get("content", "") for m in prompt
-            if isinstance(m, dict) and m.get("role") in (None, "user")
-        )
+    prompt, system = _extract_prompt(args, kwargs)
     if not prompt:
         raise ValueError("_call_cerebras: prompt नहीं मिला")
     result = await brain._call_cerebras(str(prompt), system)
