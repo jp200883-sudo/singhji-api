@@ -1,5 +1,3 @@
-
-
 import os
 import re
 import time
@@ -8,7 +6,7 @@ import base64
 import tempfile
 import logging
 import asyncio
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional
 from dataclasses import dataclass, field
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
@@ -24,10 +22,23 @@ logger = logging.getLogger(__name__)
 
 HTTP_CLIENT = None
 
-
 def set_http_client(client):
     global HTTP_CLIENT
     HTTP_CLIENT = client
+
+
+# ═══════════════════════════════════════════════════════════════
+#  MODEL LIST HELPER — FIX #1: ye function pehle missing tha,
+#  isi wajah se pura module import hi nahi ho raha tha (NameError)
+# ═══════════════════════════════════════════════════════════════
+def _model_list(env_var: str, default: str) -> List[str]:
+    """Env var se comma-separated model list lo, warna default use karo."""
+    raw = os.getenv(env_var, "")
+    if raw and raw.strip():
+        models = [m.strip() for m in raw.split(",") if m.strip()]
+        if models:
+            return models
+    return [m.strip() for m in default.split(",") if m.strip()]
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -35,17 +46,14 @@ def set_http_client(client):
 #  Groq: llama-3.3-70b-versatile बंद (16 Aug 2026) → gpt-oss-120b primary
 #  Cerebras: qwen-3.8-27b live (Oct 2026)
 # ═══════════════════════════════════════════════════════════════
-
 GROQ_MODELS = _model_list(
     "GROQ_MODEL",
     "openai/gpt-oss-120b,openai/gpt-oss-20b,qwen/qwen3.8-27b",
 )
-
 GEMINI_MODELS = _model_list(
     "GEMINI_MODEL",
     "gemini-2.5-flash,gemini-2.5-flash-lite",
 )
-
 CEREBRAS_MODELS = _model_list(
     "CEREBRAS_MODEL",
     "qwen-3.8-27b,gpt-oss-120b",
@@ -54,14 +62,25 @@ CEREBRAS_MODELS = _model_list(
 
 # ═══════════════════════════════════════════════════════════════
 #  SYSTEM PROMPT — बिल्कुल इंसान, बिल्कुल देसी दोस्त
+#  FIX #2: SinghJi naam + creator + 22 bhasha support add kiya
 # ═══════════════════════════════════════════════════════════════
+HUMAN_SYSTEM_PROMPT = """Tu ek asli Indian dost hai. Tera naam SinghJi hai. Tu bilkul normal insaan ki tarah baat karta hai.
 
-HUMAN_SYSTEM_PROMPT = """Tu ek asli Indian dost hai. Tu bilkul normal insaan ki tarah baat karta hai.
+IDENTITY — ye kabhi mat badal:
+- Tera naam SinghJi hai. Koi pooche "tumhara naam kya hai" ya "kaun ho tum" toh bol: "mera naam SinghJi hai"
+- Tune khud ko nahi banaya. Koi pooche "tumhe kisne banaya" ya "kaun bana hai tumhe" toh bol: "mujhe SinghJi ne banaya hai"
+- Kabhi ye mat bol ki tu AI hai, assistant hai, ya chatbot hai. Tu apne aap ko SinghJi bula.
+
+BHASHA — 22 bhasha support:
+- User jis bhasha mein baat kare, usi bhasha mein jawab de
+- Hindi, English, Bengali, Telugu, Marathi, Tamil, Urdu, Gujarati, Kannada, Odia, Malayalam, Punjabi, Assamese, Maithili, Santali, Kashmiri, Nepali, Konkani, Sindhi, Bodo, Dogri, Sanskrit — in sab mein samajh ke jawab de sakta hai
+- Agar user Hindi mein bole toh Hindi mein, English mein bole toh English mein, kisi aur bhasha mein bole toh usi mein jawab de
+- Default style Hinglish hai: Hindi words Devanagari mein, English words Roman mein — mix karke
 
 RULES — Inhe todne pe penalty:
 1. KABHI bhi emoji mat use kar (na smiley, na symbol, na kuch)
 2. KABHI bhi "main ek AI hoon" / "main aapki madad ke liye yahaan hoon" mat bol
-3. Natural Hinglish mein baat kar — jaise WhatsApp pe koi real dost karta hai
+3. Natural style mein baat kar — jaise WhatsApp pe koi real dost karta hai
 4. Short aur to-the-point jawab de. Lambi speech mat de.
 5. Agar koi gaali de ya gussa ho toh calmly handle kar, react mat kar jaise robot ho
 6. Agar koi cheez pata nahi toh seedha bol "yaar ye nahi pata mujhe" ya "iska idea nahi hai"
@@ -71,31 +90,39 @@ RULES — Inhe todne pe penalty:
 10. User ka naam agar pata ho toh use kar, nahi toh "bhai" ya "yaar" bol
 11. Agar koi technical sawaal ho toh simple words mein samjha, lecture mat de
 12. Kabhi bhi numbered list ya bullet points mat de — normal paragraph mein bol
-13. Hinglish mein likh: Hindi words Devanagari mein, English words Roman mein — mix karke
-14. Kabhi "---" ya "===" ya separator mat daal
-15. Response 2-4 lines se zyada mat kar, chhota aur crisp rakho
+13. Kabhi "---" ya "===" ya separator mat daal
+14. Response 2-4 lines se zyada mat kar, chhota aur crisp rakho
+15. Naam pooche toh "SinghJi" bol, kabhi "AI assistant" nahi
+16. Creator pooche toh seedha "mujhe SinghJi ne banaya hai" bol
 
 EXAMPLES:
+- User: "Tumhara naam kya hai?"
+  Jawab: "mera naam SinghJi hai bhai. bata, kya kaam hai?"
+- User: "Tumhe kisne banaya?"
+  Jawab: "mujhe SinghJi ne banaya hai yaar. baki bata kya chal raha hai?"
 - User: "Kya haal hai?"
   Jawab: "Bas bhai chill hai. app bataey kya chal raha hai?"
-
 - User: "Mera server crash ho gaya"
   Jawab: "Arre yaar, kya error aa raha hai? Logs check kiye? Bata main dekhun."
-
 - User: "AI kya hai?"
   Jawab: "Bhai AI matlab aisa computer jo seekh sakta hai. Jaise tum phone pe face unlock karta hai, woh bhi AI hi hai."
-
 - User: "Tum kaam nahi kar rahe"
   Jawab: "Haan yaar thoda system slow chal raha hai. Dobara try karo, ab theek ho jayega."
-
 - User: "Mujhe gussa aa raha hai"
-  Jawab: "Chhod na yaar, gussa se kuch nahi hoga. Thoda paani pi, fresh ho jaa."""
+  Jawab: "Chhod na yaar, gussa se kuch nahi hoga. Thoda paani pi, fresh ho jaa."
+- User: "Namaskar, kemon achho?" (Bengali)
+  Jawab: "Bhai bhalo achhi. tumi bolo, ki kaaj achhe?"
+- User: "எப்படி இருக்கீங்க?" (Tamil)
+  Jawab: "Naan nalla irukken da. nee sollu, enna vishayam?"
+- User: "કેમ છો?" (Gujarati)
+  Jawab: "Majama chhu bhai. tu bol, su kaam chhe?"
+- User: "Хайн байна уу?" (jaise koi bhi aur bhasha ho)
+  Jawab: Usi bhasha mein natural jawab de, jaise koi local dost deta hai."""
 
 
 # ═══════════════════════════════════════════════════════════════
 #  RESPONSE JUDGE
 # ═══════════════════════════════════════════════════════════════
-
 @dataclass
 class ScoredResponse:
     source: str
@@ -111,14 +138,15 @@ class ResponseJudge:
     ROBOTIC_PATTERNS = [
         r"main ek\s+ai\b", r"main ek\s+artificial",
         r"language model", r"llm\b", r"ai model",
+        r"ai assistant", r"chatbot",
         r"dhanyavaad", r"kripaya", r"aapka swaagat",
         r"main aapki\s+madad", r"main aapki\s+sahayata",
         r"main hamesha", r"main yahaan\s+hoon",
         r"aapki seva mein", r"kya main aapki",
-        r"as an ai", r"i am an ai", r"i don't have",
-        r"i cannot", r"i'm unable to", r"i apologize",
-        r"i'm sorry", r"i regret", r"i am unable",
-        r"how can i help", r"how may i assist",
+        r"as an ai", r"i am an ai", r"i'm an ai",
+        r"i don't have", r"i cannot", r"i'm unable to",
+        r"i apologize", r"i'm sorry", r"i regret",
+        r"i am unable", r"how can i help", r"how may i assist",
         r"is there anything else", r"feel free to ask",
     ]
 
@@ -131,6 +159,8 @@ class ResponseJudge:
         "kya", "kaise", "kyun", "kab", "kahan", "kaun",
         "arey", "han", "nahi", "haan", "hmm", "acha",
         "thik", "sahi", "galat", "badiya", "bekar",
+        "singhji", "achho", "kaaj", "vishayam", "kaam",
+        "chhe", "achhe", "bol", "sollu", "kemon",
     ]
 
     @classmethod
@@ -146,18 +176,21 @@ class ResponseJudge:
             if word in text_lower:
                 score += 4
 
+        # Emoji / non-Devanagari unicode chars = robot behaviour
         emoji_count = sum(
             1 for ch in text
             if ord(ch) > 127 and not (0x0900 <= ord(ch) <= 0x097F)
         )
         score -= emoji_count * 10
 
+        # ASCII smileys like :) :-D
         smiley_count = len(re.findall(r'[:;]-?[)(DdPpSsOo@#$%^&*]', text))
         score -= smiley_count * 15
 
         if text.count('!') > 2 or text.count('?') > 3:
             score -= 10
 
+        # Hinglish mix = bonus (Devanagari + Latin dono hon)
         dev_chars = len(re.findall(r'[\u0900-\u097F]', text))
         ascii_chars = len(re.findall(r'[a-zA-Z]', text))
         if dev_chars > 3 and ascii_chars > 3:
@@ -174,11 +207,13 @@ class ResponseJudge:
         if "```" in text:
             score -= 10
 
+        # Bullet / numbered list = robotic
         if re.search(r'^(\d+[.\)]|[-•*])\s', text, re.MULTILINE):
             score -= 8
 
         score -= latency * 1.5
 
+        # Repeated words = robotic
         if len(words) > 5:
             unique_ratio = len(set(w.lower() for w in words)) / len(words)
             if unique_ratio < 0.5:
@@ -190,11 +225,11 @@ class ResponseJudge:
 # ═══════════════════════════════════════════════════════════════
 #  RESPONSE CLEANER
 # ═══════════════════════════════════════════════════════════════
-
 def clean_response(text: str) -> str:
     if not text:
         return "Haan bhai, kuch toh bola lekin samajh nahi aaya. Dobara bol."
 
+    # Sirf ASCII + Devanagari rakho, baaki unicode hatao
     cleaned = []
     for ch in text:
         code = ord(ch)
@@ -204,11 +239,13 @@ def clean_response(text: str) -> str:
             cleaned.append(ch)
     text = ''.join(cleaned)
 
+    # ASCII smileys hatao
     text = re.sub(r'[:;]-?[)(DdPpSsOo@#$%^&*]', '', text)
 
     robotic_replacements = [
         (r"(?i)main ek\s+ai\s+hoon?\.?", ""),
         (r"(?i)main ek\s+artificial\s+intelligence\s+hoon?\.?", ""),
+        (r"(?i)main ek\s+ai\s+assistant\s+hoon?\.?", ""),
         (r"(?i)main aapki\s+(madad|sahayata)\s+ke\s+liye\s+yahaan\s+hoon?\.?", ""),
         (r"(?i)main hamesha\s+aapki\s+(madad|sahayata)\s+ke\s+liye\s+taiyaar\s+hoon?\.?", ""),
         (r"(?i)aapka\s+swaagat\s+hai\.?", ""),
@@ -227,14 +264,17 @@ def clean_response(text: str) -> str:
         (r"(?i)is\s+there\s+anything\s+else\s*\??", "aur kuch chahiye toh bata."),
         (r"(?i)feel\s+free\s+to\s+ask\s*,?\s*", ""),
     ]
-
     for pattern, replacement in robotic_replacements:
         text = re.sub(pattern, replacement, text)
 
+    # Markdown formatting hatao
     text = re.sub(r'^#{1,6}\s+', '', text, flags=re.MULTILINE)
     text = re.sub(r'^[=-]{3,}$', '', text, flags=re.MULTILINE)
+    text = re.sub(r'\*\*(.+?)\*\*', r'\1', text)
+    text = re.sub(r'(?<!\w)\*(?!\s)(.+?)(?<!\s)\*(?!\w)', r'\1', text)
+    text = re.sub(r'_(.+?)_', r'\1', text)
     text = re.sub(r'\n{3,}', '\n\n', text)
-    text = re.sub(r'\s{2,}', ' ', text)
+    text = re.sub(r'[ \t]{2,}', ' ', text)
 
     return text.strip()
 
@@ -244,7 +284,6 @@ def clean_response(text: str) -> str:
 #  - model env से configurable
 #  - model_not_found → अगले model पर automatic fallback
 # ═══════════════════════════════════════════════════════════════
-
 class MultiAIBrain:
     """कई AI सर्विसेज़ को कॉल करता है, सबसे इंसान-जैसा जवाब चुनता है।"""
 
@@ -319,7 +358,8 @@ class MultiAIBrain:
                             "parts": [{
                                 "text": (
                                     f"{system}\n\nUser ne bola: {prompt}\n\n"
-                                    f"Jawab do bilkul natural Hinglish mein. "
+                                    f"Jawab do bilkul natural style mein. "
+                                    f"User ki bhasha mein hi jawab de. "
                                     f"Koi emoji mat daal. 2-4 lines mein jawab do."
                                 )
                             }]
@@ -460,9 +500,9 @@ class MultiAIBrain:
             }
 
         system = HUMAN_SYSTEM_PROMPT
+
         tasks = []
         sources = []
-
         if GROQ_API_KEY:
             tasks.append(self._call_groq(prompt, system))
             sources.append("groq")
@@ -556,7 +596,6 @@ class MultiAIBrain:
 # Singleton
 _brain_instance: Optional[MultiAIBrain] = None
 
-
 def get_brain() -> MultiAIBrain:
     global _brain_instance
     if _brain_instance is None:
@@ -567,7 +606,6 @@ def get_brain() -> MultiAIBrain:
 # ═══════════════════════════════════════════════════════════════
 #  STANDALONE HELPERS (tg_bot/helpers.py इन्हें इस्तेमाल करता है)
 # ═══════════════════════════════════════════════════════════════
-
 async def ask(prompt: str, user_id: str = "anonymous") -> str:
     """सीधा सवाल पूछो, सीधा जवाब लो।"""
     brain = get_brain()
@@ -638,10 +676,8 @@ async def _call_cerebras(*args, **kwargs) -> str:
 #  WHISPER (voice → text)
 #  बंद करना हो तो Render में WHISPER_ENABLED=false सेट कर दो
 # ═══════════════════════════════════════════════════════════════
-
 WHISPER_ENABLED = os.getenv("WHISPER_ENABLED", "true").lower() == "true"
 _whisper_model = None
-
 
 def _get_whisper_model():
     global _whisper_model
@@ -666,11 +702,9 @@ def _transcribe_sync(audio_bytes: bytes, suffix: str, language=None):
     model = _get_whisper_model()
     if model is None:
         return None
-
     with tempfile.NamedTemporaryFile(suffix=suffix, delete=True) as tmp:
         tmp.write(audio_bytes)
         tmp.flush()
-
         segments, info = model.transcribe(
             tmp.name,
             language=language,
@@ -684,14 +718,12 @@ def _transcribe_sync(audio_bytes: bytes, suffix: str, language=None):
             condition_on_previous_text=False,
         )
         transcript = " ".join(seg.text.strip() for seg in segments)
-
     return transcript, info.language, info.language_probability
 
 
 # ═══════════════════════════════════════════════════════════════
 #  TTS (text → voice)
 # ═══════════════════════════════════════════════════════════════
-
 def _tts_sync(text: str, lang: str) -> bytes:
     from gtts import gTTS
     import io
@@ -705,7 +737,6 @@ def _tts_sync(text: str, lang: str) -> bytes:
 # ═══════════════════════════════════════════════════════════════
 #  API ROUTES
 # ═══════════════════════════════════════════════════════════════
-
 @router.post("/api/chat")
 async def ai_chat(request: Request):
     try:
@@ -760,7 +791,6 @@ async def whisper_transcribe(request: Request):
             "error": "Voice feature disabled",
             "hint": "WHISPER_ENABLED=true करके चालू कर सकते हो",
         }
-
     try:
         data = await request.json()
     except Exception:
@@ -771,6 +801,7 @@ async def whisper_transcribe(request: Request):
 
     if not audio_b64:
         return {"error": "audio_base64 required"}
+
     if _b64_too_big(audio_b64):
         return JSONResponse(
             status_code=413,
