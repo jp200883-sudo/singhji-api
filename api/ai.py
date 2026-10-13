@@ -1,9 +1,4 @@
-# api/ai.py
-"""
-Singh Ji AI Ultra — Multi-Model AI Brain v9.1
-Fix: Groq ने llama-3.3-70b-versatile हटा दिया (16 Aug 2026).
-अब model env से configurable + model_not_found पर automatic fallback।
-"""
+
 
 import os
 import re
@@ -41,22 +36,19 @@ def set_http_client(client):
 #  Cerebras: qwen-3.8-27b live (Oct 2026)
 # ═══════════════════════════════════════════════════════════════
 
-def _model_list(env_name: str, default: str) -> List[str]:
-    raw = os.getenv(env_name, default)
-    return [m.strip() for m in raw.split(",") if m.strip()]
-
-
 GROQ_MODELS = _model_list(
     "GROQ_MODEL",
-    "openai/gpt-oss-120b,qwen/qwen3.6-27b,qwen/qwen3-32b",
+    "openai/gpt-oss-120b,openai/gpt-oss-20b,qwen/qwen3.8-27b",
 )
+
 GEMINI_MODELS = _model_list(
     "GEMINI_MODEL",
-    "gemini-2.5-flash,gemini-2.0-flash",
+    "gemini-2.5-flash,gemini-2.5-flash-lite",
 )
+
 CEREBRAS_MODELS = _model_list(
     "CEREBRAS_MODEL",
-    "qwen-3.8-27b,gpt-oss-120b,llama-4-scout-17b-16e-instruct",
+    "qwen-3.8-27b,gpt-oss-120b",
 )
 
 
